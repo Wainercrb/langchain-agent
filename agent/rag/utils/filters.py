@@ -1,10 +1,11 @@
 """Filtering utilities for search results."""
 
-import logging
 from datetime import datetime
 from typing import Any, Dict, Generator, List
 
-logger = logging.getLogger(__name__)
+from services.logging import Console
+
+logger = Console()
 
 
 

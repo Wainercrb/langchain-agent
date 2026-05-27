@@ -1,4 +1,4 @@
-"""Custom exception hierarchy for RAG system."""
+"""Exception hierarchy and error helpers for the RAG system."""
 
 from typing import Any, Dict, Optional
 

@@ -4,7 +4,7 @@ from typing import List
 
 from config import settings
 from services.embeddings.base import Embeddings
-from rag.utils import RateLimiter
+from utils import RateLimiter
 from utils.exceptions import EmbeddingError
 from services.logging import Console
 

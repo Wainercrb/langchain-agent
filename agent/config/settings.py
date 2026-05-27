@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     # ── Supabase / pgvector ──────────────────────────────────────────
     supabase_url: str = Field(..., alias="SUPABASE_URL")
     supabase_key: str = Field(..., alias="SUPABASE_KEY")
-    supabase_direct_url: Optional[str] = Field(default=None, alias="SUPABASE_DIRECT_URL")
+    supabase_direct_url: str = Field(..., alias="SUPABASE_DIRECT_URL")
 
     # ── Scheduling ───────────────────────────────────────────────────
     cron_interval_minutes: int = Field(default=5, alias="CRON_INTERVAL_MINUTES")

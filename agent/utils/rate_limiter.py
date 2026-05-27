@@ -1,11 +1,7 @@
-"""Rate limiting for API quotas."""
+"""Rate limiting for API quotas — utility, no RAG dependency."""
 
-import logging
 import time
 from collections import deque
-
-logger = logging.getLogger(__name__)
-
 
 
 class RateLimiter:
@@ -20,6 +16,9 @@ class RateLimiter:
 
     def wait_if_needed(self):
         """Check quota and wait if necessary to stay within rate limit."""
+        from services.logging import Console  # lazy: evita circular import
+
+        logger = Console()
         current_time = time.time()
 
         # Remove timestamps older than 60 seconds

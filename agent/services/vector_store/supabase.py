@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from services.vector_store.base import VectorStoreBase
-from rag.utils import raise_document_store_error
 from utils.exceptions import DocumentStoreError
 from services.logging import Console
 
@@ -46,7 +45,7 @@ class VectorStore(VectorStoreBase):
             logger.info(f"Inserted document: {filename} (id={doc_id})")
             return doc_id
         except Exception as e:
-            raise_document_store_error(
+            raise DocumentStoreError(
                 message=f"Failed to insert document {filename}: {str(e)}",
                 error_code="DOCUMENT_INSERT_ERROR",
                 details={"filename": filename},
@@ -71,7 +70,7 @@ class VectorStore(VectorStoreBase):
             logger.info(f"Inserted {len(chunk_records)} chunks for document {document_id}")
             return len(chunk_records)
         except Exception as e:
-            raise_document_store_error(
+            raise DocumentStoreError(
                 message=f"Failed to insert chunks: {str(e)}",
                 error_code="CHUNKS_INSERT_ERROR",
                 details={"document_id": document_id, "chunk_count": len(chunks)},
@@ -136,7 +135,7 @@ class VectorStore(VectorStoreBase):
             )
             return results
         except Exception as e:
-            raise_document_store_error(
+            raise DocumentStoreError(
                 message=f"Failed to search similar chunks: {str(e)}",
                 error_code="SEARCH_ERROR",
             )
@@ -170,7 +169,7 @@ class VectorStore(VectorStoreBase):
 
             logger.info(f"Logged ingestion: {filename} ({status}, {chunk_count} chunks)")
         except Exception as e:
-            raise_document_store_error(
+            raise DocumentStoreError(
                 message=f"Failed to log ingestion: {str(e)}",
                 error_code="INGESTION_LOG_ERROR",
             )
