@@ -4,9 +4,11 @@ Tests the full API stack including FastAPI, routes, models, and dependencies.
 Uses TestClient for synchronous testing.
 """
 
+from datetime import datetime
+
 import pytest
 from fastapi.testclient import TestClient
-from datetime import datetime
+
 from main import app
 
 
@@ -129,15 +131,11 @@ def test_chat_endpoint_top_k_too_high(client):
 
 def test_chat_endpoint_temperature_out_of_range(client):
     """Test POST /v1/chat returns 422 when temperature outside 0.0-1.0."""
-    response = client.post(
-        "/v1/chat", json={"query": "test", "temperature": 1.5}
-    )
+    response = client.post("/v1/chat", json={"query": "test", "temperature": 1.5})
 
     assert response.status_code == 422
 
-    response = client.post(
-        "/v1/chat", json={"query": "test", "temperature": -0.1}
-    )
+    response = client.post("/v1/chat", json={"query": "test", "temperature": -0.1})
 
     assert response.status_code == 422
 
@@ -152,14 +150,10 @@ def test_chat_endpoint_default_parameters(client):
 
 def test_chat_endpoint_temperature_bounds(client):
     """Test POST /v1/chat accepts temperature at boundaries."""
-    response = client.post(
-        "/v1/chat", json={"query": "test", "temperature": 0.0}
-    )
+    response = client.post("/v1/chat", json={"query": "test", "temperature": 0.0})
     assert response.status_code == 200
 
-    response = client.post(
-        "/v1/chat", json={"query": "test", "temperature": 1.0}
-    )
+    response = client.post("/v1/chat", json={"query": "test", "temperature": 1.0})
     assert response.status_code == 200
 
 

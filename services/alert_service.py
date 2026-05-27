@@ -1,7 +1,7 @@
 """Alert service for success/failure notifications."""
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -14,13 +14,6 @@ class AlertService:
         discord_webhook_url: Optional[str] = None,
         alert_email: Optional[str] = None,
     ):
-        """
-        Initialize alert service.
-
-        Args:
-            discord_webhook_url: Discord webhook URL (optional)
-            alert_email: Email address for alerts (optional)
-        """
         self.discord_webhook_url = discord_webhook_url
         self.alert_email = alert_email
         logger.info(
@@ -34,15 +27,6 @@ class AlertService:
         document_id: str,
         version_date: str,
     ) -> None:
-        """
-        Send success alert for ingested document.
-
-        Args:
-            filename: Document filename
-            chunk_count: Number of chunks created
-            document_id: Supabase document ID
-            version_date: Version date used
-        """
         message = (
             f"✅ Successfully ingested: {filename}\n"
             f"   Chunks: {chunk_count}\n"
@@ -54,7 +38,7 @@ class AlertService:
         self._send_console_alert(message, level="INFO")
 
         if self.discord_webhook_url:
-            self._send_discord_alert(message, color=3066993)  # Green
+            self._send_discord_alert(message, color=3066993)
 
     def send_failure_alert(
         self,
@@ -62,18 +46,7 @@ class AlertService:
         error_message: str,
         error_code: Optional[str] = None,
     ) -> None:
-        """
-        Send failure alert for failed ingestion.
-
-        Args:
-            filename: Document filename
-            error_message: Error message
-            error_code: Error code (optional)
-        """
-        message = (
-            f"❌ Failed to ingest: {filename}\n"
-            f"   Error: {error_message}"
-        )
+        message = f"❌ Failed to ingest: {filename}\n" f"   Error: {error_message}"
         if error_code:
             message += f"\n   Code: {error_code}"
 
@@ -81,7 +54,7 @@ class AlertService:
         self._send_console_alert(message, level="WARNING")
 
         if self.discord_webhook_url:
-            self._send_discord_alert(message, color=15158332)  # Red
+            self._send_discord_alert(message, color=15158332)
 
     def send_batch_alert(self, summary: Dict[str, Any]) -> None:
         """
@@ -100,16 +73,14 @@ class AlertService:
 
         # Determine color based on success rate
         success_rate = (
-            summary["successful"] / summary["total_files"]
-            if summary["total_files"] > 0
-            else 0
+            summary["successful"] / summary["total_files"] if summary["total_files"] > 0 else 0
         )
         if success_rate == 1.0:
-            color = 3066993  # Green
+            color = 3066993
         elif success_rate >= 0.5:
-            color = 15105570  # Yellow
+            color = 15105570
         else:
-            color = 15158332  # Red
+            color = 15158332
 
         logger.info(f"Batch alert: {summary['successful']}/{summary['total_files']} successful")
         self._send_console_alert(message, level="INFO")
@@ -173,9 +144,6 @@ class AlertService:
             return
 
         try:
-            import smtplib
-            from email.mime.text import MIMEText
-            from email.mime.multipart import MIMEMultipart
 
             # TODO: Configure SMTP settings from environment
             logger.warning("Email alerts not yet configured")

@@ -1,7 +1,6 @@
-"""API module for FastAPI routes and models."""
+"""FastAPI routes and models for RAG API."""
 
-__all__ = [
-    "routes",
-    "models",
-    "dependencies",
-]
+from .routes import router
+
+__all__ = ["router"]
+

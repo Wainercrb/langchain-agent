@@ -1,55 +1,62 @@
-"""FastAPI route handlers for the Retrieval API.
-
-Implements two endpoints:
-- POST /v1/chat: Query documents with RAG
-- GET /v1/health: Service health check
-"""
-
-import time
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+import time
 from datetime import datetime
 
-from .models import ChatRequest, ChatResponse, HealthResponse, ErrorResponse
-from .dependencies import get_rag_chain, check_health
+from fastapi import APIRouter, Depends, HTTPException, status
+
 from rag.rag_chain import RAGChain
+
+from .dependencies import check_health, get_rag_chain
+from .models import ChatRequest, ChatResponse, HealthResponse, ErrorResponse
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1", tags=["chat"])
 
 
-@router.post("/chat", response_model=ChatResponse, status_code=200)
-async def chat(request: ChatRequest, chain: RAGChain = Depends(get_rag_chain)):
-    """Query documents with RAG context.
+@router.post(
+    "/chat",
+    response_model=ChatResponse,
+    status_code=200,
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid request parameters"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def chat(
+    request: ChatRequest,
+    chain: RAGChain = Depends(get_rag_chain),
+) -> ChatResponse:
+    """
+    Process a user query using RAG (Retrieval-Augmented Generation).
 
-    Accepts a user query, retrieves relevant documents, and generates an
-    LLM-powered answer augmented with document context. Returns the answer
-    along with source documents and execution timing.
+    This endpoint retrieves relevant documents based on the query, uses them as context,
+    and generates a comprehensive answer via the LLM.
 
     Args:
-        request: ChatRequest with query, top_k, temperature, include_sources.
-        chain: RAGChain instance (injected by FastAPI).
+        request: ChatRequest containing:
+            - query: User's natural language question
+            - top_k: Number of documents to retrieve (1-20)
+            - include_sources: Whether to return source documents
+            - temperature: LLM response creativity (0.0-1.0)
+        chain: Injected RAGChain dependency for processing
 
     Returns:
-        ChatResponse with answer, sources (if requested), and timing.
+        ChatResponse containing:
+            - response: LLM-generated answer
+            - query: Echo of the original query
+            - sources: Retrieved documents (if requested)
+            - execution_time_ms: Total processing time
+            - model: LLM identifier used
 
     Raises:
-        HTTPException: 400 for validation errors, 500 for server errors.
-
-    Example:
-        >>> response = await chat(
-        ...     ChatRequest(query="How to enroll?", top_k=5),
-        ...     chain=rag_chain
-        ... )
-        >>> print(response.response)
-        'To enroll, you need to...'
+        HTTPException (400): Validation error in request parameters
+        HTTPException (500): Internal server error during processing
     """
     start_time = time.time()
     try:
         logger.info(f"Chat request: query={request.query[:50]}...")
 
-        # Invoke RAG chain
         response = chain.invoke(
             query=request.query,
             top_k=request.top_k,
@@ -94,22 +101,33 @@ async def chat(request: ChatRequest, chain: RAGChain = Depends(get_rag_chain)):
         )
 
 
-@router.get("/health", response_model=HealthResponse, status_code=200)
-async def health():
-    """Health check endpoint.
+@router.get(
+    "/health",
+    response_model=HealthResponse,
+    status_code=200,
+    responses={
+        500: {"model": ErrorResponse, "description": "Health check failed"},
+    },
+)
+async def health() -> HealthResponse:
+    """
+    Check service and database connectivity status.
 
-    Verifies service connectivity and returns overall health status.
-    Used by load balancers and monitoring systems.
+    This endpoint performs a lightweight health check including:
+    - Service availability
+    - Database connectivity (Supabase/pgvector)
+    - Overall system status
 
     Returns:
-        HealthResponse with status ("ok" or "error") and db_connected flag.
+        HealthResponse containing:
+            - status: "ok" if all checks pass, "error" if degraded
+            - timestamp: Check timestamp
+            - version: API version
+            - db_connected: Database connectivity status
 
-    Example:
-        >>> response = await health()
-        >>> print(response.status)
-        'ok'
-        >>> print(response.db_connected)
-        True
+    Raises:
+        Returns degraded status rather than raising, to allow clients to assess
+        partial system health (e.g., API available but database down).
     """
     logger.debug("Health check requested")
     health_info = await check_health()
@@ -119,55 +137,3 @@ async def health():
         timestamp=datetime.utcnow(),
         db_connected=health_info.get("db_connected", False),
     )
-
-
-@router.post("/debug/retrieve", response_model=dict, status_code=200)
-async def debug_retrieve(request: ChatRequest):
-    """Debug endpoint: Show retrieved documents without LLM processing.
-
-    Useful for troubleshooting retrieval quality and similarity scores.
-
-    Args:
-        request: ChatRequest with query and top_k.
-
-    Returns:
-        Dictionary with query, retrieved documents, and similarity scores.
-    """
-    try:
-        from api.dependencies import get_retriever
-        
-        logger.info(f"Debug retrieve: query={request.query}, top_k={request.top_k}")
-        
-        retriever = get_retriever()
-        retrieved = retriever.retrieve(
-            query=request.query,
-            top_k=request.top_k,
-            similarity_threshold=0.0,  # No filtering for debug
-        )
-        
-        results = [
-            {
-                "document_id": doc.document_id,
-                "filename": doc.filename,
-                "similarity_score": doc.similarity_score,
-                "text_preview": doc.text[:200] + "..." if len(doc.text) > 200 else doc.text,
-            }
-            for doc in retrieved
-        ]
-        
-        return {
-            "query": request.query,
-            "top_k": request.top_k,
-            "results_count": len(results),
-            "results": results,
-        }
-    except Exception as e:
-        logger.error(f"Debug retrieve error: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "error": "debug_error",
-                "message": str(e),
-                "timestamp": datetime.utcnow().isoformat(),
-            },
-        )

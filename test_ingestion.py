@@ -1,22 +1,23 @@
 #!/usr/bin/env python
 """Test document ingestion directly."""
 
-import sys
 import logging
+import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from config import settings
-from utils.logging import setup_logging
-from rag.embeddings import GoogleEmbeddingsWrapper
-from services.document_processor import DocumentProcessor
-from rag.vector_store import VectorStore
-from services.version_manager import VersionManager
-from services.state_tracker import StateTracker
-from services.file_manager import FileManager
-from services.document_ingester import DocumentIngester
 from supabase import create_client
+
+from config import settings
+from rag.embeddings import GoogleEmbeddingsWrapper
+from rag.vector_store import VectorStore
+from services.document_ingester import DocumentIngester
+from services.document_processor import DocumentProcessor
+from services.file_manager import FileManager
+from services.state_tracker import StateTracker
+from services.version_manager import VersionManager
+from utils.logging import setup_logging
 
 setup_logging(level="INFO")
 logger = logging.getLogger(__name__)
@@ -54,7 +55,7 @@ for file_path in new_files:
     try:
         result = ingester.ingest_file(file_path, md5_hash)
         logger.info(f"  Status: {result['status']}")
-        if result['status'] == 'success':
+        if result["status"] == "success":
             logger.info(f"  Document ID: {result['document_id']}")
             logger.info(f"  Chunks: {result['chunk_count']}")
         else:

@@ -1,10 +1,3 @@
-"""FastAPI dependency injection for service singletons and per-request instances.
-
-Uses FastAPI's dependency injection system to manage service lifetimes:
-- Singletons: VectorStore, GoogleEmbeddingsWrapper, ChatGoogleGenerativeAI
-- Per-request: Retriever, RAGChain
-"""
-
 import logging
 from typing import Optional
 
@@ -12,12 +5,16 @@ logger = logging.getLogger(__name__)
 
 
 class Services:
-    """Service container for application singletons.
+    """
+    Singleton service registry for shared RAG dependencies.
 
-    Stores references to shared services that are expensive to initialize:
-    - vector_store: Database connection to Supabase/pgvector
-    - embeddings: Google Embeddings API wrapper
-    - llm: Google Gemini LLM instance
+    Manages lazy initialization and caching of expensive resources:
+    - VectorStore: Supabase connection with pgvector embeddings
+    - GoogleEmbeddingsWrapper: Embedding model for vector generation
+    - ChatGoogleGenerativeAI: LLM for response generation
+
+    Pattern: Services are initialized on first request, then reused across
+    all subsequent requests to minimize connection overhead and latency.
     """
 
     vector_store: Optional[object] = None
@@ -26,22 +23,26 @@ class Services:
 
 
 def get_vector_store():
-    """Return singleton VectorStore instance.
+    """
+    Get or initialize VectorStore singleton.
 
-    Creates on first call, returns cached instance on subsequent calls.
-    Configured from settings (Supabase URL/key).
+    Lazily initializes connection to Supabase with pgvector support.
+    On first call, creates connection using credentials from config.Settings.
 
     Returns:
-        VectorStore: Configured vector store instance.
+        VectorStore: Connected vector store instance for document retrieval
 
     Raises:
-        Exception: If VectorStore initialization fails.
+        Exception: If Supabase connection fails or credentials missing
+
+    Note:
+        Connection is cached. Subsequent calls return the same instance.
     """
     if Services.vector_store is None:
         try:
+            from supabase import create_client
             from config import Settings
             from rag.vector_store import VectorStore
-            from supabase import create_client
 
             settings = Settings()
             supabase_client = create_client(
@@ -58,15 +59,20 @@ def get_vector_store():
 
 
 def get_embeddings():
-    """Return singleton GoogleEmbeddingsWrapper instance.
+    """
+    Get or initialize GoogleEmbeddingsWrapper singleton.
 
-    Creates on first call, returns cached instance on subsequent calls.
+    Lazily initializes Google Generative AI embeddings model.
+    On first call, creates wrapper using API key from config.Settings.
 
     Returns:
-        GoogleEmbeddingsWrapper: Configured embeddings instance.
+        GoogleEmbeddingsWrapper: Embedding model instance for document vectorization
 
     Raises:
-        Exception: If GoogleEmbeddingsWrapper initialization fails.
+        Exception: If Google API key missing or initialization fails
+
+    Note:
+        Wrapper is cached. Subsequent calls return the same instance.
     """
     if Services.embeddings is None:
         try:
@@ -87,21 +93,26 @@ def get_embeddings():
 
 
 def get_llm():
-    """Return singleton ChatGoogleGenerativeAI instance.
+    """
+    Get or initialize ChatGoogleGenerativeAI singleton.
 
-    Creates on first call, returns cached instance on subsequent calls.
-    Configured from settings (model name, temperature).
+    Lazily initializes LangChain's Gemini chat model wrapper.
+    On first call, creates LLM instance using credentials from config.Settings.
 
     Returns:
-        ChatGoogleGenerativeAI: Configured LLM instance.
+        ChatGoogleGenerativeAI: LLM instance for response generation
 
     Raises:
-        Exception: If ChatGoogleGenerativeAI initialization fails.
+        Exception: If Google API key missing or initialization fails
+
+    Note:
+        LLM is cached. Subsequent calls return the same instance.
+        Default model: "gemini-2.5-flash" (configurable via Settings.gemini_model)
     """
     if Services.llm is None:
         try:
-            from config import Settings
             from langchain_google_genai import ChatGoogleGenerativeAI
+            from config import Settings
 
             settings = Settings()
             Services.llm = ChatGoogleGenerativeAI(
@@ -121,16 +132,21 @@ def get_llm():
 
 
 def get_retriever():
-    """Return Retriever instance (fresh per request).
+    """
+    Create a new Retriever instance for document retrieval.
 
-    Creates a new Retriever instance for each request using cached
-    VectorStore and GoogleEmbeddingsWrapper singletons.
+    Composes VectorStore and GoogleEmbeddingsWrapper for similarity-based retrieval.
+    A new instance is created per request to ensure stateless operation, though
+    underlying services (VectorStore, embeddings) are cached singletons.
 
     Returns:
-        Retriever: Fresh Retriever instance.
+        Retriever: Document retrieval pipeline instance
 
     Raises:
-        Exception: If Retriever initialization fails.
+        Exception: If VectorStore or embeddings initialization fails
+
+    Note:
+        New instance per request ensures thread-safety and request isolation.
     """
     try:
         from rag.retriever import Retriever
@@ -147,16 +163,23 @@ def get_retriever():
 
 
 def get_rag_chain():
-    """Return RAGChain instance (fresh per request).
+    """
+    Create a new RAGChain instance for query processing.
 
-    Creates a new RAGChain instance for each request using a fresh
-    Retriever and cached ChatGoogleGenerativeAI singleton.
+    Composes Retriever and LLM for full RAG pipeline:
+    1. Retrieve relevant documents via similarity search
+    2. Construct context-aware prompt
+    3. Generate response via LLM
 
     Returns:
-        RAGChain: Fresh RAGChain instance.
+        RAGChain: Complete RAG pipeline instance
 
     Raises:
-        Exception: If RAGChain initialization fails.
+        Exception: If Retriever or LLM initialization fails
+
+    Note:
+        New instance per request ensures request isolation.
+        Underlying singletons (VectorStore, Embeddings, LLM) are reused.
     """
     try:
         from rag.rag_chain import RAGChain
@@ -173,29 +196,28 @@ def get_rag_chain():
 
 
 async def check_health() -> dict:
-    """Check service health (DB connection, API availability).
+    """
+    Perform system health check including database connectivity.
 
-    Attempts lightweight operations to verify each service is functioning:
-    - VectorStore: health_check() call to database
-    - Embeddings: API availability check
-    - LLM: API availability check
+    Validates core service availability:
+    - VectorStore connection to Supabase
+    - Database responsiveness
+    - Overall system readiness
 
     Returns:
-        dict: Health status with keys:
-            - status: "ok" or "error"
-            - db_connected: bool
-            - error: (optional) error message if status="error"
+        dict containing:
+            - status: "ok" if healthy, "error" if degraded
+            - db_connected: Boolean database connectivity status
+            - error: (optional) Error message if status is "error"
 
-    Example:
-        >>> health = await check_health()
-        >>> print(health)
-        {'status': 'ok', 'db_connected': True}
+    Note:
+        This function gracefully handles errors, returning degraded status
+        rather than raising exceptions. Clients can assess partial system health.
     """
     try:
         logger.debug("Performing health check")
         vector_store = get_vector_store()
 
-        # Attempt lightweight query to verify DB
         result = await vector_store.health_check()
         db_status = "ok" if result else "error"
 

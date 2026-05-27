@@ -11,15 +11,7 @@ class JSONFormatter(logging.Formatter):
     """Custom JSON formatter for structured logging."""
 
     def format(self, record: logging.LogRecord) -> str:
-        """
-        Format log record as JSON.
-
-        Args:
-            record: Log record to format
-
-        Returns:
-            JSON-formatted log line
-        """
+        """Format log record as JSON."""
         log_data = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "level": record.levelname,
@@ -50,14 +42,7 @@ def setup_logging(
     log_file: Optional[str] = None,
     include_console: bool = True,
 ) -> None:
-    """
-    Setup structured JSON logging.
-
-    Args:
-        level: Logging level (INFO, DEBUG, ERROR, etc.)
-        log_file: Optional file path for log output
-        include_console: Whether to log to console (default: True)
-    """
+    """Setup structured JSON logging."""
     # Get root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, level.upper()))

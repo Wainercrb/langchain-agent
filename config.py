@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     @field_validator("processed_dir", mode="before")
     @classmethod
     def set_processed_dir(cls, v, info):
-        """Set processed_dir if not provided."""
+
         if v is None:
             knowledge_dir = info.data.get("knowledge_dir", Path("./knowledge"))
             return Path(knowledge_dir) / "processed"
@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     @field_validator("failed_dir", mode="before")
     @classmethod
     def set_failed_dir(cls, v, info):
-        """Set failed_dir if not provided."""
+
         if v is None:
             knowledge_dir = info.data.get("knowledge_dir", Path("./knowledge"))
             return Path(knowledge_dir) / "failed"
@@ -72,7 +72,6 @@ class Settings(BaseSettings):
     @field_validator("chunk_size")
     @classmethod
     def validate_chunk_size(cls, v):
-        """Validate chunk size."""
         if v < 100:
             raise ValueError("chunk_size must be at least 100")
         if v > 10000:

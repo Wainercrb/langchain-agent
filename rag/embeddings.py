@@ -2,9 +2,12 @@
 
 import logging
 import time
-from typing import List
 from collections import deque
+from typing import List
+
 import numpy as np
+
+from .base import Embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -13,15 +16,11 @@ class RateLimiter:
     """Rate limiter for API quotas (requests per minute)."""
 
     def __init__(self, requests_per_minute: int = 100):
-        """
-        Initialize rate limiter.
-
-        Args:
-            requests_per_minute: Maximum requests allowed per minute (Google free tier: 100)
-        """
         self.requests_per_minute = requests_per_minute
         self.request_timestamps = deque()  # Track request times (last 60 seconds)
-        self.min_interval = 60.0 / requests_per_minute  # Seconds between requests (~0.6s for 100/min)
+        self.min_interval = (
+            60.0 / requests_per_minute
+        )  # Seconds between requests (~0.6s for 100/min)
 
     def wait_if_needed(self):
         """Check quota and wait if necessary to stay within rate limit."""
@@ -45,7 +44,7 @@ class RateLimiter:
                 current_time = time.time()
                 while self.request_timestamps and self.request_timestamps[0] < current_time - 60:
                     self.request_timestamps.popleft()
-        
+
         # Also implement minimum spacing between requests to distribute evenly
         if self.request_timestamps:
             last_request = self.request_timestamps[-1]
@@ -66,16 +65,10 @@ class RateLimiter:
         return len(self.request_timestamps)
 
 
-class GoogleEmbeddingsWrapper:
+class GoogleEmbeddingsWrapper(Embeddings):
     """Wrapper for Google Embeddings API with batching and retry."""
 
     def __init__(self, api_key: str):
-        """
-        Initialize with Google API key.
-
-        Args:
-            api_key: Google API key for authentication
-        """
         try:
             import google.generativeai as genai
 
@@ -83,13 +76,13 @@ class GoogleEmbeddingsWrapper:
             genai.configure(api_key=api_key)
             self.model = "gemini-embedding-001"  # Gemini embedding model
             self.genai = genai
-            
+
             # Initialize rate limiter (100 requests per minute for free tier)
             self.rate_limiter = RateLimiter(requests_per_minute=100)
-            
+
             # Target dimension for embeddings (database constraint)
             self.target_dimension = 1536
-            
+
             logger.info(f"GoogleEmbeddingsWrapper initialized with model: {self.model}")
         except ImportError as e:
             logger.error(f"Failed to import google.generativeai: {str(e)}")
@@ -101,26 +94,26 @@ class GoogleEmbeddingsWrapper:
     def _reduce_embedding_dimension(self, embedding: List[float]) -> List[float]:
         """
         Reduce embedding dimensions from 3072 to 1536 using PCA-like truncation.
-        
+
         Args:
             embedding: Original embedding vector (3072 dimensions)
-            
+
         Returns:
             Reduced embedding vector (1536 dimensions)
         """
         if len(embedding) <= self.target_dimension:
             return embedding
-        
+
         # Simple truncation method: take first 1536 dimensions
         # (More sophisticated: could use PCA, but truncation works well in practice)
         embedding_array = np.array(embedding, dtype=np.float32)
-        reduced = embedding_array[:self.target_dimension]
-        
+        reduced = embedding_array[: self.target_dimension]
+
         # Normalize to maintain magnitude
         norm = np.linalg.norm(reduced)
         if norm > 0:
             reduced = reduced / norm
-        
+
         return reduced.tolist()
 
     def embed_documents(self, texts: List[str], batch_size: int = 10) -> List[List[float]]:
@@ -152,19 +145,19 @@ class GoogleEmbeddingsWrapper:
                     for text_idx, text in enumerate(batch):
                         # Check rate limit before each text (since each text = 1 API request)
                         self.rate_limiter.wait_if_needed()
-                        
+
                         response = self.genai.embed_content(
                             model=f"models/{self.model}",
                             content=text,
                         )
-                        embedding = response['embedding']
-                        
+                        embedding = response["embedding"]
+
                         # Reduce dimension if needed (3072 -> 1536)
                         if len(embedding) > self.target_dimension:
                             embedding = self._reduce_embedding_dimension(embedding)
-                        
+
                         results.append(embedding)
-                    
+
                     batch_num = i // batch_size + 1
                     current_count = self.rate_limiter.get_request_count_this_minute()
                     logger.info(
@@ -183,7 +176,7 @@ class GoogleEmbeddingsWrapper:
                             error_code="EMBEDDING_MAX_RETRIES",
                             details={"batch_size": len(batch), "retry_count": retry_count},
                         )
-                    wait_time = 2 ** retry_count
+                    wait_time = 2**retry_count
                     logger.warning(f"Embedding batch failed, retrying in {wait_time}s...")
                     time.sleep(wait_time)
 
@@ -212,17 +205,17 @@ class GoogleEmbeddingsWrapper:
             try:
                 # Check rate limit and wait if needed
                 self.rate_limiter.wait_if_needed()
-                
+
                 response = self.genai.embed_content(
                     model=f"models/{self.model}",
                     content=text,
                 )
-                embedding = response['embedding']
-                
+                embedding = response["embedding"]
+
                 # Reduce dimension if needed (3072 -> 1536)
                 if len(embedding) > self.target_dimension:
                     embedding = self._reduce_embedding_dimension(embedding)
-                
+
                 logger.info("Successfully embedded query")
                 return embedding
             except Exception as e:
@@ -235,6 +228,6 @@ class GoogleEmbeddingsWrapper:
                         message=f"Failed to embed query: {str(e)}",
                         error_code="EMBEDDING_QUERY_FAILED",
                     )
-                wait_time = 2 ** retry_count
+                wait_time = 2**retry_count
                 logger.warning(f"Query embedding failed, retrying in {wait_time}s...")
                 time.sleep(wait_time)

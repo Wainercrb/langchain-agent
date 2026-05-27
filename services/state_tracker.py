@@ -1,9 +1,9 @@
 """Track processing state and maintain deduplication state."""
 
 import logging
-from pathlib import Path
-from typing import Dict, Any, Optional
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -12,12 +12,6 @@ class StateTracker:
     """Track processed files and maintain deduplication state in JSON."""
 
     def __init__(self, tracking_file: Optional[Path] = None):
-        """
-        Initialize state tracker.
-
-        Args:
-            tracking_file: Path to JSON tracking file (default: .processed_files.json in knowledge dir)
-        """
         from config import settings
         from utils.file_utils import load_json_file
 
@@ -26,19 +20,11 @@ class StateTracker:
 
         self.tracking_file = tracking_file
         self.state = load_json_file(tracking_file)
-        logger.info(f"StateTracker initialized with {len(self.state)} tracked files from {tracking_file}")
+        logger.info(
+            f"StateTracker initialized with {len(self.state)} tracked files from {tracking_file}"
+        )
 
     def is_processed(self, filename: str, md5_hash: str) -> bool:
-        """
-        Check if file was already processed with the same MD5 hash (deduplication).
-
-        Args:
-            filename: Document filename
-            md5_hash: File MD5 hash
-
-        Returns:
-            True if file exists in tracking and hash matches (unchanged file)
-        """
         if filename not in self.state:
             logger.debug(f"File not in tracking: {filename}")
             return False
@@ -46,7 +32,9 @@ class StateTracker:
         stored_hash = self.state[filename].get("md5_hash")
         is_same = stored_hash == md5_hash
 
-        logger.info(f"Dedup check for {filename}: {is_same} (stored={stored_hash[:8]}..., new={md5_hash[:8]}...)")
+        logger.info(
+            f"Dedup check for {filename}: {is_same} (stored={stored_hash[:8]}..., new={md5_hash[:8]}...)"
+        )
         return is_same
 
     def mark_processed(
@@ -57,49 +45,26 @@ class StateTracker:
         chunk_count: int,
         document_id: str,
     ) -> None:
-        """
-        Mark file as successfully processed and store metadata.
-
-        Args:
-            filename: Document filename
-            md5_hash: File MD5 hash
-            version_date: Version date for this file
-            chunk_count: Number of chunks created
-            document_id: Supabase document ID
-        """
-        from utils.file_utils import save_json_file
 
         self.state[filename] = {
             "md5_hash": md5_hash,
-            "version_date": version_date.isoformat() if isinstance(version_date, datetime) else version_date,
+            "version_date": (
+                version_date.isoformat() if isinstance(version_date, datetime) else version_date
+            ),
             "chunk_count": chunk_count,
             "document_id": document_id,
             "processed_at": datetime.utcnow().isoformat(),
         }
 
         self._save()
-        logger.info(f"Marked as processed: {filename} ({chunk_count} chunks, doc_id={document_id[:8]}...)")
+        logger.info(
+            f"Marked as processed: {filename} ({chunk_count} chunks, doc_id={document_id[:8]}...)"
+        )
 
     def get_file_info(self, filename: str) -> Optional[Dict[str, Any]]:
-        """
-        Get stored file information from tracking state.
-
-        Args:
-            filename: Document filename
-
-        Returns:
-            File info dict or None if not tracked
-        """
         return self.state.get(filename)
 
     def remove_file(self, filename: str) -> None:
-        """
-        Remove file from tracking (for cleanup or manual reset).
-
-        Args:
-            filename: Document filename
-        """
-        from utils.file_utils import save_json_file
 
         if filename in self.state:
             del self.state[filename]

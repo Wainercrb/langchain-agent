@@ -3,7 +3,7 @@
 import logging
 import signal
 import sys
-from typing import Optional, Callable
+from typing import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -12,12 +12,6 @@ class CronScheduler:
     """Schedule and execute document ingestion jobs at intervals."""
 
     def __init__(self, interval_minutes: int = 5):
-        """
-        Initialize cron scheduler.
-
-        Args:
-            interval_minutes: Interval in minutes between job executions
-        """
         try:
             from apscheduler.schedulers.background import BackgroundScheduler
             from apscheduler.triggers.interval import IntervalTrigger
@@ -37,14 +31,6 @@ class CronScheduler:
         job_id: str = "document_ingestion",
         replace_existing: bool = True,
     ) -> None:
-        """
-        Add a job to the scheduler.
-
-        Args:
-            job_func: Callable to execute
-            job_id: Unique job ID
-            replace_existing: Whether to replace existing job with same ID
-        """
         try:
             self.job = self.scheduler.add_job(
                 job_func,
@@ -61,12 +47,6 @@ class CronScheduler:
             raise
 
     def start(self, blocking: bool = True) -> None:
-        """
-        Start the scheduler.
-
-        Args:
-            blocking: Whether to block until scheduler stops (default: True)
-        """
         try:
             self.scheduler.start()
             logger.info("Scheduler started")
@@ -95,12 +75,6 @@ class CronScheduler:
             raise
 
     def stop(self, wait: bool = True) -> None:
-        """
-        Stop the scheduler.
-
-        Args:
-            wait: Whether to wait for jobs to complete
-        """
         try:
             self.scheduler.shutdown(wait=wait)
             logger.info("Scheduler stopped")
@@ -109,16 +83,9 @@ class CronScheduler:
             raise
 
     def get_jobs(self):
-        """
-        Get all scheduled jobs.
-
-        Returns:
-            List of scheduled jobs
-        """
         return self.scheduler.get_jobs()
 
     def trigger_job_now(self) -> None:
-        """Manually trigger the job immediately."""
         try:
             if self.job:
                 self.job.func()
@@ -130,5 +97,4 @@ class CronScheduler:
             raise
 
     def is_running(self) -> bool:
-        """Check if scheduler is running."""
         return self.scheduler.running

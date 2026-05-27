@@ -2,9 +2,9 @@
 
 import logging
 import shutil
-from pathlib import Path
-from typing import List, Dict, Any, Tuple, Optional
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -13,12 +13,6 @@ class FileManager:
     """Manage file scanning, deduplication, and movement."""
 
     def __init__(self, state_tracker):
-        """
-        Initialize file manager.
-
-        Args:
-            state_tracker: StateTracker instance for deduplication
-        """
         from config import settings
         from utils.file_utils import is_supported_file
 
@@ -28,15 +22,6 @@ class FileManager:
         logger.info("FileManager initialized")
 
     def scan_raw_docs(self) -> List[Path]:
-        """
-        Scan raw_docs folder for supported files.
-
-        Returns:
-            List of Path objects for supported files
-
-        Raises:
-            Exception: If scan fails
-        """
         from utils.exceptions import FileManagerError
 
         try:
@@ -58,20 +43,6 @@ class FileManager:
             )
 
     def detect_new_files(self, files: List[Path]) -> Tuple[List[Path], Dict[str, str]]:
-        """
-        Detect new or modified files by comparing MD5 hashes.
-
-        Args:
-            files: List of file paths to check
-
-        Returns:
-            Tuple of (new_files, file_hashes_dict)
-            - new_files: List of files that are new or modified
-            - file_hashes_dict: Mapping of filename -> md5_hash
-
-        Raises:
-            Exception: If detection fails
-        """
         from utils.exceptions import FileManagerError
         from utils.file_utils import calculate_md5
 
@@ -90,9 +61,6 @@ class FileManager:
                         logger.info(f"Detected new/modified file: {file_path.name}")
                     else:
                         logger.debug(f"File already processed (unchanged): {file_path.name}")
-                except Exception as e:
-                    logger.error(f"Failed to process file {file_path.name}: {str(e)}")
-                    # Skip this file and continue
                     continue
 
             logger.info(f"Detected {len(new_files)} new/modified files out of {len(files)}")
@@ -205,7 +173,9 @@ class FileManager:
 
             # Move file
             shutil.move(str(file_path), str(dest_path))
-            logger.warning(f"Moved to failed: {file_path.name} -> {dest_path.name} (reason: {error_reason})")
+            logger.warning(
+                f"Moved to failed: {file_path.name} -> {dest_path.name} (reason: {error_reason})"
+            )
             return dest_path
         except Exception as e:
             logger.error(f"Failed to move to failed folder: {str(e)}")
@@ -246,6 +216,7 @@ class FileManager:
         Returns:
             Stats dictionary with file counts and sizes
         """
+
         def count_files_and_size(directory: Path) -> Tuple[int, int]:
             if not directory.exists():
                 return 0, 0

@@ -4,24 +4,12 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
 
 def calculate_md5(file_path: Path) -> str:
-    """
-    Calculate MD5 hash of a file.
-
-    Args:
-        file_path: Path to file
-
-    Returns:
-        MD5 hash as hex string
-
-    Raises:
-        FileNotFoundError: If file does not exist
-    """
     if not file_path.exists():
         raise FileNotFoundError(f"File not found: {file_path}")
 
@@ -34,19 +22,6 @@ def calculate_md5(file_path: Path) -> str:
 
 
 def load_json_file(file_path: Path) -> Dict[str, Any]:
-    """
-    Load JSON from file.
-
-    Args:
-        file_path: Path to JSON file
-
-    Returns:
-        Parsed JSON data
-
-    Raises:
-        FileNotFoundError: If file does not exist
-        json.JSONDecodeError: If file is not valid JSON
-    """
     if not file_path.exists():
         logger.warning(f"JSON file not found: {file_path}, returning empty dict")
         return {}
@@ -60,16 +35,6 @@ def load_json_file(file_path: Path) -> Dict[str, Any]:
 
 
 def save_json_file(file_path: Path, data: Dict[str, Any]) -> None:
-    """
-    Save data to JSON file.
-
-    Args:
-        file_path: Path to JSON file
-        data: Data to save
-
-    Raises:
-        IOError: If file cannot be written
-    """
     try:
         file_path.parent.mkdir(parents=True, exist_ok=True)
         with open(file_path, "w", encoding="utf-8") as f:

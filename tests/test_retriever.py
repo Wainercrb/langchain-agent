@@ -3,10 +3,12 @@
 Tests retrieval logic in isolation using mocked VectorStore and Embeddings.
 """
 
+from datetime import date, datetime
+from unittest.mock import Mock
+
 import pytest
-from datetime import datetime, date
-from unittest.mock import Mock, MagicMock, patch
-from rag.retriever import Retriever, RetrievedDocument
+
+from rag.retriever import RetrievedDocument, Retriever
 
 
 @pytest.fixture

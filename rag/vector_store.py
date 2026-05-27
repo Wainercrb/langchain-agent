@@ -1,26 +1,22 @@
 """Vector store operations using Supabase pgvector."""
 
 import logging
-from typing import List, Dict, Any, Optional
 import uuid
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from .base import VectorStoreBase
 
 logger = logging.getLogger(__name__)
 
 
-class VectorStore:
+class VectorStore(VectorStoreBase):
     """Manage vector operations in Supabase pgvector."""
 
     def __init__(self, supabase_client):
-        """
-        Initialize vector store.
-
-        Args:
-            supabase_client: Initialized Supabase client (or None for offline mode)
-        """
         self.client = supabase_client
         self.offline_mode = supabase_client is None
-        
+
         if self.offline_mode:
             logger.warning("VectorStore initialized in OFFLINE MODE (no database connection)")
         else:
@@ -32,20 +28,6 @@ class VectorStore:
         version_date: Optional[datetime] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """
-        Insert document record into documents table.
-
-        Args:
-            filename: Document filename
-            version_date: Document version date (default: now)
-            metadata: Additional metadata (dict)
-
-        Returns:
-            Document ID (UUID string)
-
-        Raises:
-            Exception: If insertion fails
-        """
         from utils.exceptions import DocumentStoreError
 
         try:
@@ -53,9 +35,7 @@ class VectorStore:
                 version_date = datetime.utcnow().isoformat()
             else:
                 version_date = (
-                    version_date.isoformat()
-                    if isinstance(version_date, datetime)
-                    else version_date
+                    version_date.isoformat() if isinstance(version_date, datetime) else version_date
                 )
 
             doc_id = str(uuid.uuid4())
@@ -65,7 +45,7 @@ class VectorStore:
                 logger.info(f"[OFFLINE] Would insert document: {filename} (id={doc_id})")
                 return doc_id
 
-            response = self.client.table("documents").insert(
+            self.client.table("documents").insert(
                 {
                     "id": doc_id,
                     "filename": filename,
@@ -86,24 +66,13 @@ class VectorStore:
             )
 
     def insert_chunks(self, document_id: str, chunks: List[Dict[str, Any]]) -> int:
-        """
-        Insert document chunks with embeddings.
-
-        Args:
-            document_id: Parent document ID
-            chunks: List of chunks with keys: {text, embedding, metadata}
-
-        Returns:
-            Number of chunks inserted
-
-        Raises:
-            Exception: If insertion fails
-        """
         from utils.exceptions import DocumentStoreError
 
         try:
             if self.offline_mode:
-                logger.info(f"[OFFLINE] Would insert {len(chunks)} chunks for document {document_id}")
+                logger.info(
+                    f"[OFFLINE] Would insert {len(chunks)} chunks for document {document_id}"
+                )
                 return len(chunks)
 
             chunk_records = []
@@ -120,7 +89,7 @@ class VectorStore:
                     }
                 )
 
-            response = self.client.table("document_chunks").insert(chunk_records).execute()
+            self.client.table("document_chunks").insert(chunk_records).execute()
             logger.info(f"Inserted {len(chunk_records)} chunks for document {document_id}")
             return len(chunk_records)
         except Exception as e:
@@ -132,18 +101,7 @@ class VectorStore:
             )
 
     def get_latest_document(self, filename: str) -> Optional[Dict[str, Any]]:
-        """
-        Get most recent version of document by filename.
 
-        Args:
-            filename: Document filename
-
-        Returns:
-            Document record (dict) or None if not found
-
-        Raises:
-            Exception: If query fails
-        """
         from utils.exceptions import DocumentStoreError
 
         try:
@@ -157,7 +115,9 @@ class VectorStore:
             )
 
             if response.data:
-                logger.info(f"Found latest document: {filename} (version_date={response.data[0].get('version_date')})")
+                logger.info(
+                    f"Found latest document: {filename} (version_date={response.data[0].get('version_date')})"
+                )
                 return response.data[0]
 
             logger.warning(f"No document found: {filename}")
@@ -175,20 +135,6 @@ class VectorStore:
         top_k: int = 5,
         similarity_threshold: float = 0.5,
     ) -> List[Dict[str, Any]]:
-        """
-        Search for similar chunks using vector similarity with pgvector.
-
-        Args:
-            query_embedding: Query embedding vector (1536-d)
-            top_k: Number of results to return
-            similarity_threshold: Minimum similarity score (0-1)
-
-        Returns:
-            List of similar chunks with similarity scores
-
-        Raises:
-            Exception: If search fails
-        """
         from utils.exceptions import DocumentStoreError
 
         try:
@@ -200,64 +146,76 @@ class VectorStore:
             # We'll compute similarity client-side and sort
             response = (
                 self.client.table("document_chunks")
-                .select("id, document_id, text, chunk_index, metadata, embedding, documents(filename, version_date)")
+                .select(
+                    "id, document_id, text, chunk_index, metadata, embedding, documents(filename, version_date)"
+                )
                 .execute()
             )
 
             # Compute cosine similarity for each chunk
             import numpy as np
+
             similar_chunks = []
-            
+
             for item in response.data or []:
                 # Parse embedding from pgvector format
                 embedding = item.get("embedding")
                 if not embedding:
                     continue
-                
+
                 # Parse if it's a string representation
                 if isinstance(embedding, str):
                     # Remove brackets and split by comma
-                    embedding = np.array([float(x) for x in embedding.strip('[]').split(',')])
+                    embedding = np.array([float(x) for x in embedding.strip("[]").split(",")])
                 else:
                     embedding = np.array(embedding)
-                
+
                 # Compute cosine similarity: (A·B) / (||A|| ||B||)
                 dot_product = np.dot(query_embedding, embedding)
                 norm_query = np.linalg.norm(query_embedding)
                 norm_chunk = np.linalg.norm(embedding)
-                
+
                 if norm_query > 0 and norm_chunk > 0:
                     similarity = dot_product / (norm_query * norm_chunk)
                 else:
                     similarity = 0.0
-                
+
                 # Get document info
                 documents_list = item.get("documents")
-                if not documents_list or not isinstance(documents_list, list) or len(documents_list) == 0:
+                if (
+                    not documents_list
+                    or not isinstance(documents_list, list)
+                    or len(documents_list) == 0
+                ):
                     documents_list = [{}]
-                
+
                 doc_info = documents_list[0] if isinstance(documents_list, list) else {}
-                
-                similar_chunks.append({
-                    "id": item.get("id"),
-                    "document_id": item.get("document_id"),
-                    "text": item.get("text"),
-                    "chunk_index": item.get("chunk_index"),
-                    "metadata": item.get("metadata"),
-                    "filename": doc_info.get("filename", "unknown"),
-                    "version_date": doc_info.get("version_date"),
-                    "similarity_score": similarity,
-                })
-            
+
+                similar_chunks.append(
+                    {
+                        "id": item.get("id"),
+                        "document_id": item.get("document_id"),
+                        "text": item.get("text"),
+                        "chunk_index": item.get("chunk_index"),
+                        "metadata": item.get("metadata"),
+                        "filename": doc_info.get("filename", "unknown"),
+                        "version_date": doc_info.get("version_date"),
+                        "similarity_score": similarity,
+                    }
+                )
+
             # Sort by similarity descending and filter by threshold
             similar_chunks.sort(key=lambda x: x["similarity_score"], reverse=True)
             flattened_results = [
-                chunk for chunk in similar_chunks 
+                chunk
+                for chunk in similar_chunks
                 if chunk["similarity_score"] >= similarity_threshold
             ][:top_k]
 
             # Format top score for logging
-            top_score = f"{flattened_results[0]['similarity_score']:.3f}" if flattened_results else 'N/A'
+            top_score = (
+                f"{flattened_results[0]['similarity_score']:.3f}" if flattened_results else "N/A"
+            )
             logger.info(
                 f"Found {len(flattened_results)} similar chunks "
                 f"(top_k={top_k}, threshold={similarity_threshold}, top_score={top_score})"
@@ -277,18 +235,6 @@ class VectorStore:
         chunk_count: int = 0,
         error_message: Optional[str] = None,
     ) -> None:
-        """
-        Log ingestion operation for audit trail.
-
-        Args:
-            filename: Document filename
-            status: 'success', 'failure', or 'partial'
-            chunk_count: Number of chunks processed
-            error_message: Error message if failed
-
-        Raises:
-            Exception: If logging fails
-        """
         from utils.exceptions import DocumentStoreError
 
         try:
@@ -314,3 +260,31 @@ class VectorStore:
                 message=f"Failed to log ingestion: {str(e)}",
                 error_code="INGESTION_LOG_ERROR",
             )
+
+    async def health_check(self) -> bool:
+        """
+        Check vector store health and database connectivity.
+
+        Performs a lightweight query to verify:
+        - Database connection is alive
+        - Supabase client is operational
+        - Minimal latency acceptable
+
+        Returns:
+            bool: True if healthy, False if offline or connection failed
+
+        Note:
+            In offline_mode (no database), returns True to allow graceful degradation.
+        """
+        try:
+            if self.offline_mode:
+                logger.info("Health check: OFFLINE mode - returning True (no database)")
+                return True
+
+            # Lightweight query: just count documents, no data transfer
+            response = self.client.table("documents").select("id", count="exact").limit(1).execute()
+            logger.info("Health check passed: database is healthy")
+            return True
+        except Exception as e:
+            logger.error(f"Health check failed: {str(e)}")
+            return False

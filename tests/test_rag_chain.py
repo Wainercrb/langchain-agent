@@ -3,9 +3,11 @@
 Tests RAG pipeline in isolation using mocked Retriever and LLM.
 """
 
-import pytest
 from datetime import datetime
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock
+
+import pytest
+
 from rag.rag_chain import RAGChain, RAGResponse, SourceDocument
 from rag.retriever import RetrievedDocument
 
@@ -70,9 +72,7 @@ def test_invoke_success(rag_chain, mock_retriever, mock_llm):
     assert response.execution_time_ms > 0
 
     # Verify calls
-    mock_retriever.retrieve.assert_called_once_with(
-        query="how to enroll", top_k=5
-    )
+    mock_retriever.retrieve.assert_called_once_with(query="how to enroll", top_k=5)
     mock_llm.invoke.assert_called_once()
 
 
@@ -120,7 +120,7 @@ def test_invoke_temperature_parameter(rag_chain, mock_llm):
 
 def test_invoke_top_k_parameter(rag_chain, mock_retriever):
     """Test that top_k parameter is passed to retriever."""
-    response = rag_chain.invoke("query", top_k=10)
+    rag_chain.invoke("query", top_k=10)
 
     call_args = mock_retriever.retrieve.call_args
     assert call_args[1]["top_k"] == 10
@@ -208,9 +208,7 @@ def test_invoke_returns_rag_response(rag_chain):
         (False, type(None)),
     ],
 )
-def test_invoke_include_sources_parameter(
-    rag_chain, include_sources, expected_sources_type
-):
+def test_invoke_include_sources_parameter(rag_chain, include_sources, expected_sources_type):
     """Test include_sources parameter controls source inclusion."""
     response = rag_chain.invoke("query", include_sources=include_sources)
 

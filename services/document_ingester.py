@@ -1,9 +1,9 @@
 """Document ingestion orchestrator coordinating all RAG components."""
 
 import logging
-from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -19,16 +19,7 @@ class DocumentIngester:
         version_manager,
         state_tracker,
     ):
-        """
-        Initialize document ingester with all dependencies.
-
-        Args:
-            document_processor: DocumentProcessor instance
-            embeddings_wrapper: GoogleEmbeddingsWrapper instance
-            vector_store: VectorStore instance
-            version_manager: VersionManager instance
-            state_tracker: StateTracker instance
-        """
+        """Initialize document ingester with dependencies."""
         self.processor = document_processor
         self.embeddings = embeddings_wrapper
         self.vector_store = vector_store
@@ -42,27 +33,6 @@ class DocumentIngester:
         md5_hash: str,
         custom_version_date: Optional[datetime] = None,
     ) -> Dict[str, Any]:
-        """
-        Ingest a single file end-to-end.
-
-        Args:
-            file_path: Path to file to ingest
-            md5_hash: MD5 hash of file for tracking
-            custom_version_date: Optional custom version date
-
-        Returns:
-            Ingestion result dict with:
-            - status: 'success' or 'error'
-            - document_id: UUID of inserted document
-            - chunk_count: Number of chunks created
-            - version_date: Version date used
-            - error_message: Error message if failed
-
-        Raises:
-            Exception: If critical error occurs
-        """
-        from utils.exceptions import IngestionError
-
         result = {
             "filename": file_path.name,
             "status": "error",
@@ -205,7 +175,9 @@ class DocumentIngester:
                     results["ingested_chunks"] += result["chunk_count"]
                 else:
                     results["failed"] += 1
-                    results["errors"].append({"file": file_path.name, "error": result["error_message"]})
+                    results["errors"].append(
+                        {"file": file_path.name, "error": result["error_message"]}
+                    )
 
             except Exception as e:
                 logger.error(f"Batch ingestion failed for {file_path.name}: {str(e)}")

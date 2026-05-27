@@ -9,15 +9,16 @@ This script handles:
 5. Configuration validation
 """
 
-import sys
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import logging
+
 from utils.logging import setup_logging
 
 setup_logging(level="INFO")
@@ -38,14 +39,14 @@ def check_python_version():
 def check_env_file():
     """Verify .env file exists and contains required variables."""
     logger.info("Checking .env configuration...")
-    
+
     env_file = Path(__file__).parent.parent / ".env"
     env_example = Path(__file__).parent.parent / ".env.example"
-    
+
     if not env_file.exists():
         logger.warning(f"  .env not found at {env_file}")
         logger.info(f"  Creating from {env_example}...")
-        
+
         if env_example.exists():
             with open(env_example, "r") as f:
                 example_content = f.read()
@@ -55,31 +56,31 @@ def check_env_file():
         else:
             logger.error(f"  {env_example} not found")
             return False
-        
+
         logger.warning("  ⚠️  IMPORTANT: Edit .env and set these required variables:")
         logger.warning("     - GOOGLE_API_KEY (from Google AI Studio)")
         logger.warning("     - SUPABASE_URL (from Supabase project settings)")
         logger.warning("     - SUPABASE_KEY (from Supabase project settings)")
         return False
-    
+
     # Read and validate .env
     required_vars = ["GOOGLE_API_KEY", "SUPABASE_URL", "SUPABASE_KEY"]
     env_vars = {}
-    
+
     with open(env_file, "r") as f:
         for line in f:
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 key, value = line.split("=", 1)
                 env_vars[key.strip()] = value.strip().strip('"').strip("'")
-    
+
     missing = [var for var in required_vars if not env_vars.get(var)]
-    
+
     if missing:
         logger.error(f"  Missing required variables: {', '.join(missing)}")
         logger.info("  Edit .env and fill in the missing values")
         return False
-    
+
     logger.info("  ✓ .env configured with all required variables")
     return True
 
@@ -87,14 +88,14 @@ def check_env_file():
 def check_dependencies():
     """Verify all required packages are installed."""
     logger.info("Checking dependencies...")
-    
+
     try:
         requirements_file = Path(__file__).parent.parent / "requirements-batch.txt"
-        
+
         if not requirements_file.exists():
             logger.error(f"  {requirements_file} not found")
             return False
-        
+
         # Try importing key dependencies
         dependencies = {
             "langchain": "LangChain",
@@ -103,7 +104,7 @@ def check_dependencies():
             "apscheduler": "APScheduler",
             "pydantic": "Pydantic",
         }
-        
+
         missing = []
         for module, name in dependencies.items():
             try:
@@ -111,15 +112,15 @@ def check_dependencies():
                 logger.info(f"  ✓ {name}")
             except ImportError:
                 missing.append(f"{module} ({name})")
-        
+
         if missing:
             logger.error(f"  Missing: {', '.join(missing)}")
             logger.info(f"  Install dependencies: pip install -r {requirements_file}")
             return False
-        
+
         logger.info("  ✓ All dependencies installed")
         return True
-        
+
     except Exception as e:
         logger.error(f"  Dependency check failed: {str(e)}")
         return False
@@ -128,13 +129,13 @@ def check_dependencies():
 def load_environment():
     """Load environment variables from .env file."""
     logger.info("Loading environment variables...")
-    
+
     env_file = Path(__file__).parent.parent / ".env"
-    
+
     if not env_file.exists():
         logger.error(f"  {env_file} not found")
         return False
-    
+
     try:
         with open(env_file, "r") as f:
             for line in f:
@@ -142,7 +143,7 @@ def load_environment():
                 if line and not line.startswith("#") and "=" in line:
                     key, value = line.split("=", 1)
                     os.environ[key.strip()] = value.strip().strip('"').strip("'")
-        
+
         logger.info("  ✓ Environment variables loaded")
         return True
     except Exception as e:
@@ -153,9 +154,9 @@ def load_environment():
 def create_directories():
     """Create required project directories."""
     logger.info("Creating directories...")
-    
+
     from config import settings
-    
+
     try:
         settings.create_directories()
         logger.info("  ✓ Directories created")
@@ -168,23 +169,23 @@ def create_directories():
 def setup_database():
     """Run database setup script."""
     logger.info("Setting up database...")
-    
+
     script_file = Path(__file__).parent / "setup_db.py"
-    
+
     try:
         result = subprocess.run(
             [sys.executable, str(script_file)],
             capture_output=False,
             timeout=60,
         )
-        
+
         if result.returncode == 0:
             logger.info("  ✓ Database setup completed")
             return True
         else:
             logger.warning("  ⚠️  Database setup failed or requires manual intervention")
             return False
-            
+
     except subprocess.TimeoutExpired:
         logger.error("  Database setup timed out")
         return False
@@ -196,10 +197,10 @@ def setup_database():
 def validate_config():
     """Validate final configuration."""
     logger.info("Validating configuration...")
-    
+
     try:
         from config import settings
-        
+
         logger.info(f"  ✓ Config loaded: {settings}")
         return True
     except Exception as e:
@@ -212,7 +213,7 @@ def main():
     logger.info("=" * 70)
     logger.info("🚀 Project Setup Script - Langchain Agent RAG System")
     logger.info("=" * 70)
-    
+
     checks = [
         ("Python Version", check_python_version),
         ("Environment File", check_env_file),
@@ -222,38 +223,38 @@ def main():
         ("Database Setup", setup_database),
         ("Validate Config", validate_config),
     ]
-    
+
     results = []
-    
+
     for check_name, check_func in checks:
         logger.info(f"\n[{len(results)+1}/{len(checks)}] {check_name}")
         logger.info("-" * 70)
-        
+
         try:
             success = check_func()
             results.append((check_name, success))
-            
+
             if not success:
                 logger.warning(f"⚠️  {check_name} failed - some functionality may not work")
                 # Continue with other checks instead of failing completely
         except Exception as e:
             logger.error(f"❌ {check_name} error: {str(e)}", exc_info=True)
             results.append((check_name, False))
-    
+
     # Summary
     logger.info("\n" + "=" * 70)
     logger.info("📋 Setup Summary")
     logger.info("=" * 70)
-    
+
     passed = sum(1 for _, success in results if success)
     total = len(results)
-    
+
     for check_name, success in results:
         status = "✅" if success else "⚠️ "
         logger.info(f"{status} {check_name}")
-    
+
     logger.info(f"\nPassed: {passed}/{total}")
-    
+
     if passed == total:
         logger.info("\n✅ Setup completed successfully!")
         logger.info("\nNext steps:")
