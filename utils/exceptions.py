@@ -57,49 +57,4 @@ class IngestionError(RAGException):
         super().__init__(message, error_code, details)
 
 
-class RetrieverError(RAGException):
-    """Raised when retrieval fails."""
 
-    def __init__(
-        self,
-        message: str,
-        error_code: str = "RETRIEVER_ERROR",
-        details: Optional[Dict[str, Any]] = None,
-    ):
-        super().__init__(message, error_code, details)
-
-
-class FileManagerError(RAGException):
-    """Raised when file management operations fail."""
-
-    def __init__(
-        self,
-        message: str,
-        error_code: str = "FILE_MANAGER_ERROR",
-        details: Optional[Dict[str, Any]] = None,
-    ):
-        super().__init__(message, error_code, details)
-
-
-class SchedulerError(RAGException):
-    """Raised when scheduler job fails."""
-
-    def __init__(
-        self,
-        message: str,
-        error_code: str = "SCHEDULER_ERROR",
-        details: Optional[Dict[str, Any]] = None,
-    ):
-        super().__init__(message, error_code, details)
-
-
-class ConfigError(RAGException):
-    """Raised when configuration is invalid or missing."""
-
-    def __init__(
-        self,
-        message: str,
-        error_code: str = "CONFIG_ERROR",
-        details: Optional[Dict[str, Any]] = None,
-    ):
-        super().__init__(message, error_code, details)

@@ -1,64 +1,30 @@
-"""Services layer - abstracted providers, builders, backends, and utility services."""
+"""Services layer — pluggable backends (Strategy Pattern).
 
-# Organized services (document, state, scheduler, alert, file)
-from .document import DocumentIngester, DocumentProcessor, ParserFactory
-from .state import StateTracker, VersionManager
-from .scheduler import CronScheduler
-from .alert import AlertService
-from .file import FileManager
+Lo que se swappea vive acá:
+  - llm / embeddings / vector_store / parsers / logging
 
-# New abstraction layers (providers, builders, backends)
+Razon pura (no swappable) vive en rag/ y api/.
+"""
+
 from .llm import (
-    AnthropicProvider,
-    GeminiProvider,
+    GoogleProvider,
     LLMProvider,
     LLMProviderError,
-    OpenAIProvider,
-    create_llm_provider,
-    get_provider_info,
 )
-from .logging_backend import (
-    JSONLoggerBackend,
-    LoggerBackend,
-    create_logger_backend,
-    setup_global_logging,
-)
-from .messaging import (
-    LangChainMessageBuilder,
-    MessageBuilder,
-    create_message_builder,
-)
+from .embeddings import GoogleEmbeddingsWrapper
+from .vector_store import VectorStore
+from .parsers import FileParser, ParserFactory
 
 __all__ = [
-    # Document services
-    "DocumentIngester",
-    "DocumentProcessor",
-    "ParserFactory",
-    # State services
-    "StateTracker",
-    "VersionManager",
-    # Scheduler services
-    "CronScheduler",
-    # Alert services
-    "AlertService",
-    # File services
-    "FileManager",
     # LLM Providers
     "LLMProvider",
     "LLMProviderError",
-    "GeminiProvider",
-    "OpenAIProvider",
-    "AnthropicProvider",
-    "create_llm_provider",
-    "get_provider_info",
-    # Message Builders
-    "MessageBuilder",
-    "LangChainMessageBuilder",
-    "create_message_builder",
-    # Logger Backends
-    "LoggerBackend",
-    "JSONLoggerBackend",
-    "create_logger_backend",
-    "setup_global_logging",
+    "GoogleProvider",
+    # Embeddings
+    "GoogleEmbeddingsWrapper",
+    # Vector Store
+    "VectorStore",
+    # Parsers (Strategy)
+    "FileParser",
+    "ParserFactory",
 ]
-

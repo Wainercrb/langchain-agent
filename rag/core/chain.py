@@ -1,11 +1,12 @@
-import logging
 import time
+from typing import List
 
-from models import RAGResponse, RetrievedDocument, SourceDocument
+from config import settings
+from models import ChatResponse, RetrievedDocument, SourceDocument
 
 from ..retrieval.retriever import Retriever
+from services.container import logger
 
-logger = logging.getLogger(__name__)
 
 
 class RAGChain:
@@ -20,7 +21,7 @@ class RAGChain:
         top_k: int = 5,
         temperature: float = 0.7,
         include_sources: bool = True,
-    ) -> RAGResponse:
+    ) -> ChatResponse:
         start_time = time.time()
         try:
             logger.info(
@@ -76,12 +77,12 @@ class RAGChain:
                 ]
                 logger.debug(f"Formatted {len(sources_list)} source documents")
 
-            rag_response = RAGResponse(
+            rag_response = ChatResponse(
                 response=response_text,
                 query=query,
                 sources=sources_list,
                 execution_time_ms=execution_time_ms,
-                model="gemini-2.5-flash",
+                model=settings.gemini_model,
             )
 
             logger.info(

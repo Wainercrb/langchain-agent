@@ -1,6 +1,4 @@
-"""RAG core services: base classes and chain orchestration."""
-
-from .base import Embeddings, VectorStoreBase
+"""RAG core services: chain orchestration."""
 from .chain import RAGChain
 
-__all__ = ["Embeddings", "VectorStoreBase", "RAGChain"]
+__all__ = ["RAGChain"]

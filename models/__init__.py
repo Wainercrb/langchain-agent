@@ -2,7 +2,7 @@
 
 from .chat import ChatRequest
 from .document import SourceDocument
-from .responses import ChatResponse, ErrorResponse, HealthResponse, RAGResponse
+from .responses import ChatResponse, ErrorResponse, HealthResponse
 from .retrieval import RetrievedDocument
 
 __all__ = [
@@ -10,7 +10,6 @@ __all__ = [
     "ChatResponse",
     "ErrorResponse",
     "HealthResponse",
-    "RAGResponse",
     "RetrievedDocument",
     "SourceDocument",
 ]

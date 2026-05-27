@@ -7,6 +7,7 @@ from typing import Any, Dict, Generator, List
 logger = logging.getLogger(__name__)
 
 
+
 def filter_by_threshold(
     results: List[Dict[str, Any]], threshold: float
 ) -> Generator[Dict[str, Any], None, None]:
@@ -35,40 +36,26 @@ def filter_by_threshold(
 
 
 def filter_by_version(
-    results: List[Dict[str, Any]], version_date: datetime
+    results: List[Dict[str, Any]], min_version: datetime
 ) -> Generator[Dict[str, Any], None, None]:
     """
-    Filter search results by version date.
+    Filter search results by minimum version date.
 
     Args:
         results: List of search result dictionaries
-        version_date: Minimum version date to include
+        min_version: Minimum version date threshold
 
     Yields:
-        Result dictionaries with version_date >= filter date
-
-    Example:
-        from datetime import datetime
-        min_date = datetime(2025, 1, 1)
-        filtered = list(filter_by_version(results, min_date))
+        Results with version_date >= min_version
     """
+    min_date = min_version.date() if isinstance(min_version, datetime) else min_version
+
     for result in results:
         doc_version = result.get("version_date")
         if doc_version is None:
-            logger.debug(
-                f"Filtered out document {result.get('document_id')} (version_date is None)"
-            )
             continue
 
-        if isinstance(doc_version, datetime):
-            doc_version_date = doc_version.date()
-        else:
-            doc_version_date = doc_version
+        doc_date = doc_version.date() if isinstance(doc_version, datetime) else doc_version
 
-        if doc_version_date >= version_date.date():
+        if doc_date >= min_date:
             yield result
-        else:
-            logger.debug(
-                f"Filtered out document {result.get('document_id')} "
-                f"(version {doc_version_date} < {version_date.date()})"
-            )

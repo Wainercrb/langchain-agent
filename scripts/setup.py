@@ -17,12 +17,8 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import logging
 
-from utils.logging import setup_logging
-
-setup_logging(level="INFO")
-logger = logging.getLogger(__name__)
+from services.container import logger
 
 
 def check_python_version():
@@ -158,7 +154,9 @@ def create_directories():
     from config import settings
 
     try:
-        settings.create_directories()
+        dirs = [settings.knowledge_dir, settings.processed_dir, settings.failed_dir]
+        for d in dirs:
+            d.mkdir(parents=True, exist_ok=True)
         logger.info("  ✓ Directories created")
         return True
     except Exception as e:

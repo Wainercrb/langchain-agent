@@ -1,12 +1,11 @@
-import logging
 from datetime import datetime
 from typing import List, Optional
 
 from models import RetrievedDocument
 
 from ..utils import filter_by_threshold, filter_by_version
+from services.container import logger
 
-logger = logging.getLogger(__name__)
 
 
 class Retriever:
@@ -34,7 +33,7 @@ class Retriever:
             )
 
             filtered = list(filter_by_threshold(search_results, similarity_threshold))
-            if version_filter:
+            if version_filter is not None:
                 filtered = list(filter_by_version(filtered, version_filter))
 
             retrieved_documents = [

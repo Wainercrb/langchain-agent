@@ -8,7 +8,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from rag.core.chain import RAGChain, RAGResponse, SourceDocument
+from models import ChatResponse, SourceDocument
+from rag.core.chain import RAGChain
 from rag.retrieval.retriever import RetrievedDocument
 
 
@@ -63,7 +64,7 @@ def test_invoke_success(rag_chain, mock_retriever, mock_llm):
     response = rag_chain.invoke("how to enroll", top_k=5)
 
     # Verify type
-    assert isinstance(response, RAGResponse)
+    assert isinstance(response, ChatResponse)
 
     # Verify content
     assert response.response is not None
@@ -115,7 +116,7 @@ def test_invoke_temperature_parameter(rag_chain, mock_llm):
 
     # Temperature should be passed to RAGChain, but we're not directly testing
     # it's in the prompt since we mock the LLM. Just verify invoke completes.
-    assert isinstance(response, RAGResponse)
+    assert isinstance(response, ChatResponse)
 
 
 def test_invoke_top_k_parameter(rag_chain, mock_retriever):
@@ -189,10 +190,10 @@ def test_invoke_source_document_structure(rag_chain):
 
 
 def test_invoke_returns_rag_response(rag_chain):
-    """Test that invoke always returns RAGResponse model."""
+    """Test that invoke always returns ChatResponse model."""
     response = rag_chain.invoke("query")
 
-    assert isinstance(response, RAGResponse)
+    assert isinstance(response, ChatResponse)
     # Verify Pydantic model can be serialized to dict
     response_dict = response.model_dump()
     assert "response" in response_dict

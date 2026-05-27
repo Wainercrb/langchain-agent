@@ -1,4 +1,3 @@
-import logging
 import time
 from datetime import datetime
 
@@ -7,9 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from rag.core.chain import RAGChain
 
 from .dependencies import check_health, get_rag_chain
-from .models import ChatRequest, ChatResponse, HealthResponse, ErrorResponse
+from models import ChatRequest, ChatResponse, HealthResponse, ErrorResponse
+from services.container import logger
 
-logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1", tags=["chat"])
 

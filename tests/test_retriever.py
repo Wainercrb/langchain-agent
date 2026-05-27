@@ -20,7 +20,7 @@ def mock_vector_store():
             "document_id": "doc1",
             "chunk_id": "chunk1",
             "text": "How to enroll in the program: Step 1: Fill out the form",
-            "similarity": 0.95,
+            "similarity_score": 0.95,
             "filename": "enrollment.pdf",
             "version_date": datetime(2025, 1, 1),
         },
@@ -28,7 +28,7 @@ def mock_vector_store():
             "document_id": "doc2",
             "chunk_id": "chunk2",
             "text": "Enrollment requirements include: valid ID, proof of address",
-            "similarity": 0.87,
+            "similarity_score": 0.87,
             "filename": "requirements.txt",
             "version_date": datetime(2025, 1, 2),
         },
@@ -36,7 +36,7 @@ def mock_vector_store():
             "document_id": "doc3",
             "chunk_id": "chunk3",
             "text": "Some unrelated content about parking",
-            "similarity": 0.42,
+            "similarity_score": 0.42,
             "filename": "parking.txt",
             "version_date": datetime(2025, 1, 3),
         },
@@ -66,13 +66,12 @@ def test_retrieve_success(retriever, mock_vector_store, mock_embeddings):
     mock_embeddings.embed_query.assert_called_once_with("how to enroll")
     mock_vector_store.search_similar.assert_called_once()
 
-    # Verify results
-    assert len(result) == 3
+    # Verify results (doc3 filtered by default threshold of 0.5)
+    assert len(result) == 2
     assert isinstance(result[0], RetrievedDocument)
     assert result[0].document_id == "doc1"
     assert result[0].similarity_score == 0.95
     assert result[1].similarity_score == 0.87
-    assert result[2].similarity_score == 0.42
 
 
 def test_retrieve_no_results(retriever, mock_vector_store):

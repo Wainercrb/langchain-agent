@@ -66,37 +66,6 @@ class ChatResponse(BaseModel):
     )
 
 
-class RAGResponse(BaseModel):
-    """RAG chain response model (alias for ChatResponse for compatibility)."""
-
-    response: str = Field(...)
-    query: str = Field(...)
-    sources: Optional[List[SourceDocument]] = Field(default=None)
-    execution_time_ms: float = Field(...)
-    model: str = Field(default="gemini-2.5-flash")
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "response": "To enroll in the program, you need to follow these steps...",
-                "query": "How do I enroll?",
-                "sources": [
-                    {
-                        "document_id": "550e8400-e29b-41d4-a716-446655440000",
-                        "filename": "enrollment_guide.pdf",
-                        "similarity_score": 0.92,
-                        "version_date": "2025-01-15T10:30:00",
-                        "content_preview": "Enrollment Guidelines: To enroll in our program...",
-                        "chunk_id": "550e8400-e29b-41d4-a716-446655440001",
-                    }
-                ],
-                "execution_time_ms": 2340.5,
-                "model": "gemini-2.5-flash",
-            }
-        }
-    )
-
-
 class HealthResponse(BaseModel):
     """
     Response model for GET /v1/health endpoint.

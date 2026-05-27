@@ -1,15 +1,11 @@
-import logging
 from datetime import datetime
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from api import router
 from config import settings
-from utils.logging import setup_logging
-from api.routes import router
-
-setup_logging(level=settings.log_level)
-logger = logging.getLogger(__name__)
+from services.container import logger
 
 app = FastAPI(
     title="LangChain Agent RAG API",
@@ -33,26 +29,6 @@ async def global_exception_handler(request: Request, exc: Exception):
             "timestamp": datetime.utcnow().isoformat(),
         },
     )
-
-# TODO: Remove this
-@app.on_event("startup")
-async def startup_event():
-    try:
-        from api.dependencies import (
-            get_embeddings,
-            get_llm,
-            get_vector_store,
-        )
-        get_vector_store()
-        get_embeddings()
-        get_llm()
-
-        logger.info("All services initialized successfully")
-
-    except Exception as e:
-        logger.error(f"Startup failed: {str(e)}", exc_info=True)
-        raise
-
 
 @app.on_event("shutdown")
 async def shutdown_event():

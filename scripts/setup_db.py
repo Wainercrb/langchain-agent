@@ -7,7 +7,6 @@ This script:
 3. Validates schema setup
 """
 
-import logging
 import sys
 from pathlib import Path
 
@@ -15,10 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config import settings
-from utils.logging import setup_logging
-
-setup_logging(level="INFO")
-logger = logging.getLogger(__name__)
+from services.container import logger
 
 
 def load_schema() -> str:
