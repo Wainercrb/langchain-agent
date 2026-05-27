@@ -3,7 +3,7 @@ import time
 
 from models import RAGResponse, RetrievedDocument, SourceDocument
 
-from .retriever import Retriever
+from ..retrieval.retriever import Retriever
 
 logger = logging.getLogger(__name__)
 

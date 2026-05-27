@@ -10,13 +10,13 @@ sys.path.insert(0, str(Path(__file__).parent))
 from supabase import create_client
 
 from config import settings
-from rag.embeddings import GoogleEmbeddingsWrapper
-from rag.vector_store import VectorStore
-from services.document_ingester import DocumentIngester
-from services.document_processor import DocumentProcessor
-from services.file_manager import FileManager
-from services.state_tracker import StateTracker
-from services.version_manager import VersionManager
+from rag.embeddings.wrapper import GoogleEmbeddingsWrapper
+from rag.retrieval.vector_store import VectorStore
+from services.document.ingester import DocumentIngester
+from services.document.processor import DocumentProcessor
+from services.file.manager import FileManager
+from services.state.tracker import StateTracker
+from services.state.version import VersionManager
 from utils.logging import setup_logging
 
 setup_logging(level="INFO")

@@ -7,8 +7,8 @@ from typing import Any, Dict, List, Optional
 
 from utils.exceptions import DocumentStoreError
 
-from .base import VectorStoreBase
-from .utils import raise_document_store_error
+from ..core.base import VectorStoreBase
+from ..utils import raise_document_store_error
 
 logger = logging.getLogger(__name__)
 

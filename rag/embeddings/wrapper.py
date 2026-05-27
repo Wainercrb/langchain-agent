@@ -6,8 +6,8 @@ from typing import List
 from config import settings
 from utils.exceptions import EmbeddingError
 
-from .base import Embeddings
-from .utils import RateLimiter
+from ..core.base import Embeddings
+from ..utils import RateLimiter
 
 logger = logging.getLogger(__name__)
 

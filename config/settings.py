@@ -44,6 +44,30 @@ class Settings(BaseSettings):
     gemini_model: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL")
     gemini_temperature: float = Field(default=0.7, alias="GEMINI_TEMPERATURE")
 
+    # LLM Provider Selection (Strategy Pattern)
+    llm_provider: str = Field(
+        default="gemini",
+        alias="LLM_PROVIDER",
+        description="LLM provider: 'gemini' (default), 'openai', 'anthropic'",
+    )
+
+    # OpenAI Configuration (for future use)
+    openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
+    openai_model: str = Field(default="gpt-4", alias="OPENAI_MODEL")
+    openai_temperature: float = Field(default=0.7, alias="OPENAI_TEMPERATURE")
+
+    # Anthropic Configuration (for future use)
+    anthropic_api_key: Optional[str] = Field(default=None, alias="ANTHROPIC_API_KEY")
+    anthropic_model: str = Field(default="claude-3-opus-20240229", alias="ANTHROPIC_MODEL")
+    anthropic_temperature: float = Field(default=0.7, alias="ANTHROPIC_TEMPERATURE")
+
+    # Message Builder Configuration
+    message_builder: str = Field(default="langchain", alias="MESSAGE_BUILDER", description="Message builder: 'langchain' (default)")
+
+    # Logger Backend Configuration
+    logger_backend: str = Field(default="json", alias="LOGGER_BACKEND", description="Logger backend: 'json' (default)")
+    log_file: Optional[str] = Field(default=None, alias="LOG_FILE", description="Optional file path for logging")
+
     model_config = {
         "env_file": ".env",
         "case_sensitive": False,
@@ -88,6 +112,33 @@ class Settings(BaseSettings):
             raise ValueError("embedding_retries must not exceed 10")
         return v
 
+    @field_validator("llm_provider")
+    @classmethod
+    def validate_llm_provider(cls, v):
+        """Validate LLM provider is one of supported options."""
+        valid_providers = ("gemini", "openai", "anthropic")
+        if v.lower() not in valid_providers:
+            raise ValueError(f"llm_provider must be one of {valid_providers}, got {v}")
+        return v.lower()
+
+    @field_validator("message_builder")
+    @classmethod
+    def validate_message_builder(cls, v):
+        """Validate message builder is valid."""
+        valid_builders = ("langchain", "default")
+        if v.lower() not in valid_builders:
+            raise ValueError(f"message_builder must be one of {valid_builders}, got {v}")
+        return v.lower()
+
+    @field_validator("logger_backend")
+    @classmethod
+    def validate_logger_backend(cls, v):
+        """Validate logger backend is valid."""
+        valid_backends = ("json", "default")
+        if v.lower() not in valid_backends:
+            raise ValueError(f"logger_backend must be one of {valid_backends}, got {v}")
+        return v.lower()
+
     def create_directories(self) -> None:
         """Create required directories."""
         self.knowledge_dir.mkdir(parents=True, exist_ok=True)
@@ -97,7 +148,9 @@ class Settings(BaseSettings):
     def __repr__(self) -> str:
         """String representation (hide sensitive data)."""
         return (
-            f"Settings(cron_interval={self.cron_interval_minutes}min, "
+            f"Settings(llm_provider={self.llm_provider}, "
+            f"logger_backend={self.logger_backend}, "
+            f"cron_interval={self.cron_interval_minutes}min, "
             f"chunk_size={self.chunk_size}, "
             f"knowledge_dir={self.knowledge_dir})"
         )

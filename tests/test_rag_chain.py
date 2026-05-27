@@ -8,8 +8,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from rag.rag_chain import RAGChain, RAGResponse, SourceDocument
-from rag.retriever import RetrievedDocument
+from rag.core.chain import RAGChain, RAGResponse, SourceDocument
+from rag.retrieval.retriever import RetrievedDocument
 
 
 @pytest.fixture

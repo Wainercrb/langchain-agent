@@ -1,7 +1,136 @@
 import logging
-from typing import Optional
+from typing import Optional, Dict
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ProviderConfig:
+    """Configuration template for an LLM provider.
+    
+    Represents provider-specific settings mappings and defaults.
+    
+    Attributes:
+        name: Provider identifier (e.g., "gemini", "openai")
+        model_key: Settings attribute for model name
+        temperature_key: Settings attribute for temperature
+        api_key_key: Settings attribute for API key
+        default_model: Fallback model if not in settings
+        default_temperature: Fallback temperature if not in settings
+    """
+    name: str
+    model_key: str
+    temperature_key: str
+    api_key_key: str
+    default_model: str
+    default_temperature: float = 0.7
+
+
+class ProviderRegistry:
+    """Registry for LLM provider configurations using Composite Pattern.
+    
+    Manages provider configurations and enables:
+    - Dynamic provider registration (open for extension)
+    - Type-safe configuration lookup
+    - Easy provider addition without modifying get_llm()
+    
+    Pattern: Registry Pattern + Composite Pattern
+    - Registry: centralized provider configuration management
+    - Composite: collection of provider configs with uniform interface
+    """
+    
+    def __init__(self):
+        """Initialize registry with built-in providers."""
+        self._providers: Dict[str, ProviderConfig] = {}
+        self._register_default_providers()
+    
+    def _register_default_providers(self) -> None:
+        """Register built-in LLM providers."""
+        self.register(ProviderConfig(
+            name="gemini",
+            model_key="gemini_model",
+            temperature_key="gemini_temperature",
+            api_key_key="google_api_key",
+            default_model="gemini-2.5-flash",
+            default_temperature=0.7,
+        ))
+        
+        self.register(ProviderConfig(
+            name="openai",
+            model_key="openai_model",
+            temperature_key="openai_temperature",
+            api_key_key="openai_api_key",
+            default_model="gpt-4",
+            default_temperature=0.7,
+        ))
+        
+        self.register(ProviderConfig(
+            name="anthropic",
+            model_key="anthropic_model",
+            temperature_key="anthropic_temperature",
+            api_key_key="anthropic_api_key",
+            default_model="claude-3-opus-20240229",
+            default_temperature=0.7,
+        ))
+    
+    def register(self, config: ProviderConfig) -> None:
+        """Register a new provider configuration.
+        
+        Args:
+            config: ProviderConfig instance to register
+            
+        Raises:
+            ValueError: If provider with same name already registered
+        """
+        if config.name in self._providers:
+            raise ValueError(f"Provider '{config.name}' already registered")
+        self._providers[config.name] = config
+        logger.debug(f"Registered provider: {config.name}")
+    
+    def get(self, provider_name: str) -> ProviderConfig:
+        """Get provider configuration by name.
+        
+        Args:
+            provider_name: Provider identifier
+            
+        Returns:
+            ProviderConfig for the provider
+            
+        Raises:
+            ValueError: If provider not found in registry
+        """
+        if provider_name not in self._providers:
+            available = ", ".join(self._providers.keys())
+            raise ValueError(
+                f"Unknown LLM provider: '{provider_name}'. "
+                f"Available: {available}. "
+                f"To add a new provider: registry.register(ProviderConfig(...))"
+            )
+        return self._providers[provider_name]
+    
+    def list_providers(self) -> list:
+        """Get list of all registered provider names.
+        
+        Returns:
+            List of provider identifiers
+        """
+        return list(self._providers.keys())
+    
+    def has_provider(self, provider_name: str) -> bool:
+        """Check if provider is registered.
+        
+        Args:
+            provider_name: Provider identifier
+            
+        Returns:
+            True if provider registered, False otherwise
+        """
+        return provider_name in self._providers
+
+
+# Global registry singleton
+_provider_registry = ProviderRegistry()
 
 
 class Services:
@@ -42,7 +171,7 @@ def get_vector_store():
         try:
             from supabase import create_client
             from config import Settings
-            from rag.vector_store import VectorStore
+            from rag.retrieval.vector_store import VectorStore
 
             settings = Settings()
             supabase_client = create_client(
@@ -77,7 +206,7 @@ def get_embeddings():
     if Services.embeddings is None:
         try:
             from config import Settings
-            from rag.embeddings import GoogleEmbeddingsWrapper
+            from rag.embeddings.wrapper import GoogleEmbeddingsWrapper
 
             settings = Settings()
             Services.embeddings = GoogleEmbeddingsWrapper(api_key=settings.google_api_key)
@@ -94,38 +223,80 @@ def get_embeddings():
 
 def get_llm():
     """
-    Get or initialize ChatGoogleGenerativeAI singleton.
+    Get or initialize LLM provider singleton using OOP Provider Registry Pattern.
 
-    Lazily initializes LangChain's Gemini chat model wrapper.
-    On first call, creates LLM instance using credentials from config.Settings.
+    Lazily initializes the LLM provider (Gemini, OpenAI, Anthropic) based on config.
+    Uses ProviderRegistry (type-safe OOP) to dynamically fetch configuration.
+    Adding new providers requires only calling registry.register(ProviderConfig(...)).
+    
+    Design Patterns:
+    - Registry Pattern: centralized provider config management
+    - Composite Pattern: uniform interface for all providers
+    - Strategy Pattern: all providers implement LLMProvider interface
+    - Lazy Initialization: provider created on first use, cached
 
     Returns:
-        ChatGoogleGenerativeAI: LLM instance for response generation
+        LLMProvider: Initialized LLM provider instance
 
     Raises:
-        Exception: If Google API key missing or initialization fails
+        ValueError: If provider not in registry
+        LLMProviderError: If provider initialization fails or credentials missing
 
     Note:
-        LLM is cached. Subsequent calls return the same instance.
-        Default model: "gemini-2.5-flash" (configurable via Settings.gemini_model)
+        Provider is cached. Subsequent calls return the same instance.
+        
+    Example - Add new provider at runtime:
+        from api.dependencies import _provider_registry, ProviderConfig
+        
+        # Add Cohere provider
+        _provider_registry.register(ProviderConfig(
+            name="cohere",
+            model_key="cohere_model",
+            temperature_key="cohere_temperature",
+            api_key_key="cohere_api_key",
+            default_model="command-r-plus",
+            default_temperature=0.7,
+        ))
+        
+        # Now you can use it
+        export LLM_PROVIDER=cohere
+        python main.py
     """
     if Services.llm is None:
         try:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-            from config import Settings
+            from config import settings
+            from services import create_llm_provider
 
-            settings = Settings()
-            Services.llm = ChatGoogleGenerativeAI(
-                model=settings.gemini_model or "gemini-2.5-flash",
-                temperature=settings.gemini_temperature or 0.7,
-                google_api_key=settings.google_api_key,
+            # Get provider name from configuration
+            provider_name = settings.llm_provider
+            
+            # Get provider config from registry (OOP approach)
+            provider_config = _provider_registry.get(provider_name)
+            
+            # Dynamically fetch provider-specific settings using config object
+            model = (
+                getattr(settings, provider_config.model_key, None) 
+                or provider_config.default_model
             )
-            logger.info("ChatGoogleGenerativeAI singleton initialized")
+            temperature = (
+                getattr(settings, provider_config.temperature_key, None) 
+                or provider_config.default_temperature
+            )
+            api_key = getattr(settings, provider_config.api_key_key)
+
+            # Create provider using factory (Strategy pattern)
+            Services.llm = create_llm_provider(
+                provider_name=provider_name,
+                model=model,
+                temperature=temperature,
+                api_key=api_key,
+            )
+            logger.info(
+                f"LLM provider singleton initialized: "
+                f"{Services.llm.get_provider_name()} (model={model})"
+            )
         except Exception as e:
-            logger.error(
-                f"Failed to initialize ChatGoogleGenerativeAI: {str(e)}",
-                exc_info=True,
-            )
+            logger.error(f"Failed to initialize LLM provider: {str(e)}", exc_info=True)
             raise
 
     return Services.llm
@@ -149,7 +320,7 @@ def get_retriever():
         New instance per request ensures thread-safety and request isolation.
     """
     try:
-        from rag.retriever import Retriever
+        from rag.retrieval.retriever import Retriever
 
         retriever = Retriever(
             vector_store=get_vector_store(),
@@ -182,7 +353,7 @@ def get_rag_chain():
         Underlying singletons (VectorStore, Embeddings, LLM) are reused.
     """
     try:
-        from rag.rag_chain import RAGChain
+        from rag.core.chain import RAGChain
 
         chain = RAGChain(
             retriever=get_retriever(),

@@ -76,20 +76,7 @@ class FileManager:
         destination_dir: Path,
         add_timestamp: bool = True,
     ) -> Path:
-        """
-        Move file to destination directory.
-
-        Args:
-            file_path: Source file path
-            destination_dir: Destination directory
-            add_timestamp: Whether to append timestamp to filename
-
-        Returns:
-            Path to moved file
-
-        Raises:
-            Exception: If move fails
-        """
+        """Move file to destination directory."""
         from utils.exceptions import FileManagerError
 
         try:
@@ -122,16 +109,7 @@ class FileManager:
         file_path: Path,
         add_timestamp: bool = True,
     ) -> Path:
-        """
-        Move successfully processed file to processed folder.
-
-        Args:
-            file_path: File to move
-            add_timestamp: Whether to append timestamp
-
-        Returns:
-            Path to moved file
-        """
+        """Move successfully processed file to processed folder."""
         processed_dir = self.settings.processed_dir
         return self.move_file(file_path, processed_dir, add_timestamp)
 
@@ -141,17 +119,7 @@ class FileManager:
         error_reason: Optional[str] = None,
         add_timestamp: bool = True,
     ) -> Path:
-        """
-        Move failed file to failed folder.
-
-        Args:
-            file_path: File that failed processing
-            error_reason: Brief error description (will be added to filename)
-            add_timestamp: Whether to append timestamp
-
-        Returns:
-            Path to moved file
-        """
+        """Move failed file to failed folder."""
         from utils.exceptions import FileManagerError
 
         try:
@@ -183,15 +151,7 @@ class FileManager:
             )
 
     def cleanup_raw_docs(self, file_path: Path) -> None:
-        """
-        Delete a file from raw_docs (after successful move).
-
-        Args:
-            file_path: File to delete
-
-        Raises:
-            Exception: If deletion fails
-        """
+        """Delete a file from raw_docs (after successful move)."""
         from utils.exceptions import FileManagerError
 
         try:
@@ -208,12 +168,7 @@ class FileManager:
             )
 
     def get_file_stats(self) -> Dict[str, Any]:
-        """
-        Get statistics about files in knowledge directories.
-
-        Returns:
-            Stats dictionary with file counts and sizes
-        """
+        """Get statistics about files in knowledge directories."""
 
         def count_files_and_size(directory: Path) -> Tuple[int, int]:
             if not directory.exists():

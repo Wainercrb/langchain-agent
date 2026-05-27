@@ -8,7 +8,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from rag.retriever import RetrievedDocument, Retriever
+from rag.retrieval.retriever import RetrievedDocument, Retriever
 
 
 @pytest.fixture

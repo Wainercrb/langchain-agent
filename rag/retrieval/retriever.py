@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from models import RetrievedDocument
 
-from .utils import filter_by_threshold, filter_by_version
+from ..utils import filter_by_threshold, filter_by_version
 
 logger = logging.getLogger(__name__)
 

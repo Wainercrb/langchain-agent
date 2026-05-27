@@ -4,7 +4,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from rag.rag_chain import RAGChain
+from rag.core.chain import RAGChain
 
 from .dependencies import check_health, get_rag_chain
 from .models import ChatRequest, ChatResponse, HealthResponse, ErrorResponse
