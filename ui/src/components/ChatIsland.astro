@@ -519,15 +519,18 @@
   .message {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);  /* Increased gap between messages */
+    width: 100%;  /* Full width to position bubble left/right */
+    gap: var(--space-2);
   }
 
   .message--user {
     align-items: flex-end;
+    padding-left: 20%;  /* Push user messages to the right */
   }
 
   .message--assistant {
     align-items: flex-start;
+    padding-right: 20%;  /* Push AI messages to the left */
   }
 
   .message__label {
