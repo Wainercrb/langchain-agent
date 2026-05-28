@@ -190,9 +190,10 @@
         actions.appendChild(dislikeBtn);
       }
 
-      bubble.appendChild(actions);
+      bubble.appendChild(content);
       wrapper.appendChild(label);
       wrapper.appendChild(bubble);
+      wrapper.appendChild(actions);
     } else {
       // User message: simple bubble
       const bubble = document.createElement('div');
@@ -433,7 +434,7 @@
   .message {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: var(--space-2);  /* Increased gap between messages */
   }
 
   .message--user {
@@ -448,7 +449,8 @@
     display: flex;
     align-items: center;
     gap: var(--space-1);
-    padding: 0 var(--space-2);
+    margin-bottom: var(--space-1);  /* Space between label and bubble */
+    padding: 0;
   }
 
   .message__label-icon {
@@ -464,7 +466,7 @@
   }
 
   .message__bubble {
-    max-width: 80%;
+    max-width: 85%;  /* Wider bubbles */
     padding: var(--space-3) var(--space-4);
     word-break: break-word;
   }
@@ -547,7 +549,8 @@
   .message__actions {
     display: flex;
     gap: var(--space-1);
-    margin-top: var(--space-2);
+    margin-top: var(--space-2);  /* Space between bubble and actions */
+    padding-left: var(--space-1);  /* Align with bubble start */
   }
 
   .message__action-btn {
