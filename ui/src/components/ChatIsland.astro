@@ -1,15 +1,15 @@
 ---
 // ChatIsland — Client-side interactive chat component
-// Uses client:load for immediate hydration
 ---
 
 <div class="chat-island" role="log" aria-live="polite" aria-label="Chat messages">
   <div class="messages-container" id="messages-container">
     <!-- Empty state -->
     <div class="empty-state" id="empty-state">
-      <span aria-hidden="true">💭</span>
-      <p>Start a conversation...</p>
-      <p class="hint">Ask anything about the documents</p>
+      <div class="empty-state__content">
+        <p class="empty-state__title">Start a conversation...</p>
+        <p class="empty-state__hint">Ask anything about the documents</p>
+      </div>
     </div>
   </div>
 </div>
@@ -27,7 +27,7 @@
     role: 'user' | 'assistant';
     content: string;
     timestamp: Date;
-    sources?: Array<{ filename: string; similarity_score: number }>;
+    sources?: Array<{ filename: string; similarity_score: number; content?: string }>;
     executionTime?: number;
     model?: string;
     runId?: string | null;
@@ -36,7 +36,6 @@
   interface ChatState {
     messages: ChatMessage[];
     isLoading: boolean;
-    error: string | null;
     settings: { topK: number; temperature: number; includeSources: boolean };
   }
 
@@ -47,7 +46,6 @@
   let state: ChatState = {
     messages: [],
     isLoading: false,
-    error: null,
     settings: loadSettings(),
   };
 
@@ -55,7 +53,7 @@
   let resizeTimeout: number | undefined;
 
   // ============================================
-  // Settings Management
+  // Settings
   // ============================================
 
   function loadSettings() {
@@ -82,138 +80,132 @@
   }
 
   // ============================================
-  // Utilities
+  // SVG Icons
   // ============================================
 
-  function generateId(): string {
-    return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-  }
-
-  function escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-
-  function getSvgIcon(icon: 'copy' | 'thumbUp' | 'thumbDown'): string {
-    const icons = {
-      copy: `<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`,
-      thumbUp: `<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>`,
-      thumbDown: `<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"/></svg>`,
-    };
-    return icons[icon];
-  }
+  const icons = {
+    bolt: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
+    copy: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`,
+    thumbUp: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>`,
+    thumbDown: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"/></svg>`,
+    description: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>`,
+  };
 
   // ============================================
-  // DOM Rendering
+  // Render Message
   // ============================================
 
   function renderMessage(message: ChatMessage): HTMLElement {
     const wrapper = document.createElement('div');
-    wrapper.className = `message-wrapper message-wrapper--${message.role}`;
-    wrapper.setAttribute('data-message-id', message.id);
+    wrapper.className = `message message--${message.role}`;
 
-    const bubble = document.createElement('div');
-    bubble.className = `message-bubble message-bubble--${message.role}`;
-
-    const content = document.createElement('p');
-    content.className = 'message-content';
-    content.textContent = message.content;
-    bubble.appendChild(content);
-
-    // Metadata for assistant messages
-    if (message.role === 'assistant' && (message.executionTime || message.model)) {
-      const meta = document.createElement('div');
-      meta.className = 'message-meta';
-      if (message.executionTime) {
-        const time = document.createElement('span');
-        time.textContent = `${Math.round(message.executionTime)}ms`;
-        meta.appendChild(time);
-      }
-      if (message.model) {
-        const model = document.createElement('span');
-        model.textContent = message.model;
-        meta.appendChild(model);
-      }
-      bubble.appendChild(meta);
-    }
-
-    // Sources for assistant messages
-    if (message.sources && message.sources.length > 0) {
-      const details = document.createElement('details');
-      details.className = 'message-sources';
-
-      const summary = document.createElement('summary');
-      summary.textContent = `Sources (${message.sources.length})`;
-      details.appendChild(summary);
-
-      const list = document.createElement('div');
-      list.className = 'message-sources__list';
-
-      message.sources.forEach(src => {
-        const item = document.createElement('div');
-        item.className = 'message-sources__item';
-
-        const filename = document.createElement('div');
-        filename.className = 'message-sources__filename';
-        filename.textContent = src.filename || 'Document';
-
-        const score = document.createElement('div');
-        score.className = 'message-sources__score';
-        score.textContent = `Match: ${(src.similarity_score * 100).toFixed(0)}%`;
-
-        item.appendChild(filename);
-        item.appendChild(score);
-        list.appendChild(item);
-      });
-
-      details.appendChild(list);
-      bubble.appendChild(details);
-    }
-
-    // Action buttons for assistant messages
     if (message.role === 'assistant') {
-      const actions = document.createElement('div');
-      actions.className = 'message-actions';
+      // AI message: label "FW Agent" with bolt + content bubble
+      const label = document.createElement('div');
+      label.className = 'message__label';
+      label.innerHTML = `<span class="message__label-icon" aria-hidden="true">${icons.bolt}</span><span class="message__label-text">FW Agent</span>`;
 
-      // Copy button
+      const bubble = document.createElement('div');
+      bubble.className = 'message__bubble';
+
+      const content = document.createElement('p');
+      content.className = 'message__content';
+      content.textContent = message.content;
+      bubble.appendChild(content);
+
+      // Attached Files (mockup style)
+      if (message.sources && message.sources.length > 0 && state.settings.includeSources) {
+        const filesSection = document.createElement('div');
+        filesSection.className = 'message__files';
+
+        const filesHeader = document.createElement('div');
+        filesHeader.className = 'message__files-header';
+        filesHeader.textContent = 'Attached Files';
+        filesSection.appendChild(filesHeader);
+
+        message.sources.forEach(src => {
+          const fileItem = document.createElement('div');
+          fileItem.className = 'message__file';
+
+          const fileIcon = document.createElement('span');
+          fileIcon.className = 'message__file-icon';
+          fileIcon.innerHTML = icons.description;
+          fileItem.appendChild(fileIcon);
+
+          const fileInfo = document.createElement('div');
+          fileInfo.className = 'message__file-info';
+
+          const fileName = document.createElement('span');
+          fileName.className = 'message__file-name';
+          fileName.textContent = src.filename || 'Document';
+          fileInfo.appendChild(fileName);
+
+          const fileMeta = document.createElement('span');
+          fileMeta.className = 'message__file-meta';
+          fileMeta.textContent = 'PDF • 2.4 MB';
+          fileInfo.appendChild(fileMeta);
+
+          fileItem.appendChild(fileInfo);
+          filesSection.appendChild(fileItem);
+        });
+
+        bubble.appendChild(filesSection);
+      }
+
+      // Action buttons
+      const actions = document.createElement('div');
+      actions.className = 'message__actions';
+
+      // Copy
       const copyBtn = document.createElement('button');
-      copyBtn.className = 'message-action-btn';
+      copyBtn.className = 'message__action-btn';
       copyBtn.setAttribute('aria-label', 'Copy message');
       copyBtn.type = 'button';
-      copyBtn.innerHTML = getSvgIcon('copy');
+      copyBtn.innerHTML = icons.copy;
       copyBtn.addEventListener('click', () => {
         navigator.clipboard.writeText(message.content).then(() => {
-          copyBtn.setAttribute('aria-label', 'Copied!');
-          setTimeout(() => copyBtn.setAttribute('aria-label', 'Copy message'), 2000);
+          copyBtn.setAttribute('data-copied', 'true');
+          setTimeout(() => copyBtn.removeAttribute('data-copied'), 2000);
         });
       });
       actions.appendChild(copyBtn);
 
       if (message.runId) {
-        // Like button
+        // Thumb up
         const likeBtn = document.createElement('button');
-        likeBtn.className = 'message-action-btn';
+        likeBtn.className = 'message__action-btn';
         likeBtn.setAttribute('aria-label', 'Like response');
         likeBtn.type = 'button';
-        likeBtn.innerHTML = getSvgIcon('thumbUp');
-        likeBtn.addEventListener('click', () => handleFeedback(message.runId!, 'like', likeBtn, dislikeBtn));
+        likeBtn.innerHTML = icons.thumbUp;
+        likeBtn.addEventListener('click', () => handleFeedback(message.runId!, 'like'));
         actions.appendChild(likeBtn);
 
-        // Dislike button
+        // Thumb down
         const dislikeBtn = document.createElement('button');
-        dislikeBtn.className = 'message-action-btn';
+        dislikeBtn.className = 'message__action-btn';
         dislikeBtn.setAttribute('aria-label', 'Dislike response');
         dislikeBtn.type = 'button';
-        dislikeBtn.innerHTML = getSvgIcon('thumbDown');
-        dislikeBtn.addEventListener('click', () => handleFeedback(message.runId!, 'dislike', likeBtn, dislikeBtn));
+        dislikeBtn.innerHTML = icons.thumbDown;
+        dislikeBtn.addEventListener('click', () => handleFeedback(message.runId!, 'dislike'));
         actions.appendChild(dislikeBtn);
       }
 
       bubble.appendChild(actions);
+      wrapper.appendChild(label);
+      wrapper.appendChild(bubble);
+    } else {
+      // User message: simple bubble
+      const bubble = document.createElement('div');
+      bubble.className = 'message__bubble message__bubble--user';
+
+      const content = document.createElement('p');
+      content.className = 'message__content';
+      content.textContent = message.content;
+      bubble.appendChild(content);
+
+      wrapper.appendChild(bubble);
     }
 
-    wrapper.appendChild(bubble);
     return wrapper;
   }
 
@@ -228,10 +220,18 @@
     }
   }
 
-  function showLoadingMessage(): HTMLElement {
+  function showLoading(): HTMLElement {
     const wrapper = document.createElement('div');
-    wrapper.className = 'message-wrapper message-wrapper--assistant loading-message';
-    wrapper.innerHTML = '<div class="message-bubble message-bubble--assistant"><p class="message-content">Thinking...</p></div>';
+    wrapper.className = 'message message--assistant';
+    wrapper.innerHTML = `
+      <div class="message__label">
+        <span class="message__label-icon" aria-hidden="true">${icons.bolt}</span>
+        <span class="message__label-text">FW Agent</span>
+      </div>
+      <div class="message__bubble">
+        <p class="message__content">Thinking...</p>
+      </div>
+    `;
     const container = document.getElementById('messages-container');
     if (container) {
       container.appendChild(wrapper);
@@ -240,7 +240,7 @@
     return wrapper;
   }
 
-  function removeLoadingMessage(el: HTMLElement) {
+  function removeLoading(el: HTMLElement) {
     el.remove();
   }
 
@@ -248,33 +248,11 @@
   // Event Handlers
   // ============================================
 
-  async function handleFeedback(
-    runId: string,
-    type: 'like' | 'dislike',
-    likeBtn: HTMLButtonElement,
-    dislikeBtn: HTMLButtonElement
-  ) {
-    if (likeBtn.disabled) return;
-
-    likeBtn.disabled = true;
-    dislikeBtn.disabled = true;
-
+  async function handleFeedback(runId: string, type: 'like' | 'dislike') {
     try {
-      const result = await submitFeedback(runId, type);
-      if (result.status === 'recorded' || result.status === 'accepted') {
-        likeBtn.classList.remove('message-action-btn--active');
-        dislikeBtn.classList.remove('message-action-btn--active');
-        if (type === 'like') {
-          likeBtn.classList.add('message-action-btn--active');
-        } else {
-          dislikeBtn.classList.add('message-action-btn--active');
-        }
-      }
+      await submitFeedback(runId, type);
     } catch (error) {
       console.error('Feedback error:', error);
-    } finally {
-      likeBtn.disabled = false;
-      dislikeBtn.disabled = false;
     }
   }
 
@@ -285,9 +263,12 @@
 
     if (!query || state.isLoading) return;
 
-    // Add user message
+    state.isLoading = true;
+    input.disabled = true;
+    sendBtn.disabled = true;
+
     addMessageToDOM({
-      id: generateId(),
+      id: crypto.randomUUID(),
       role: 'user',
       content: query,
       timestamp: new Date(),
@@ -295,19 +276,15 @@
 
     input.value = '';
     input.style.height = 'auto';
-    input.disabled = true;
-    sendBtn.disabled = true;
 
-    // Show loading
-    state.isLoading = true;
-    const loadingEl = showLoadingMessage();
+    const loadingEl = showLoading();
 
     try {
       const response: ChatResponse = await chatWithAgent(query, state.settings);
-      removeLoadingMessage(loadingEl);
+      removeLoading(loadingEl);
 
       addMessageToDOM({
-        id: generateId(),
+        id: crypto.randomUUID(),
         role: 'assistant',
         content: response.response,
         timestamp: new Date(),
@@ -320,12 +297,11 @@
         runId: response.run_id,
       });
     } catch (error) {
-      removeLoadingMessage(loadingEl);
-      const errorMsg = error instanceof Error ? error.message : 'An unexpected error occurred';
+      removeLoading(loadingEl);
       addMessageToDOM({
-        id: generateId(),
+        id: crypto.randomUUID(),
         role: 'assistant',
-        content: `Error: ${errorMsg}`,
+        content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
         timestamp: new Date(),
       });
     } finally {
@@ -343,25 +319,23 @@
     const sendBtn = document.getElementById('send-btn') as HTMLButtonElement;
     const input = document.getElementById('chat-input') as HTMLTextAreaElement;
 
-    if (statusDot && statusText) {
-      statusDot.className = isHealthy ? 'status-dot status-dot--online' : 'status-dot status-dot--offline';
-      statusText.textContent = isHealthy ? 'Online' : 'Offline';
-      statusText.className = isHealthy ? 'status-text status-text--online' : 'status-text status-text--offline';
+    if (statusDot) {
+      statusDot.style.background = isHealthy ? 'var(--color-success)' : 'var(--color-error)';
     }
-
+    if (statusText) {
+      statusText.textContent = isHealthy ? 'System Online' : 'Offline';
+    }
     if (sendBtn) sendBtn.disabled = !isHealthy || state.isLoading;
     if (input) input.disabled = !isHealthy || state.isLoading;
   }
 
   // ============================================
-  // Initialization
+  // Init
   // ============================================
 
   function init() {
-    // Send button
     document.getElementById('send-btn')?.addEventListener('click', handleSend);
 
-    // Enter to send (Shift+Enter for new line)
     document.getElementById('chat-input')?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -369,7 +343,7 @@
       }
     });
 
-    // Settings toggles
+    // Settings
     document.getElementById('results-toggle')?.addEventListener('change', (e) => {
       state.settings.topK = (e.target as HTMLInputElement).checked ? 10 : 5;
       saveSettings();
@@ -400,19 +374,17 @@
     healthInterval = window.setInterval(updateHealth, 5000);
   }
 
-  // Cleanup on page unload
   window.addEventListener('beforeunload', () => {
     if (healthInterval) clearInterval(healthInterval);
     if (resizeTimeout) clearTimeout(resizeTimeout);
   });
 
-  // Initialize
   init();
 </script>
 
 <style>
   /* ============================================
-     Message Layout
+     Layout
      ============================================ */
   .chat-island {
     display: flex;
@@ -423,121 +395,10 @@
   .messages-container {
     flex: 1;
     overflow-y: auto;
-    padding: var(--space-6);
+    padding: var(--space-4) var(--space-6);
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-  }
-
-  .message-wrapper {
-    display: flex;
-    margin-bottom: var(--space-4);
-  }
-
-  .message-wrapper--user {
-    justify-content: flex-end;
-  }
-
-  .message-wrapper--assistant {
-    justify-content: flex-start;
-  }
-
-  .message-bubble {
-    max-width: 75%;
-    padding: var(--space-3) var(--space-4);
-    word-break: break-word;
-  }
-
-  .message-bubble--user {
-    background: var(--color-primary);
-    color: white;
-    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
-  }
-
-  .message-bubble--assistant {
-    background: var(--color-ai-bubble);
-    color: var(--color-text);
-    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-sm);
-  }
-
-  .message-content {
-    margin: 0;
-    font-size: 0.875rem;
-    line-height: 1.6;
-  }
-
-  .message-meta {
-    display: flex;
-    gap: var(--space-3);
-    margin-top: var(--space-2);
-    font-size: 0.75rem;
-    color: var(--color-text-muted);
-  }
-
-  /* ============================================
-     Message Actions
-     ============================================ */
-  .message-actions {
-    display: flex;
-    gap: var(--space-1);
-    margin-top: var(--space-2);
-  }
-
-  .message-action-btn {
-    padding: var(--space-1);
-    color: var(--color-text-muted);
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: color var(--transition-fast), background var(--transition-fast);
-  }
-
-  .message-action-btn:hover {
-    color: var(--color-primary);
-    background: var(--color-primary-subtle);
-  }
-
-  .message-action-btn--active {
-    color: var(--color-primary);
-    background: var(--color-primary-subtle);
-  }
-
-  /* ============================================
-     Sources
-     ============================================ */
-  .message-sources {
-    margin-top: var(--space-2);
-  }
-
-  .message-sources summary {
-    cursor: pointer;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--color-primary);
-  }
-
-  .message-sources summary:hover {
-    color: var(--color-primary-hover);
-  }
-
-  .message-sources__list {
-    margin-top: var(--space-2);
-    padding-left: var(--space-2);
-    border-left: 2px solid var(--color-border);
-  }
-
-  .message-sources__item {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
-  }
-
-  .message-sources__filename {
-    font-weight: 500;
-  }
-
-  .message-sources__score {
-    color: var(--color-text-muted);
   }
 
   /* ============================================
@@ -545,52 +406,178 @@
      ============================================ */
   .empty-state {
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
     height: 100%;
-    text-align: center;
-    color: var(--color-text-secondary);
-    opacity: 0.5;
   }
 
-  .empty-state span {
-    font-size: 2rem;
+  .empty-state__content {
+    text-align: center;
+    color: var(--color-text-secondary);
+  }
+
+  .empty-state__title {
+    font-size: 1rem;
+    margin: 0 0 var(--space-1);
+  }
+
+  .empty-state__hint {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin: 0;
+  }
+
+  /* ============================================
+     Message
+     ============================================ */
+  .message {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .message--user {
+    align-items: flex-end;
+  }
+
+  .message--assistant {
+    align-items: flex-start;
+  }
+
+  .message__label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: 0 var(--space-2);
+  }
+
+  .message__label-icon {
+    display: flex;
+    align-items: center;
+    color: var(--color-primary);
+  }
+
+  .message__label-text {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+  }
+
+  .message__bubble {
+    max-width: 80%;
+    padding: var(--space-3) var(--space-4);
+    word-break: break-word;
+  }
+
+  .message__bubble--user {
+    background: var(--color-primary);
+    color: white;
+    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
+  }
+
+  .message__bubble:not(.message__bubble--user) {
+    background: var(--color-surface-elevated);
+    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-sm);
+  }
+
+  .message__content {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+
+  .message__bubble--user .message__content {
+    color: white;
+  }
+
+  /* ============================================
+     Attached Files (Mockup style)
+     ============================================ */
+  .message__files {
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .message__files-header {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
     margin-bottom: var(--space-2);
   }
 
-  .empty-state p {
-    margin: 0;
-    font-size: 0.875rem;
+  .message__file {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--space-1);
   }
 
-  .empty-state .hint {
-    margin-top: var(--space-1);
+  .message__file-icon {
+    display: flex;
+    align-items: center;
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+  }
+
+  .message__file-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .message__file-name {
     font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text);
+  }
+
+  .message__file-meta {
+    font-size: 0.625rem;
     color: var(--color-text-muted);
   }
 
   /* ============================================
-     Status Indicators
+     Action Buttons
      ============================================ */
-  .status-dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: var(--radius-full);
-    animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  .message__actions {
+    display: flex;
+    gap: var(--space-1);
+    margin-top: var(--space-2);
   }
 
-  .status-dot--online {
-    background: var(--color-success);
+  .message__action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: all var(--transition-fast);
   }
 
-  .status-dot--offline {
-    background: var(--color-error);
-    animation: none;
+  .message__action-btn:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    background: var(--color-primary-subtle);
   }
 
-  @keyframes pulse-soft {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
+  .message__action-btn[data-copied="true"] {
+    border-color: var(--color-success);
+    color: var(--color-success);
+  }
+
+  .message__action-btn:focus-visible {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: 2px;
   }
 </style>

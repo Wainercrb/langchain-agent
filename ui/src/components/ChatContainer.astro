@@ -6,95 +6,91 @@
   <!-- Header -->
   <header class="chat-header">
     <div class="chat-header__brand">
-      <h1 class="chat-header__title">FW Agent</h1>
-      <p class="chat-header__status">
-        <span class="status-dot status-dot--online" id="status-dot" aria-hidden="true"></span>
-        <span class="status-text status-text--online" id="status-text">System Online</span>
-      </p>
+      <div class="chat-header__title-group">
+        <h1 class="chat-header__title">FW Agent</h1>
+        <p class="chat-header__status">
+          <span class="status-dot" id="status-dot" aria-hidden="true"></span>
+          <span id="status-text">System Online</span>
+        </p>
+      </div>
+      <div class="chat-header__bolt" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+      </div>
     </div>
   </header>
 
   <!-- Main content area -->
   <main class="chat-main" role="main">
     <section class="chat-messages-area" aria-label="Chat messages">
-      <!-- Messages rendered by ChatIsland -->
       <slot />
     </section>
   </main>
 
+  <!-- Toggles Row (ABOVE input per mockup) -->
+  <div class="chat-toggles-row">
+    <label class="chat-toggle" aria-label="Results (K)">
+      <input type="checkbox" id="results-toggle" class="sr-only" />
+      <span class="chat-toggle__track">
+        <span class="chat-toggle__thumb"></span>
+      </span>
+      <span class="chat-toggle__label">Results (K)</span>
+    </label>
+
+    <label class="chat-toggle" aria-label="Creativity">
+      <input type="checkbox" id="creativity-toggle" class="sr-only" />
+      <span class="chat-toggle__track">
+        <span class="chat-toggle__thumb"></span>
+      </span>
+      <span class="chat-toggle__label">Creativity</span>
+    </label>
+
+    <label class="chat-checkbox" aria-label="Show Sources">
+      <input type="checkbox" id="include-sources" checked />
+      <span class="chat-checkbox__box" aria-hidden="true"></span>
+      <span class="chat-checkbox__label">Show Sources</span>
+    </label>
+  </div>
+
   <!-- Input Section -->
   <footer class="chat-input-section" role="contentinfo">
-    <form class="chat-input-form" onsubmit="return false;">
-      <!-- Input card -->
-      <div class="chat-input-card">
-        <!-- Textarea with paperclip -->
-        <div class="chat-input-wrapper">
-          <!-- Paperclip icon (decorative) -->
-          <span class="chat-input-icon" aria-hidden="true">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18.84 5.6l-8.58 8.58a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-            </svg>
-          </span>
-          <textarea
-            id="chat-input"
-            class="chat-textarea"
-            placeholder="Ask anything about the documents..."
-            rows="2"
-            aria-label="Type your message"
-          ></textarea>
-        </div>
+    <div class="chat-input-card">
+      <!-- Paperclip icon (decorative, LEFT) -->
+      <span class="chat-input-icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18.84 5.6l-8.58 8.58a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+        </svg>
+      </span>
 
-        <!-- Bottom row: settings + send -->
-        <div class="chat-input-footer">
-          <!-- Settings controls -->
-          <div class="chat-settings">
-            <!-- Results (K) Toggle -->
-            <label class="chat-toggle" aria-label="Results (K)">
-              <input type="checkbox" id="results-toggle" class="sr-only" />
-              <span class="chat-toggle__track">
-                <span class="chat-toggle__thumb"></span>
-              </span>
-              <span class="chat-toggle__label">Results (K)</span>
-            </label>
+      <!-- Textarea -->
+      <textarea
+        id="chat-input"
+        class="chat-textarea"
+        placeholder="Ask anything..."
+        rows="1"
+        aria-label="Type your message"
+      ></textarea>
 
-            <!-- Creativity Toggle -->
-            <label class="chat-toggle" aria-label="Creativity">
-              <input type="checkbox" id="creativity-toggle" class="sr-only" />
-              <span class="chat-toggle__track">
-                <span class="chat-toggle__thumb"></span>
-              </span>
-              <span class="chat-toggle__label">Creativity</span>
-            </label>
+      <!-- Send button (RIGHT, inside input card) -->
+      <button
+        type="button"
+        id="send-btn"
+        class="chat-send-btn"
+        aria-label="Send message"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="m5 12 7-7 7 7"/>
+          <path d="M12 19V5"/>
+        </svg>
+      </button>
+    </div>
 
-            <!-- Show Sources -->
-            <label class="chat-checkbox" aria-label="Show sources">
-              <input type="checkbox" id="include-sources" checked />
-              <span class="chat-checkbox__box" aria-hidden="true"></span>
-              <span class="chat-checkbox__label">Show Sources</span>
-            </label>
-          </div>
-
-          <!-- Send button -->
-          <button
-            type="button"
-            id="send-btn"
-            class="chat-send-btn"
-            aria-label="Send message"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="m5 12 7-7 7 7"/>
-              <path d="M12 19V5"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- Hint text -->
-      <p class="chat-hint">Shift + Enter for new line</p>
-
-      <!-- Disclaimer -->
+    <!-- Hint text and disclaimer -->
+    <div class="chat-footer-text">
+      <span>Shift + Enter for new line</span>
       <p class="chat-disclaimer">FW Agent may provide inaccurate information. Verify critical data.</p>
-    </form>
+    </div>
   </footer>
 </div>
 
@@ -117,10 +113,9 @@
   .chat-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     padding: var(--space-4) var(--space-6);
-    border-bottom: 1px solid var(--color-border);
     background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
   }
 
   .chat-header__brand {
@@ -129,11 +124,18 @@
     gap: var(--space-3);
   }
 
+  .chat-header__title-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
   .chat-header__title {
     font-size: 1.25rem;
     font-weight: 700;
     color: var(--color-text);
     margin: 0;
+    line-height: 1.2;
   }
 
   .chat-header__status {
@@ -143,6 +145,13 @@
     font-size: 0.75rem;
     color: var(--color-text-secondary);
     margin: 0;
+  }
+
+  .chat-header__bolt {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-primary);
   }
 
   /* ============================================
@@ -159,78 +168,15 @@
   }
 
   /* ============================================
-     Input Section
+     Toggles Row (ABOVE input per mockup)
      ============================================ */
-  .chat-input-section {
-    padding: var(--space-4) var(--space-6);
-    border-top: 1px solid var(--color-border);
-    background: var(--color-surface);
-  }
-
-  .chat-input-card {
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-  }
-
-  .chat-input-card:focus-within {
-    border-color: var(--color-border-focus);
-    box-shadow: 0 0 0 3px var(--color-primary-subtle);
-  }
-
-  /* Input wrapper */
-  .chat-input-wrapper {
-    position: relative;
-    padding: var(--space-3) var(--space-4);
-  }
-
-  .chat-input-icon {
-    position: absolute;
-    left: var(--space-4);
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--color-text-muted);
-    pointer-events: none;
-  }
-
-  .chat-textarea {
-    width: 100%;
-    padding: var(--space-2) var(--space-4) var(--space-2) var(--space-8);
-    border: none;
-    background: transparent;
-    color: var(--color-text);
-    font-family: inherit;
-    font-size: 1rem;
-    line-height: 1.5;
-    resize: none;
-  }
-
-  .chat-textarea:focus {
-    outline: none;
-  }
-
-  .chat-textarea::placeholder {
-    color: var(--color-text-muted);
-  }
-
-  /* Input footer */
-  .chat-input-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-3) var(--space-4);
-    border-top: 1px solid var(--color-border);
-  }
-
-  /* ============================================
-     Settings Controls
-     ============================================ */
-  .chat-settings {
+  .chat-toggles-row {
     display: flex;
     align-items: center;
     gap: var(--space-4);
+    padding: var(--space-3) var(--space-6);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
   }
 
   /* Toggle switch */
@@ -334,26 +280,79 @@
   }
 
   /* ============================================
+     Input Section
+     ============================================ */
+  .chat-input-section {
+    padding: var(--space-3) var(--space-6) var(--space-4);
+    background: var(--color-surface);
+  }
+
+  .chat-input-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-2) var(--space-3);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  }
+
+  .chat-input-card:focus-within {
+    border-color: var(--color-border-focus);
+    box-shadow: 0 0 0 3px var(--color-primary-subtle);
+  }
+
+  .chat-input-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+  }
+
+  .chat-textarea {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: var(--color-text);
+    font-family: inherit;
+    font-size: 1rem;
+    line-height: 1.5;
+    resize: none;
+    padding: var(--space-1) 0;
+    min-height: 1.5rem;
+    max-height: 6rem;
+  }
+
+  .chat-textarea:focus {
+    outline: none;
+  }
+
+  .chat-textarea::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  /* ============================================
      Send Button
      ============================================ */
   .chat-send-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 2.25rem;
-    height: 2.25rem;
+    width: 2rem;
+    height: 2rem;
     background: var(--color-primary);
     color: white;
     border: none;
     border-radius: 50%;
     cursor: pointer;
-    transition: background var(--transition-fast), box-shadow var(--transition-fast);
+    transition: background var(--transition-fast);
     flex-shrink: 0;
   }
 
   .chat-send-btn:hover:not(:disabled) {
     background: var(--color-primary-hover);
-    box-shadow: var(--shadow-lg);
   }
 
   .chat-send-btn:disabled {
@@ -367,18 +366,23 @@
   }
 
   /* ============================================
-     Hint & Disclaimer
+     Footer Text
      ============================================ */
-  .chat-hint {
+  .chat-footer-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
     margin-top: var(--space-2);
-    padding-left: var(--space-1);
+  }
+
+  .chat-footer-text > span {
     font-size: 0.75rem;
     color: var(--color-text-muted);
   }
 
   .chat-disclaimer {
-    margin-top: var(--space-2);
-    text-align: center;
+    margin: 0;
     font-size: 0.75rem;
     color: var(--color-text-muted);
   }
@@ -389,30 +393,9 @@
   .status-dot {
     width: 0.5rem;
     height: 0.5rem;
-    border-radius: var(--radius-full);
-  }
-
-  .status-dot--online {
     background: var(--color-success);
+    border-radius: 50%;
     animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-
-  .status-dot--offline {
-    background: var(--color-error);
-    animation: none;
-  }
-
-  .status-text {
-    font-size: 0.75rem;
-    font-weight: 500;
-  }
-
-  .status-text--online {
-    color: var(--color-text-secondary);
-  }
-
-  .status-text--offline {
-    color: var(--color-error);
   }
 
   @keyframes pulse-soft {
