@@ -1,5 +1,6 @@
 import time
-from typing import List
+from datetime import datetime
+from typing import List, Optional
 
 from config import settings
 from models import ChatResponse, RetrievedDocument, SourceDocument
@@ -21,15 +22,19 @@ class RAGChain:
         top_k: int = 5,
         temperature: float = 0.7,
         include_sources: bool = True,
+        version_filter: Optional[datetime] = None,
     ) -> ChatResponse:
         start_time = time.time()
         try:
             logger.info(
                 f"RAGChain.invoke: query={query[:50]}..., top_k={top_k}, "
-                f"temperature={temperature}, include_sources={include_sources}"
+                f"temperature={temperature}, include_sources={include_sources}, "
+                f"version_filter={version_filter}"
             )
 
-            retrieved = self.retriever.retrieve(query=query, top_k=top_k)
+            retrieved = self.retriever.retrieve(
+                query=query, top_k=top_k, version_filter=version_filter
+            )
             logger.debug(f"Retrieved {len(retrieved)} documents")
 
             context_str = self._format_context(retrieved)
@@ -38,7 +43,7 @@ class RAGChain:
             system_prompt = (
                 "You are a helpful assistant that answers questions based on "
                 "provided context. If the context does not contain information "
-                "needed to answer the question, say so clearly."
+                "needed to answer the question, say so clearly. Always use the most recently ingested documents as context."
             )
 
             user_prompt = (

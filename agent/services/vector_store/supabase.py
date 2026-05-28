@@ -80,58 +80,28 @@ class VectorStore(VectorStoreBase):
         self,
         query_embedding: List[float],
         top_k: int = 5,
-        similarity_threshold: float = 0.5,
+        version_filter: Optional[datetime] = None,
     ) -> List[Dict[str, Any]]:
         try:
-            response = (
-                self.client.table("document_chunks")
-                .select(
-                    "id, document_id, text, chunk_index, metadata, embedding, documents(filename, version_date)"
-                )
-                .execute()
-            )
-
-            similar_chunks = []
-            for item in response.data or []:
-                embedding = item.get("embedding")
-                if not embedding:
-                    continue
-
-                if isinstance(embedding, str):
-                    embedding = [float(x) for x in embedding.strip("[]").split(",")]
-
-                similarity = self._cosine_similarity(query_embedding, embedding)
-
-                documents = item.get("documents")
-                if isinstance(documents, list):
-                    doc_info = documents[0] if documents else {}
-                elif isinstance(documents, dict):
-                    doc_info = documents
-                else:
-                    doc_info = {}
-
-                similar_chunks.append(
-                    {
-                        "id": item.get("id"),
-                        "document_id": item.get("document_id"),
-                        "text": item.get("text"),
-                        "chunk_index": item.get("chunk_index"),
-                        "metadata": item.get("metadata"),
-                        "filename": doc_info.get("filename", "unknown"),
-                        "version_date": doc_info.get("version_date"),
-                        "similarity_score": similarity,
-                    }
+            rpc_params = {
+                "query_embedding": query_embedding,
+                "top_k": top_k,
+            }
+            if version_filter is not None:
+                rpc_params["version_filter"] = (
+                    version_filter.isoformat()
+                    if isinstance(version_filter, datetime)
+                    else version_filter
                 )
 
-            similar_chunks.sort(key=lambda x: x["similarity_score"], reverse=True)
-            results = [c for c in similar_chunks if c["similarity_score"] >= similarity_threshold][
-                :top_k
-            ]
+            response = self.client.rpc("search_similar_chunks", rpc_params).execute()
+
+            results = response.data or []
 
             top_score = f"{results[0]['similarity_score']:.3f}" if results else "N/A"
             logger.info(
                 f"Found {len(results)} similar chunks "
-                f"(top_k={top_k}, threshold={similarity_threshold}, top_score={top_score})"
+                f"(top_k={top_k}, top_score={top_score}, version_filter={version_filter})"
             )
             return results
         except Exception as e:
@@ -139,14 +109,6 @@ class VectorStore(VectorStoreBase):
                 message=f"Failed to search similar chunks: {str(e)}",
                 error_code="SEARCH_ERROR",
             )
-
-    def _cosine_similarity(self, vec_a: List[float], vec_b: List[float]) -> float:
-        if not vec_a or not vec_b:
-            return 0.0
-        dot_product = sum(a * b for a, b in zip(vec_a, vec_b))
-        norm_a = sum(x * x for x in vec_a) ** 0.5
-        norm_b = sum(x * x for x in vec_b) ** 0.5
-        return dot_product / (norm_a * norm_b) if norm_a > 0 and norm_b > 0 else 0.0
 
     def log_ingestion(
         self,

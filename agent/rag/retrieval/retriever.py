@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from models import RetrievedDocument
 
-from ..utils import filter_by_threshold, filter_by_version
+from ..utils import filter_by_threshold
 from services.container import logger
 
 
@@ -29,12 +29,12 @@ class Retriever:
 
             query_embedding = self.embeddings.embed_query(query)
             search_results = self.vector_store.search_similar(
-                query_embedding=query_embedding, top_k=top_k
+                query_embedding=query_embedding,
+                top_k=top_k,
+                version_filter=version_filter,
             )
 
             filtered = list(filter_by_threshold(search_results, similarity_threshold))
-            if version_filter is not None:
-                filtered = list(filter_by_version(filtered, version_filter))
 
             retrieved_documents = [
                 RetrievedDocument(

@@ -1,6 +1,7 @@
 """Abstract base for vector stores — define el contrato para bases de datos vectoriales."""
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 
@@ -23,9 +24,23 @@ class VectorStoreBase(ABC):
 
     @abstractmethod
     def search_similar(
-        self, query_embedding: List[float], top_k: int = 5
+        self,
+        query_embedding: List[float],
+        top_k: int = 5,
+        version_filter: Optional[datetime] = None,
     ) -> List[Dict[str, Any]]:
-        """Search for similar documents."""
+        """Search for similar documents.
+
+        Args:
+            query_embedding: Embedding vector of the query.
+            top_k: Number of top results to return.
+            version_filter: Optional minimum version date. Only documents
+                with version_date >= version_filter are considered.
+
+        Returns:
+            List of result dictionaries with keys: id, document_id, text,
+            chunk_index, metadata, filename, version_date, similarity_score.
+        """
         pass
 
     @abstractmethod
