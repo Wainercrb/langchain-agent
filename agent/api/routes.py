@@ -86,7 +86,7 @@ async def chat(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "error": "invalid_request",
-                "message": str(e),
+                "message": "Invalid request parameters",
                 "timestamp": datetime.utcnow().isoformat(),
             },
         )
@@ -190,4 +190,6 @@ async def health() -> HealthResponse:
         status=health_info["status"],
         timestamp=datetime.utcnow(),
         db_connected=health_info.get("db_connected", False),
+        llm_connected=health_info.get("llm_connected", False),
+        embedding_connected=health_info.get("embedding_connected", False),
     )

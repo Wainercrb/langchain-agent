@@ -101,6 +101,14 @@ class HealthResponse(BaseModel):
         ...,
         description="Database connectivity status",
     )
+    llm_connected: bool = Field(
+        default=False,
+        description="LLM provider availability",
+    )
+    embedding_connected: bool = Field(
+        default=False,
+        description="Embedding service availability",
+    )
 
     model_config = ConfigDict(
         json_schema_extra={

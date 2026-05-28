@@ -42,6 +42,7 @@ llm = OpenRouterProvider(
     temperature=settings.openrouter_temperature,
     max_tokens=settings.openrouter_max_tokens,
     api_key=settings.openrouter_api_key,
+    timeout=settings.llm_timeout_seconds,
 )
 
 # ── Embeddings ───────────────────────────────────────────────────────
@@ -58,3 +59,15 @@ db_url = settings.supabase_url
 db_key = settings.supabase_key
 supabase_client = create_client(db_url, db_key)
 vector_store = VectorStore(supabase_client)
+
+# ── LangSmith Tracing ──────────────────────────────────────────────
+tracing_callback = None
+if settings.langchain_tracing_v2 and settings.langsmith_api_key:
+    try:
+        from langchain.callbacks.tracers.langchain import LangChainTracer
+        tracing_callback = LangChainTracer(project=settings.langchain_project)
+        logger.info(f"LangSmith tracing enabled: project={settings.langchain_project}")
+    except ImportError:
+        logger.warning("langsmith package not installed — tracing disabled")
+    except Exception as e:
+        logger.warning(f"LangSmith tracer init failed: {str(e)}")

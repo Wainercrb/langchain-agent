@@ -8,34 +8,45 @@
 :root {
   /* Colors */
   --color-bg: #f9f9ff;
-  --color-surface: #ffffff;
+  --color-surface: #f9f9ff;
   --color-surface-elevated: #e7eeff;
   --color-surface-high: #dee8ff;
   --color-surface-highest: #d8e3fb;
-  --color-border: #c7c4d7;
-  --color-border-focus: #6366f1;
+  --color-border: #e2e8f0;
   --color-text: #111c2d;
-  --color-text-secondary: #626567;
+  --color-text-secondary: #464554;
   --color-text-muted: #9ca3af;
   --color-primary: #6366f1;
   --color-primary-hover: #4648d4;
   --color-primary-subtle: rgba(99, 102, 241, 0.1);
   --color-success: #10b981;
   --color-error: #ef4444;
-  --color-ai-bubble: #f1f3f4;
+  --color-ai-bubble: #f8fafc;
 
-  /* Spacing */
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-6: 1.5rem;
-  --space-8: 2rem;
+  /* Spacing — 8px base unit (matching Stitch) */
+  --space-1: 0.5rem;   /* 8px */
+  --space-2: 1rem;     /* 16px */
+  --space-3: 1.5rem;   /* 24px */
+  --space-4: 2rem;     /* 32px */
+  --space-6: 3rem;     /* 48px */
+  --space-8: 4rem;     /* 64px */
 
-  /* Radii */
-  --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
+  /* Additional spacing tokens (Stitch) */
+  --space-xs: 0.25rem;  /* 4px */
+  --space-sm: 0.5rem;   /* 8px */
+  --space-md: 1rem;     /* 16px */
+  --space-lg: 1.5rem;   /* 24px */
+  --space-xl: 2rem;     /* 32px */
+
+  /* Chat-specific */
+  --chat-gap: 1.25rem;  /* 20px — Stitch chat-gap */
+  --container-margin: 1.25rem;
+
+  /* Radii — Stitch design system */
+  --radius-sm: 0.5rem;  /* 8px — buttons, inputs */
+  --radius-md: 0.75rem; /* 12px */
+  --radius-lg: 1rem;    /* 16px — chat bubbles */
+  --radius-xl: 1.5rem;  /* 24px — chips, pills */
   --radius-full: 9999px;
 
   /* Shadows */

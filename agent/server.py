@@ -9,6 +9,7 @@ from datetime import datetime
 from api import router
 from config import settings
 from services.container import logger
+from utils.correlation import set_correlation_id, get_correlation_id
 
 app = FastAPI(title="LangChain Agent RAG API", version="1.0.0", docs_url="/docs")
 
@@ -20,6 +21,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def correlation_id_middleware(request: Request, call_next):
+    """Set a correlation ID for each request."""
+    cid = request.headers.get("X-Correlation-ID", "")
+    set_correlation_id(cid)
+    response = await call_next(request)
+    response.headers["X-Correlation-ID"] = get_correlation_id()
+    return response
+
 
 app.include_router(router)
 

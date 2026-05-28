@@ -52,6 +52,15 @@ class Settings(BaseSettings):
     # ── Alerts ────────────────────────────────────────────────────────
     discord_webhook_url: Optional[str] = Field(default=None, alias="DISCORD_WEBHOOK_URL")
 
+    # ── LLM Resilience ────────────────────────────────────────────────
+    llm_timeout_seconds: int = Field(default=60, alias="LLM_TIMEOUT_SECONDS")
+    llm_max_retries: int = Field(default=3, alias="LLM_MAX_RETRIES")
+
+    # ── LangSmith / Observability ─────────────────────────────────────
+    langchain_tracing_v2: bool = Field(default=False, alias="LANGCHAIN_TRACING_V2")
+    langchain_project: str = Field(default="langchain-agent", alias="LANGCHAIN_PROJECT")
+    langsmith_api_key: str = Field(default="", alias="LANGSMITH_API_KEY")
+
     model_config = {
         "env_file": ".env",
         "case_sensitive": False,

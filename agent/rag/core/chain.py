@@ -12,11 +12,11 @@ from ..retrieval.retriever import Retriever
 from services.container import logger
 
 
-
 class RAGChain:
-    def __init__(self, retriever: Retriever, llm):
+    def __init__(self, retriever: Retriever, llm, callbacks=None):
         self.retriever = retriever
         self.llm = llm
+        self.callbacks = callbacks or []
         logger.info("RAGChain initialized")
 
     def invoke(
@@ -57,18 +57,36 @@ class RAGChain:
 
             logger.debug("Constructed prompts for LLM")
 
-            run_id = uuid.uuid4()
+            config = RunnableConfig()
+            if self.callbacks:
+                config["callbacks"] = self.callbacks
+
             llm_response = self.llm.invoke(
                 [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                config=RunnableConfig(run_id=run_id),
+                config=config,
             )
             response_text = (
                 llm_response.content if hasattr(llm_response, "content") else str(llm_response)
             )
             logger.debug(f"LLM response received: {len(response_text)} chars")
+
+            # Log token usage if available
+            if hasattr(llm_response, 'usage') and llm_response.usage:
+                logger.info(
+                    f"Token usage: prompt={llm_response.usage.get('prompt_tokens', 'N/A')}, "
+                    f"completion={llm_response.usage.get('completion_tokens', 'N/A')}, "
+                    f"total={llm_response.usage.get('total_tokens', 'N/A')}"
+                )
+
+            # Extract run_id from LangSmith tracer if available
+            run_id = None
+            if hasattr(llm_response, 'response_metadata'):
+                run_id = llm_response.response_metadata.get('run_id')
+            if not run_id:
+                run_id = str(uuid.uuid4())
 
             execution_time_ms = (time.time() - start_time) * 1000
 

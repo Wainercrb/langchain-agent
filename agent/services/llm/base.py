@@ -3,6 +3,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
+from utils.exceptions import LLMProviderError, TransientLLMError, PermanentLLMError
+
 
 class LLMProvider(ABC):
     """Abstract base class for LLM providers.
@@ -49,13 +51,3 @@ class LLMResponse:
 
     def __str__(self) -> str:
         return self.content
-
-
-class LLMProviderError(Exception):
-    """Base exception for LLM provider errors."""
-
-    def __init__(self, message: str, provider: str, original_error: Optional[Exception] = None):
-        self.message = message
-        self.provider = provider
-        self.original_error = original_error
-        super().__init__(f"[{provider}] {message}")

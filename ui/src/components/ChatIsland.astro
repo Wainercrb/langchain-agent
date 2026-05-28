@@ -398,7 +398,7 @@
     padding: var(--space-4) var(--space-6);
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
+    gap: var(--chat-gap);  /* 1.25rem — Stitch design system */
   }
 
   /* ============================================
@@ -476,14 +476,14 @@
   }
 
   .message__bubble:not(.message__bubble--user) {
-    background: var(--color-surface-elevated);
+    background: var(--color-ai-bubble);  /* #f8fafc — Stitch secondary */
     border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-sm);
   }
 
   .message__content {
     margin: 0;
-    font-size: 0.875rem;
-    line-height: 1.6;
+    font-size: 1rem;  /* Stitch body-lg: 16px */
+    line-height: 1.625;  /* 26px line-height */
   }
 
   .message__bubble--user .message__content {

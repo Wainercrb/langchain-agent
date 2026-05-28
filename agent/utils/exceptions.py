@@ -57,4 +57,36 @@ class IngestionError(RAGException):
         super().__init__(message, error_code, details)
 
 
+class LLMProviderError(RAGException):
+    """Base exception for LLM provider errors, unified under RAGException."""
+
+    def __init__(
+        self,
+        message: str,
+        provider: str,
+        original_error: Optional[Exception] = None,
+        is_transient: bool = True,
+        error_code: str = "LLM_PROVIDER_ERROR",
+        details: Optional[Dict[str, Any]] = None,
+    ):
+        self.provider = provider
+        self.original_error = original_error
+        self.is_transient = is_transient
+        super().__init__(message, error_code, details or {"provider": provider})
+
+
+class TransientLLMError(LLMProviderError):
+    """LLM error that SHOULD be retried (rate limits, timeouts, 5xx)."""
+
+    def __init__(self, message: str, provider: str, original_error: Optional[Exception] = None):
+        super().__init__(message, provider, original_error, is_transient=True, error_code="LLM_TRANSIENT_ERROR")
+
+
+class PermanentLLMError(LLMProviderError):
+    """LLM error that should NOT be retried (auth failures, invalid model, 4xx)."""
+
+    def __init__(self, message: str, provider: str, original_error: Optional[Exception] = None):
+        super().__init__(message, provider, original_error, is_transient=False, error_code="LLM_PERMANENT_ERROR")
+
+
 

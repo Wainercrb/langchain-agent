@@ -26,10 +26,13 @@ def get_rag_chain():
     """Create a new RAGChain instance per request."""
     try:
         from rag.core.chain import RAGChain
+        from services.container import tracing_callback
 
+        callbacks = [tracing_callback] if tracing_callback else []
         return RAGChain(
             retriever=get_retriever(),
             llm=llm,
+            callbacks=callbacks,
         )
     except Exception as e:
         logger.error(f"Failed to create RAGChain: {str(e)}", exc_info=True)
@@ -37,18 +40,35 @@ def get_rag_chain():
 
 
 async def check_health() -> dict:
-    """Perform system health check including database connectivity."""
+    """Perform system health check including DB, LLM, and embedding services."""
+    health = {
+        "status": "ok",
+        "db_connected": False,
+        "llm_connected": False,
+        "embedding_connected": False,
+    }
+
+    # DB check
     try:
         result = await vector_store.health_check()
-
-        return {
-            "status": "ok" if result else "error",
-            "db_connected": bool(result),
-        }
+        health["db_connected"] = bool(result)
     except Exception as e:
-        logger.error(f"Health check failed: {str(e)}", exc_info=True)
-        return {
-            "status": "error",
-            "db_connected": False,
-            "error": str(e),
-        }
+        logger.error(f"DB health check failed: {str(e)}")
+
+    # LLM check (lightweight — verify provider is initialized)
+    try:
+        health["llm_connected"] = llm is not None and hasattr(llm, '_llm')
+    except Exception as e:
+        logger.error(f"LLM health check failed: {str(e)}")
+
+    # Embedding check
+    try:
+        health["embedding_connected"] = embeddings is not None
+    except Exception as e:
+        logger.error(f"Embedding health check failed: {str(e)}")
+
+    # Overall status: error if any critical dependency is down
+    if not health["db_connected"]:
+        health["status"] = "error"
+
+    return health
