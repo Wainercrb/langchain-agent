@@ -519,25 +519,23 @@
   .message {
     display: flex;
     flex-direction: column;
-    width: 100%;  /* Full width to position bubble left/right */
+    width: 100%;
     gap: var(--space-2);
   }
 
   .message--user {
     align-items: flex-end;
-    padding-left: 20%;  /* Push user messages to the right */
   }
 
   .message--assistant {
     align-items: flex-start;
-    padding-right: 20%;  /* Push AI messages to the left */
   }
 
   .message__label {
     display: flex;
     align-items: center;
     gap: var(--space-1);
-    margin-bottom: var(--space-1);  /* Space between label and bubble */
+    margin-bottom: var(--space-1);
     padding: 0;
   }
 
@@ -554,9 +552,17 @@
   }
 
   .message__bubble {
-    max-width: 85%;  /* Wider bubbles */
+    max-width: 80%;
     padding: var(--space-3) var(--space-4);
     word-break: break-word;
+  }
+
+  .message--user .message__bubble {
+    margin-left: auto;  /* Push user bubble to the right */
+  }
+
+  .message--assistant .message__bubble {
+    margin-right: auto;  /* Keep AI bubble on the left */
   }
 
   .message__bubble--user {
