@@ -12,9 +12,11 @@ Cada provider implementa LLMProvider (ABC). Se instancian directamente:
 
 from .base import LLMProvider, LLMProviderError
 from .google import GoogleProvider
+from .openai import OpenAIProvider
 
 __all__ = [
     "LLMProvider",
     "LLMProviderError",
     "GoogleProvider",
+    "OpenAIProvider",
 ]

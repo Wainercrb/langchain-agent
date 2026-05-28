@@ -23,13 +23,19 @@ from services.logging import Console
 logger = Console()
 
 # ── LLM ──────────────────────────────────────────────────────────────
-from services.llm import GoogleProvider
+from services.llm import GoogleProvider, OpenAIProvider
 
-llm = GoogleProvider(
-    model=settings.gemini_model,
-    temperature=settings.gemini_temperature,
-    api_key=settings.google_api_key,
+llm = OpenAIProvider(
+    model=settings.openai_model,
+    temperature=settings.openai_temperature,
+    api_key=settings.openai_api_key or None,
 )
+
+# llm = GoogleProvider(
+#     model=settings.gemini_model,
+#     temperature=settings.gemini_temperature,
+#     api_key=settings.google_api_key,
+# )
 
 # ── Embeddings ───────────────────────────────────────────────────────
 from services.embeddings import GoogleEmbeddingsWrapper

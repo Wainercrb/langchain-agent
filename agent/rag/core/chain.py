@@ -87,7 +87,7 @@ class RAGChain:
                 query=query,
                 sources=sources_list,
                 execution_time_ms=execution_time_ms,
-                model=settings.gemini_model,
+                model=self.llm.model,
             )
 
             logger.info(

@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     gemini_model: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL")
     gemini_temperature: float = Field(default=0.7, alias="GEMINI_TEMPERATURE")
 
+    # ── OpenAI ───────────────────────────────────────────────────────
+    openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
+    openai_model: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL")
+    openai_temperature: float = Field(default=0.7, alias="OPENAI_TEMPERATURE")
+
     # ── Supabase / pgvector ──────────────────────────────────────────
     supabase_url: str = Field(..., alias="SUPABASE_URL")
     supabase_key: str = Field(..., alias="SUPABASE_KEY")
