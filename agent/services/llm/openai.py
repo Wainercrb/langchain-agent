@@ -49,9 +49,9 @@ class OpenAIProvider(LLMProvider):
         logger.info(f"OpenAI provider initialized: model={self.model}")
 
     @_retry_with_backoff(max_retries=3, base_wait=2)
-    def invoke(self, messages: List[Dict[str, str]]) -> LLMResponse:
+    def invoke(self, messages: List[Dict[str, str]], **kwargs) -> LLMResponse:
         try:
-            response = self._llm.invoke(messages)
+            response = self._llm.invoke(messages, **kwargs)
             return LLMResponse(
                 content=response.content if hasattr(response, "content") else str(response),
                 model=self.model,

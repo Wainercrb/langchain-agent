@@ -41,7 +41,7 @@ python -m venv .venv
 source .venv/bin/activate
 
 # Install dependencies
-pip install -r requirements-batch.txt
+pip install -r requirements.txt
 
 # Run complete setup (handles everything)
 python scripts/setup.py
@@ -136,7 +136,7 @@ echo "This is a test document about Python programming." > knowledge/raw_docs/te
 langchain-agent/
 ├── config.py                    # Configuration & environment
 ├── main.py                      # Entry point & scheduler
-├── requirements-batch.txt       # Python dependencies
+├── requirements.txt       # Python dependencies
 ├── schema.sql                   # Supabase schema
 ├── .env.example                 # Environment template
 ├── .env                         # Your actual config (git-ignored)
@@ -368,8 +368,8 @@ python scripts/setup.py
 # Install directly
 pip install psycopg2-binary
 
-# Or it's in requirements-batch.txt:
-pip install -r requirements-batch.txt
+# Or it's in requirements.txt:
+pip install -r requirements.txt
 ```
 
 ---
@@ -428,8 +428,8 @@ python main.py
 ```dockerfile
 FROM python:3.11-slim
 WORKDIR /app
-COPY requirements-batch.txt .
-RUN pip install -r requirements-batch.txt
+COPY requirements.txt .
+RUN pip install -r requirements.txt
 COPY . .
 CMD ["python", "main.py"]
 ```

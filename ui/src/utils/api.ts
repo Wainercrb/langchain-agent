@@ -17,6 +17,17 @@ interface ChatResponse {
   sources: Source[];
   execution_time_ms: number;
   model: string;
+  run_id: string | null;
+}
+
+interface FeedbackPayload {
+  run_id: string;
+  feedback_type: 'like' | 'dislike';
+  comment?: string;
+}
+
+interface FeedbackResponse {
+  status: 'recorded' | 'accepted';
 }
 
 interface ChatSettings {
@@ -93,6 +104,51 @@ export async function chatWithAgent(
     temperature: settings.temperature,
     include_sources: settings.includeSources,
   });
+}
+
+export async function submitFeedback(
+  run_id: string,
+  feedback_type: 'like' | 'dislike',
+  comment?: string
+): Promise<FeedbackResponse> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const payload: FeedbackPayload = { run_id, feedback_type };
+    if (comment) {
+      payload.comment = comment;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/v1/feedback`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.detail || `Feedback API error: ${response.statusText}`
+      );
+    }
+
+    const data = await response.json();
+    return data as FeedbackResponse;
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Feedback request timed out. Please try again.');
+      }
+      throw error;
+    }
+    throw new Error('Failed to submit feedback');
+  }
 }
 
 export function getErrorMessage(error: unknown): string {

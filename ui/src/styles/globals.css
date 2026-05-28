@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --color-dark-bg: #0a0e27;
-  --color-dark-card: #1a1f3a;
-  --color-dark-border: #374151;
-  --color-dark-text: #f3f4f6;
-  --color-dark-text-secondary: #9ca3af;
+  --color-dark-bg: #ffffff;
+  --color-dark-card: #f8f9fa;
+  --color-dark-border: #e5e7eb;
+  --color-dark-text: #1f2937;
+  --color-dark-text-secondary: #6b7280;
 }
 
 html,
@@ -23,16 +23,16 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-dark-card);
+  background: #f3f4f6;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-dark-border);
+  background: #d1d5db;
   border-radius: 0.25rem;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background: #9ca3af;
 }
 
 /* Button styles */

@@ -1,6 +1,9 @@
 import time
+import uuid
 from datetime import datetime
 from typing import List, Optional
+
+from langchain_core.runnables.config import RunnableConfig
 
 from config import settings
 from models import ChatResponse, RetrievedDocument, SourceDocument
@@ -54,11 +57,13 @@ class RAGChain:
 
             logger.debug("Constructed prompts for LLM")
 
+            run_id = uuid.uuid4()
             llm_response = self.llm.invoke(
                 [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
-                ]
+                ],
+                config=RunnableConfig(run_id=run_id),
             )
             response_text = (
                 llm_response.content if hasattr(llm_response, "content") else str(llm_response)
@@ -88,6 +93,7 @@ class RAGChain:
                 sources=sources_list,
                 execution_time_ms=execution_time_ms,
                 model=self.llm.model,
+                run_id=str(run_id),
             )
 
             logger.info(

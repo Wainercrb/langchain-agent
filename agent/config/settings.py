@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     openai_model: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL")
     openai_temperature: float = Field(default=0.7, alias="OPENAI_TEMPERATURE")
 
+    # ── OpenRouter ───────────────────────────────────────────────────
+    openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
+    openrouter_model: str = Field(default="openai/gpt-4o", alias="OPENROUTER_MODEL")
+    openrouter_temperature: float = Field(default=0.7, alias="OPENROUTER_TEMPERATURE")
+    openrouter_max_tokens: int = Field(default=2000, alias="OPENROUTER_MAX_TOKENS")
+
     # ── Supabase / pgvector ──────────────────────────────────────────
     supabase_url: str = Field(..., alias="SUPABASE_URL")
     supabase_key: str = Field(..., alias="SUPABASE_KEY")

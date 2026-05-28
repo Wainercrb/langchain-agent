@@ -1,0 +1,38 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Node
+node_modules
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+pnpm-error.log
+
+# IDEs
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build artifacts (we'll rebuild)
+dist
+.astro
+
+# Testing
+coverage
+.nyc_output
+
+# Misc
+*.log
+.vagrant
+.gradle
+local.properties

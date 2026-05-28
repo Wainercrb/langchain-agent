@@ -43,6 +43,10 @@ class ChatResponse(BaseModel):
         default="gemini-2.5-flash",
         description="LLM model identifier",
     )
+    run_id: Optional[str] = Field(
+        default=None,
+        description="LangSmith run ID for feedback correlation (null when tracing disabled)",
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -61,6 +65,7 @@ class ChatResponse(BaseModel):
                 ],
                 "execution_time_ms": 2340.5,
                 "model": "gemini-2.5-flash",
+                "run_id": "550e8400-e29b-41d4-a716-446655440000",
             }
         }
     )

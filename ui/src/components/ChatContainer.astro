@@ -2,119 +2,135 @@
 // ChatContainer - Professional Tailwind CSS chat UI
 ---
 
-<div class="flex flex-col h-screen w-full bg-dark-bg text-dark-text">
+<div class="flex flex-col h-screen w-full bg-white text-gray-900">
 	<!-- Header -->
-	<div class="flex items-center justify-between px-6 py-4 border-b border-dark-border bg-dark-card shadow-sm">
+	<div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white shadow-sm">
 		<div class="flex items-center gap-3">
-			<div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-				<span class="text-white font-bold">💬</span>
-			</div>
+			<div class="text-xl font-bold">⚡</div>
 			<div>
-				<h1 class="text-xl font-bold text-dark-text">Chat with RAG</h1>
-				<p class="text-xs text-dark-text-secondary">Connected to AI Agent</p>
+				<h1 class="text-xl font-bold text-gray-900">FW Agent</h1>
+				<p class="text-xs text-gray-500 flex items-center gap-1">
+					<span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+					SYSTEM ONLINE
+				</p>
 			</div>
 		</div>
-		<div class="flex items-center gap-2 px-3 py-1 bg-yellow-500/10 border border-yellow-500/30 rounded-full" data-status-badge="true">
+		<div class="flex items-center gap-2 px-3 py-1 bg-yellow-100 border border-yellow-300 rounded-full" data-status-badge="true">
 			<div class="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-			<span class="text-xs font-medium text-yellow-400">Disabled</span>
-		</div>
-	</div>
-
-	<!-- Settings Panel -->
-	<div class="px-6 py-4 border-b border-dark-border bg-dark-card/50 backdrop-blur-sm">
-		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-			<!-- Top K Input -->
-			<div class="space-y-2">
-				<label for="topK" class="text-sm font-semibold text-dark-text-secondary block">Results (K)</label>
-				<input
-					type="number"
-					id="topK"
-					name="topK"
-					min="1"
-					max="20"
-					value="5"
-					class="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition"
-				/>
-			</div>
-
-			<!-- Temperature Range -->
-			<div class="space-y-2">
-				<label for="temperature" class="text-sm font-semibold text-dark-text-secondary block">Creativity</label>
-				<div class="flex items-center gap-3">
-					<input
-						type="range"
-						id="temperature"
-						name="temperature"
-						min="0"
-						max="1"
-						step="0.1"
-						value="0.7"
-						class="flex-1 h-2 bg-dark-border rounded-lg appearance-none cursor-pointer accent-blue-500"
-					/>
-					<span id="tempValue" class="text-sm font-medium text-blue-400 w-8 text-right">0.7</span>
-				</div>
-			</div>
-
-			<!-- Include Sources Checkbox -->
-			<div class="space-y-2">
-				<label class="text-sm font-semibold text-dark-text-secondary block">Options</label>
-				<label class="flex items-center gap-3 px-3 py-2 bg-dark-bg border border-dark-border rounded-lg cursor-pointer hover:border-blue-500/50 transition">
-					<input type="checkbox" id="includeSources" name="includeSources" checked class="w-4 h-4 cursor-pointer accent-blue-500 rounded" />
-					<span class="text-sm text-dark-text">Show Sources</span>
-				</label>
-			</div>
-
-			<!-- Status Info -->
-			<div class="space-y-2">
-				<label class="text-sm font-semibold text-dark-text-secondary block">Status</label>
-				<div class="px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs text-blue-300 font-medium">
-					Ready to chat
-				</div>
-			</div>
+			<span class="text-xs font-medium text-yellow-700">Loading</span>
 		</div>
 	</div>
 
 	<!-- Messages Area -->
-	<div class="flex-1 overflow-y-auto px-6 py-6 space-y-4 bg-gradient-to-b from-dark-bg/95 to-dark-bg">
+	<div class="flex-1 overflow-y-auto px-6 py-6 space-y-4 bg-gray-50">
 		<div class="flex flex-col items-center justify-center h-full text-center opacity-50 pointer-events-none">
 			<div class="text-4xl mb-2">💭</div>
-			<p class="text-dark-text-secondary">Start a conversation...</p>
-			<p class="text-xs text-dark-text-secondary/50 mt-1">Ask anything about the documents</p>
+			<p class="text-gray-500">Start a conversation...</p>
+			<p class="text-xs text-gray-400 mt-1">Ask anything about the documents</p>
 		</div>
 	</div>
 
-	<!-- Input Section -->
-	<div class="px-6 py-4 border-t border-dark-border bg-dark-card/80 backdrop-blur-sm">
-		<form class="flex flex-col sm:flex-row gap-3 items-end" onsubmit="return false;">
-			<div class="flex-1 relative">
-				<textarea
-					placeholder="Type your question here..."
-					rows="1"
-					class="w-full px-4 py-3 bg-dark-bg border border-dark-border text-dark-text rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none font-inherit text-base max-h-24 min-h-12 transition placeholder-dark-text-secondary/50"
-				></textarea>
-				<div class="absolute right-3 bottom-3 text-xs text-dark-text-secondary/50">
-					<span class="hidden sm:inline">Shift + Enter for new line</span>
-					<span class="sm:hidden">Enter to send</span>
+	<!-- Input Section with Inline Settings -->
+	<div class="px-6 py-4 border-t border-gray-200 bg-white">
+		<!-- Main Input Card -->
+		<div class="relative bg-white border border-gray-200 rounded-2xl overflow-hidden focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition shadow-sm hover:shadow-md">
+			<!-- Textarea -->
+			<textarea
+				placeholder="Message FW Agent..."
+				rows="4"
+				class="w-full px-5 py-4 bg-white text-gray-900 rounded-2xl focus:outline-none resize-none font-inherit text-base transition placeholder-gray-400"
+			></textarea>
+
+			<!-- Bottom Section: Controls on Left, Button on Right -->
+			<div class="flex items-center justify-between px-5 py-3 bg-white border-t border-gray-200">
+				<!-- Settings Controls -->
+				<div class="flex items-center justify-start gap-6">
+					<!-- Results (K) Toggle -->
+					<div class="flex items-center gap-2">
+						<label class="relative inline-flex items-center cursor-pointer">
+							<input type="checkbox" id="resultsToggle" class="sr-only peer results-toggle" />
+							<div class="w-8 h-4 bg-gray-300 rounded-full peer-checked:bg-blue-600 transition peer-focus:ring-2 peer-focus:ring-blue-500/30"></div>
+							<div class="absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full transition peer-checked:translate-x-4"></div>
+						</label>
+						<span class="text-xs font-medium text-gray-600 whitespace-nowrap">Results (K)</span>
+					</div>
+
+					<!-- Creativity Toggle -->
+					<div class="flex items-center gap-2">
+						<label class="relative inline-flex items-center cursor-pointer">
+							<input type="checkbox" id="creativityToggle" class="sr-only peer creativity-toggle" />
+							<div class="w-8 h-4 bg-gray-300 rounded-full peer-checked:bg-blue-600 transition peer-focus:ring-2 peer-focus:ring-blue-500/30"></div>
+							<div class="absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full transition peer-checked:translate-x-4"></div>
+						</label>
+						<span class="text-xs font-medium text-gray-600 whitespace-nowrap">Creativity</span>
+					</div>
+
+					<!-- Show Sources Checkbox -->
+					<label class="flex items-center gap-2 cursor-pointer">
+						<input type="checkbox" id="includeSources" name="includeSources" checked class="w-3.5 h-3.5 cursor-pointer accent-blue-600 rounded" />
+						<span class="text-xs font-medium text-gray-600 whitespace-nowrap">Show Sources</span>
+					</label>
 				</div>
+
+				<!-- Send Button -->
+				<button
+					type="button"
+					aria-label="Send message"
+					class="w-9 h-9 flex items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-blue-700 text-white transition-all hover:from-blue-500 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl hover:shadow-blue-500/20 ml-4 flex-shrink-0"
+				>
+					↑
+				</button>
 			</div>
-			<button
-				type="button"
-				aria-label="Send message"
-				class="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold transition-all hover:from-blue-500 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl hover:shadow-blue-500/20 w-full sm:w-auto"
-			>
-				Send
-			</button>
-		</form>
+		</div>
+
+		<!-- Hint text -->
+		<div class="text-xs text-gray-400 mt-2 px-1">
+			<span class="hidden sm:inline">Shift + Enter for new line</span>
+		</div>
+	</div>
+
+	<!-- Hidden sliders for actual values -->
+	<div class="hidden">
+		<input
+			type="range"
+			id="topK"
+			name="topK"
+			min="1"
+			max="20"
+			value="5"
+			class="topk-slider"
+		/>
+		<input
+			type="range"
+			id="temperature"
+			name="temperature"
+			min="0"
+			max="1"
+			step="0.1"
+			value="0.7"
+			class="temperature-slider"
+		/>
 	</div>
 </div>
 
 <script>
-	// Show temperature value
+	// Results toggle
+	const topKInput = document.querySelector('input[name="topK"]') as HTMLInputElement;
+	const resultsToggle = document.getElementById('resultsToggle') as HTMLInputElement;
+	
+	if (topKInput && resultsToggle) {
+		resultsToggle.addEventListener('change', () => {
+			topKInput.value = resultsToggle.checked ? '10' : '5';
+		});
+	}
+
+	// Creativity toggle
 	const tempInput = document.querySelector('input[name="temperature"]') as HTMLInputElement;
-	const tempValue = document.getElementById('tempValue');
-	if (tempInput && tempValue) {
-		tempInput.addEventListener('input', () => {
-			tempValue.textContent = tempInput.value;
+	const creativityToggle = document.getElementById('creativityToggle') as HTMLInputElement;
+	
+	if (tempInput && creativityToggle) {
+		creativityToggle.addEventListener('change', () => {
+			tempInput.value = creativityToggle.checked ? '0.9' : '0.7';
 		});
 	}
 

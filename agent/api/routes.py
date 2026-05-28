@@ -2,12 +2,14 @@ import time
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 
 from rag.core.chain import RAGChain
 
 from .dependencies import check_health, get_rag_chain
-from models import ChatRequest, ChatResponse, HealthResponse, ErrorResponse
+from models import ChatRequest, ChatResponse, ErrorResponse, FeedbackRequest, HealthResponse
 from services.container import logger
+from services.feedback import FeedbackService
 
 
 router = APIRouter(prefix="/v1", tags=["chat"])
@@ -75,6 +77,7 @@ async def chat(
             sources=response.sources if request.include_sources else None,
             execution_time_ms=execution_time_ms,
             model=response.model,
+            run_id=response.run_id,
         )
 
     except ValueError as e:
@@ -95,6 +98,58 @@ async def chat(
             detail={
                 "error": "internal_error",
                 "message": "Failed to process query",
+                "timestamp": datetime.utcnow().isoformat(),
+            },
+        )
+
+
+@router.post(
+    "/feedback",
+    status_code=200,
+    responses={
+        202: {"description": "Feedback accepted but LangSmith unreachable"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+    },
+)
+async def feedback(request: FeedbackRequest) -> dict:
+    """Record user feedback (like/dislike) correlated to a LangSmith run_id.
+
+    Accepts feedback via the LangSmith Native Feedback API. If LangSmith is
+    unreachable, the feedback is logged server-side and a 202 Accepted is
+    returned instead of failing the request.
+
+    Args:
+        request: FeedbackRequest containing:
+            - run_id: LangSmith run ID for feedback correlation
+            - feedback_type: "like" (score=1.0) or "dislike" (score=0.0)
+            - comment: Optional user comment (max 1000 chars)
+
+    Returns:
+        Dictionary with status "recorded" (200) or "accepted" (202)
+
+    Raises:
+        HTTPException (422): Validation error in request parameters
+    """
+    try:
+        service = FeedbackService()
+        result = service.record_feedback(
+            run_id=request.run_id,
+            feedback_type=request.feedback_type,
+            comment=request.comment,
+        )
+        if result.status == "accepted":
+            return JSONResponse(
+                content={"status": "accepted"},
+                status_code=status.HTTP_202_ACCEPTED,
+            )
+        return {"status": "recorded"}
+    except Exception as e:
+        logger.error(f"Feedback error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "internal_error",
+                "message": "Failed to process feedback",
                 "timestamp": datetime.utcnow().isoformat(),
             },
         )
