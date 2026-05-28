@@ -53,6 +53,88 @@
   let resizeTimeout: number | undefined;
 
   // ============================================
+  // Mock Data (remove when backend is complete)
+  // ============================================
+
+  function loadMockData() {
+    const mockMessages: ChatMessage[] = [
+      {
+        id: '1',
+        role: 'user',
+        content: 'Hello, can you help me understand the enrollment requirements?',
+        timestamp: new Date(),
+        sources: [],
+        executionTime: 0,
+        model: '',
+        runId: null,
+      },
+      {
+        id: '2',
+        role: 'assistant',
+        content: 'Hello! I\'d be happy to help you understand the enrollment requirements. Based on our records, you\'ll need to complete the online application form, provide identification documents, and meet the prerequisite coursework requirements. Would you like me to detail each step?',
+        timestamp: new Date(),
+        sources: [
+          {
+            document_id: '550e8400-e29b-41d4-a716-446655440000',
+            filename: 'enrollment_guide.pdf',
+            similarity_score: 0.92,
+            version_date: '2025-01-15T10:30:00',
+            content_preview: 'Enrollment Guidelines: To enroll in our program, you need to follow these steps...',
+            chunk_id: '550e8400-e29b-41d4-a716-446655440001',
+          },
+        ],
+        executionTime: 1234,
+        model: 'gemini-2.5-flash',
+        runId: 'mock-run-id-1',
+      },
+      {
+        id: '3',
+        role: 'user',
+        content: 'Yes please, detail each step for me.',
+        timestamp: new Date(),
+        sources: [],
+        executionTime: 0,
+        model: '',
+        runId: null,
+      },
+      {
+        id: '4',
+        role: 'assistant',
+        content: 'Absolutely! Here are the enrollment steps:\n\n1. **Online Application**: Complete the application form at our portal.\n2. **Document Submission**: Upload your ID and transcripts.\n3. **Prerequisites**: Complete the required coursework.\n4. **Interview**: Schedule an interview with an advisor.\n5. **Enrollment Fee**: Pay the enrollment deposit.\n\nWould you like more details on any specific step?',
+        timestamp: new Date(),
+        sources: [
+          {
+            document_id: '550e8400-e29b-41d4-a716-446655440002',
+            filename: 'admissions_checklist.pdf',
+            similarity_score: 0.88,
+            version_date: '2025-02-01T14:00:00',
+            content_preview: 'Admissions Checklist: Follow these steps to complete your enrollment...',
+            chunk_id: '550e8400-e29b-41d4-a716-446655440003',
+          },
+        ],
+        executionTime: 2156,
+        model: 'gemini-2.5-flash',
+        runId: 'mock-run-id-2',
+      },
+    ];
+
+    // Add mock messages to state
+    state.messages = mockMessages;
+
+    // Render mock messages to DOM
+    const container = document.getElementById('messages-container');
+    const emptyState = document.getElementById('empty-state');
+    if (emptyState) emptyState.remove();
+    if (container) {
+      container.innerHTML = '';  // Clear loading/empty state
+      mockMessages.forEach(msg => {
+        container.appendChild(renderMessage(msg));
+      });
+      container.scrollTop = container.scrollHeight;
+    }
+  }
+
+  // ============================================
   // Settings
   // ============================================
 
@@ -370,9 +452,12 @@
       }, 100);
     });
 
-    // Health check
-    updateHealth();
-    healthInterval = window.setInterval(updateHealth, 5000);
+    // Load mock data for development (REMOVE when backend is complete)
+    loadMockData();
+
+    // Health check (disabled when using mock data)
+    // updateHealth();
+    // healthInterval = window.setInterval(updateHealth, 5000);
   }
 
   window.addEventListener('beforeunload', () => {
