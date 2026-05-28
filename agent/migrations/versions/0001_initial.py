@@ -1,4 +1,4 @@
-"""Create baseline schema matching schema.sql
+"""Initial schema: documents, document_chunks, ingestion_logs, version_cache.
 
 Revision ID: 0001
 Revises:
@@ -18,11 +18,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Create all tables, indexes, functions, triggers, and grants."""
-    # ── pgvector extension ────────────────────────────────────────────
     op.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
-    # ── documents table ───────────────────────────────────────────────
     op.create_table(
         "documents",
         sa.Column("id", sa.UUID(), nullable=False, server_default=sa.text("gen_random_uuid()")),
@@ -35,18 +32,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
 
-    op.create_index(
-        "idx_documents_filename_version",
-        "documents",
-        [sa.text("filename"), sa.text("version_date DESC")],
-    )
-    op.create_index(
-        "idx_documents_created_at",
-        "documents",
-        [sa.text("created_at DESC")],
-    )
+    op.create_index("idx_documents_filename_version", "documents", [sa.text("filename"), sa.text("version_date DESC")])
+    op.create_index("idx_documents_created_at", "documents", [sa.text("created_at DESC")])
 
-    # ── document_chunks table ─────────────────────────────────────────
     op.create_table(
         "document_chunks",
         sa.Column("id", sa.UUID(), nullable=False, server_default=sa.text("gen_random_uuid()")),
@@ -61,26 +49,12 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
 
-    op.create_index(
-        "idx_document_chunks_embedding",
-        "document_chunks",
-        ["embedding"],
-        postgresql_using="ivfflat",
-        postgresql_with={"lists": 100},
-        postgresql_ops={"embedding": "vector_cosine_ops"},
-    )
-    op.create_index(
-        "idx_document_chunks_document_id",
-        "document_chunks",
-        ["document_id"],
-    )
-    op.create_index(
-        "idx_document_chunks_document_chunk",
-        "document_chunks",
-        ["document_id", "chunk_index"],
-    )
+    op.create_index("idx_document_chunks_embedding", "document_chunks", ["embedding"],
+                    postgresql_using="ivfflat", postgresql_with={"lists": 100},
+                    postgresql_ops={"embedding": "vector_cosine_ops"})
+    op.create_index("idx_document_chunks_document_id", "document_chunks", ["document_id"])
+    op.create_index("idx_document_chunks_document_chunk", "document_chunks", ["document_id", "chunk_index"])
 
-    # ── ingestion_logs table ──────────────────────────────────────────
     op.create_table(
         "ingestion_logs",
         sa.Column("id", sa.UUID(), nullable=False, server_default=sa.text("gen_random_uuid()")),
@@ -94,18 +68,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
 
-    op.create_index(
-        "idx_ingestion_logs_filename_status",
-        "ingestion_logs",
-        ["filename", "status"],
-    )
-    op.create_index(
-        "idx_ingestion_logs_processed_at",
-        "ingestion_logs",
-        [sa.text("processed_at DESC")],
-    )
+    op.create_index("idx_ingestion_logs_filename_status", "ingestion_logs", ["filename", "status"])
+    op.create_index("idx_ingestion_logs_processed_at", "ingestion_logs", [sa.text("processed_at DESC")])
 
-    # ── version_cache table ───────────────────────────────────────────
     op.create_table(
         "version_cache",
         sa.Column("id", sa.UUID(), nullable=False, server_default=sa.text("gen_random_uuid()")),
@@ -118,15 +83,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
 
-    op.create_index(
-        "idx_version_cache_filename",
-        "version_cache",
-        ["filename"],
-    )
+    op.create_index("idx_version_cache_filename", "version_cache", ["filename"])
 
-    # ── Function: auto-update updated_at ──────────────────────────────
-    op.execute(
-        """
+    op.execute("""
         CREATE OR REPLACE FUNCTION update_updated_at_column()
         RETURNS TRIGGER AS $$
         BEGIN
@@ -134,20 +93,15 @@ def upgrade() -> None:
             RETURN NEW;
         END;
         $$ LANGUAGE plpgsql
-        """
-    )
+    """)
 
-    # ── Trigger: documents.updated_at ─────────────────────────────────
-    op.execute(
-        """
+    op.execute("""
         CREATE TRIGGER update_documents_updated_at
         BEFORE UPDATE ON documents
         FOR EACH ROW
         EXECUTE FUNCTION update_updated_at_column()
-        """
-    )
+    """)
 
-    # ── Grants (Supabase authenticated role) ──────────────────────────
     op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON documents TO authenticated")
     op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON document_chunks TO authenticated")
     op.execute("GRANT SELECT, INSERT, UPDATE ON ingestion_logs TO authenticated")
@@ -155,17 +109,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Reverse the baseline migration — drop all objects in safe order."""
-    # Drop trigger and function first (no table dependencies)
     op.execute("DROP TRIGGER IF EXISTS update_documents_updated_at ON documents")
     op.execute("DROP FUNCTION IF EXISTS update_updated_at_column()")
-
-    # Drop tables in reverse dependency order
     op.drop_table("version_cache")
     op.drop_table("ingestion_logs")
     op.drop_table("document_chunks")
     op.drop_table("documents")
-
-    # Note: pgvector extension is NOT dropped here because it may be
-    # shared by other databases or future migrations. If a full teardown
-    # is needed, run: DROP EXTENSION IF EXISTS vector CASCADE;

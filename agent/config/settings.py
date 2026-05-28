@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     cron_interval_minutes: int = Field(default=5, alias="CRON_INTERVAL_MINUTES")
 
     # ── Paths ────────────────────────────────────────────────────────
-    knowledge_dir: Path = Field(default=Path("./knowledge"), alias="KNOWLEDGE_DIR")
+    knowledge_dir: Path = Field(default=Path("./knowledge/raw_docs"), alias="KNOWLEDGE_DIR")
     processed_dir: Path = Field(default=Path("./knowledge/processed"), alias="PROCESSED_DIR")
     failed_dir: Path = Field(default=Path("./knowledge/failed"), alias="FAILED_DIR")
 

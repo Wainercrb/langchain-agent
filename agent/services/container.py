@@ -40,5 +40,8 @@ embeddings = GoogleEmbeddingsWrapper(api_key=settings.google_api_key)
 from supabase import create_client
 from services.vector_store import VectorStore
 
-supabase_client = create_client(settings.supabase_url, settings.supabase_key)
+db_direct_url = settings.supabase_direct_url
+db_url = settings.supabase_url
+db_key = settings.supabase_key
+supabase_client = create_client(db_url, db_key)
 vector_store = VectorStore(supabase_client)

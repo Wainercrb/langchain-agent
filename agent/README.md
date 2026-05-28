@@ -124,7 +124,7 @@ echo "This is a test document about Python programming." > knowledge/raw_docs/te
 │    ├─ FileManager.move_to_processed()  │
 │    └─ AlertService.send_alerts()       │
 ├─ Supabase pgvector (backend)           │
-├─ .processed_files.json (state)         │
+│                                      │
 └─ /knowledge/ (document folders)        │
 ```
 
@@ -140,8 +140,7 @@ langchain-agent/
 ├── schema.sql                   # Supabase schema
 ├── .env.example                 # Environment template
 ├── .env                         # Your actual config (git-ignored)
-├── .processed_files.json        # Deduplication state
-│
+ │
 ├── rag/
 │   ├── embeddings.py           # Google Embeddings API wrapper
 │   └── vector_store.py         # Supabase pgvector operations
@@ -169,8 +168,7 @@ langchain-agent/
 │   ├── raw_docs/               # Input: new documents here
 │   ├── processed/              # Successful ingestions
 │   ├── failed/                 # Failed documents
-│   └── .processed_files.json   # State tracking (created on first run)
-│
+ │
 └── tests/                       # Unit & integration tests (Phase 5)
 ```
 
@@ -190,7 +188,6 @@ cp my_document.pdf knowledge/raw_docs/
 # Check results
 ls knowledge/processed/          # Success
 ls knowledge/failed/             # Errors
-cat .processed_files.json         # Tracking info
 ```
 
 ### Example 2: Monitor Processing
@@ -216,8 +213,7 @@ print(f"Processed files: {stats['total_processed']}")
 print(f"Total chunks: {stats['total_chunks']}")
 
 # List all tracked files
-files = tracker.list_processed_files()
-for filename, info in files.items():
+for filename, info in tracker.get_stats().items():
     print(f"{filename}: {info['chunk_count']} chunks")
 ```
 
