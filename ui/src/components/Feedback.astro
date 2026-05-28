@@ -4,168 +4,169 @@ export interface Props {
 }
 
 const { runId } = Astro.props;
+
+const thumbUpSvg = `<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>`;
+const thumbDownSvg = `<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"/></svg>`;
 ---
 
-{
-  runId ? (
-    <div class="feedback" data-run-id={runId}>
-      <button class="feedback-btn like-btn" data-type="like" disabled aria-label="Like response">
-        👍 <span class="btn-label">Like</span>
-      </button>
-      <button class="feedback-btn dislike-btn" data-type="dislike" disabled aria-label="Dislike response">
-        👎 <span class="btn-label">Dislike</span>
-      </button>
-      <span class="feedback-status" aria-live="polite"></span>
-    </div>
-  ) : (
-    <div class="feedback disabled">
-      <button class="feedback-btn like-btn" disabled aria-label="Like response" title="Feedback unavailable">
-        👍 <span class="btn-label">Like</span>
-      </button>
-      <button class="feedback-btn dislike-btn" disabled aria-label="Dislike response" title="Feedback unavailable">
-        👎 <span class="btn-label">Dislike</span>
-      </button>
-    </div>
-  )
-}
+{runId ? (
+  <div class="feedback" data-run-id={runId} role="group" aria-label="Feedback">
+    <button class="feedback__btn feedback__btn--like" data-type="like" disabled aria-label="Like response" type="button">
+      <span class="feedback__icon" set:html={thumbUpSvg} />
+      <span class="feedback__label">Like</span>
+    </button>
+    <button class="feedback__btn feedback__btn--dislike" data-type="dislike" disabled aria-label="Dislike response" type="button">
+      <span class="feedback__icon" set:html={thumbDownSvg} />
+      <span class="feedback__label">Dislike</span>
+    </button>
+    <span class="feedback__status" aria-live="polite"></span>
+  </div>
+) : (
+  <div class="feedback feedback--disabled" role="group" aria-label="Feedback unavailable">
+    <button class="feedback__btn feedback__btn--like" disabled aria-label="Like response (unavailable)" type="button">
+      <span class="feedback__icon" set:html={thumbUpSvg} />
+      <span class="feedback__label">Like</span>
+    </button>
+    <button class="feedback__btn feedback__btn--dislike" disabled aria-label="Dislike response (unavailable)" type="button">
+      <span class="feedback__icon" set:html={thumbDownSvg} />
+      <span class="feedback__label">Dislike</span>
+    </button>
+  </div>
+)}
 
 <style>
   .feedback {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
   }
 
-  .feedback-btn {
-    background: transparent;
-    border: 1px solid #4b5563;
-    color: #9ca3af;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.875rem;
-    transition: all 0.2s;
+  .feedback__btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-2);
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
   }
 
-  .feedback-btn:disabled {
+  .feedback__btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
   }
 
-  .feedback-btn:not(:disabled):hover {
-    border-color: #10b981;
-    color: #10b981;
+  .feedback__btn:not(:disabled):hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    background: var(--color-primary-subtle);
   }
 
-  .feedback-btn.active-like {
-    background: #10b981;
-    border-color: #10b981;
-    color: white;
+  .feedback__btn:focus-visible {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: 2px;
   }
 
-  .feedback-btn.active-dislike {
-    background: #ef4444;
-    border-color: #ef4444;
-    color: white;
+  .feedback__btn--active {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    background: var(--color-primary-subtle);
   }
 
-  .feedback-btn.loading {
-    opacity: 0.6;
-    cursor: wait;
+  .feedback__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  .feedback-status {
+  .feedback__status {
     font-size: 0.75rem;
-    color: #6b7280;
-    transition: opacity 0.2s;
+    color: var(--color-text-muted);
+    transition: color var(--transition-fast);
   }
 
-  .feedback-status.success {
-    color: #10b981;
+  .feedback__status--success {
+    color: var(--color-success);
   }
 
-  .feedback-status.error {
-    color: #ef4444;
+  .feedback__status--error {
+    color: var(--color-error);
+  }
+
+  .feedback--disabled {
+    opacity: 0.5;
   }
 </style>
 
 <script>
   import { submitFeedback } from '../utils/api';
 
-  const container = document.currentScript?.closest('.feedback') as HTMLElement | null;
-  if (!container) throw new Error('Feedback component missing container');
+  const containers = document.querySelectorAll('.feedback[data-run-id]');
 
-  const runId = container.getAttribute('data-run-id');
-  const likeBtn = container.querySelector('.like-btn') as HTMLButtonElement;
-  const dislikeBtn = container.querySelector('.dislike-btn') as HTMLButtonElement;
-  const statusEl = container.querySelector('.feedback-status') as HTMLElement;
+  containers.forEach(container => {
+    const el = container as HTMLElement;
+    const runId = el.getAttribute('data-run-id');
+    const likeBtn = el.querySelector('.feedback__btn--like') as HTMLButtonElement;
+    const dislikeBtn = el.querySelector('.feedback__btn--dislike') as HTMLButtonElement;
+    const statusEl = el.querySelector('.feedback__status') as HTMLElement;
 
-  let activeType: 'like' | 'dislike' | null = null;
-  let isSubmitting = false;
+    if (!runId || !likeBtn || !dislikeBtn || !statusEl) return;
 
-  function setStatus(message: string, type: 'success' | 'error' | '') {
-    if (!statusEl) return;
-    statusEl.textContent = message;
-    statusEl.className = 'feedback-status' + (type ? ` ${type}` : '');
-  }
+    let activeType: 'like' | 'dislike' | null = null;
+    let isSubmitting = false;
 
-  function clearStatus() {
-    if (statusEl) {
+    function setStatus(message: string, type: 'success' | 'error' | '') {
+      statusEl.textContent = message;
+      statusEl.className = `feedback__status${type ? ` feedback__status--${type}` : ''}`;
+    }
+
+    function clearStatus() {
       statusEl.textContent = '';
-      statusEl.className = 'feedback-status';
+      statusEl.className = 'feedback__status';
     }
-  }
 
-  async function handleFeedback(type: 'like' | 'dislike') {
-    if (isSubmitting || !runId) return;
+    async function handleFeedback(type: 'like' | 'dislike') {
+      if (isSubmitting) return;
 
-    isSubmitting = true;
-    likeBtn.disabled = true;
-    dislikeBtn.disabled = true;
-    likeBtn.classList.add('loading');
-    dislikeBtn.classList.add('loading');
-    setStatus('Saving...', '');
+      isSubmitting = true;
+      likeBtn.disabled = true;
+      dislikeBtn.disabled = true;
+      clearStatus();
 
-    try {
-      const result = await submitFeedback(runId, type);
+      try {
+        const result = await submitFeedback(runId, type);
 
-      if (result.status === 'recorded' || result.status === 'accepted') {
-        activeType = type;
-        clearStatus();
+        if (result.status === 'recorded' || result.status === 'accepted') {
+          activeType = type;
+          clearStatus();
 
-        // Visual feedback: highlight selected button
-        likeBtn.classList.remove('active-like', 'active-dislike');
-        dislikeBtn.classList.remove('active-like', 'active-dislike');
-        if (type === 'like') {
-          likeBtn.classList.add('active-like');
-        } else {
-          dislikeBtn.classList.add('active-dislike');
+          likeBtn.classList.remove('feedback__btn--active');
+          dislikeBtn.classList.remove('feedback__btn--active');
+
+          if (type === 'like') {
+            likeBtn.classList.add('feedback__btn--active');
+          } else {
+            dislikeBtn.classList.add('feedback__btn--active');
+          }
         }
+      } catch (error) {
+        setStatus(
+          error instanceof Error ? error.message : 'Failed to save feedback',
+          'error'
+        );
+      } finally {
+        isSubmitting = false;
+        likeBtn.disabled = false;
+        dislikeBtn.disabled = false;
       }
-    } catch (error) {
-      setStatus(
-        error instanceof Error ? error.message : 'Failed to save feedback',
-        'error'
-      );
-    } finally {
-      isSubmitting = false;
-      likeBtn.disabled = false;
-      dislikeBtn.disabled = false;
-      likeBtn.classList.remove('loading');
-      dislikeBtn.classList.remove('loading');
     }
-  }
-
-  // Enable buttons now that script is loaded
-  if (runId) {
-    likeBtn.disabled = false;
-    dislikeBtn.disabled = false;
 
     likeBtn.addEventListener('click', () => handleFeedback('like'));
     dislikeBtn.addEventListener('click', () => handleFeedback('dislike'));
-  }
+  });
 </script>

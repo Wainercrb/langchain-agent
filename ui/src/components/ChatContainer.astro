@@ -1,160 +1,422 @@
 ---
-// ChatContainer - Professional Tailwind CSS chat UI
+// ChatContainer — Main chat layout shell
 ---
 
-<div class="flex flex-col h-screen w-full bg-[#f9f9ff] text-[#111c2d]">
-	<!-- Header -->
-	<div class="flex items-center justify-between px-6 py-4 border-b border-[#c7c4d7] bg-[#f9f9ff] shadow-sm">
-		<div class="flex items-center gap-3">
-			<div>
-				<h1 class="text-xl font-bold text-[#111c2d]">FW Agent</h1>
-				<p class="text-xs text-gray-500 flex items-center gap-1">
-					<span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-					System Online
-				</p>
-			</div>
-		</div>
-		<div class="flex items-center gap-2 px-3 py-1 bg-green-100 border border-green-300 rounded-full" data-status-badge="true">
-			<div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-			<span class="text-xs font-medium text-green-700">Online</span>
-		</div>
-	</div>
+<div class="chat-container">
+  <!-- Header -->
+  <header class="chat-header">
+    <div class="chat-header__brand">
+      <h1 class="chat-header__title">FW Agent</h1>
+      <p class="chat-header__status">
+        <span class="status-dot status-dot--online" id="status-dot" aria-hidden="true"></span>
+        <span class="status-text status-text--online" id="status-text">System Online</span>
+      </p>
+    </div>
+  </header>
 
-	<!-- Messages Area -->
-	<div class="flex-1 overflow-y-auto px-6 py-6 space-y-4 bg-[#f9f9ff]">
-		<div class="flex flex-col items-center justify-center h-full text-center opacity-50 pointer-events-none">
-			<div class="text-4xl mb-2">💭</div>
-			<p class="text-[#626567]">Start a conversation...</p>
-			<p class="text-xs text-[#626567] mt-1">Ask anything about the documents</p>
-		</div>
-	</div>
+  <!-- Main content area -->
+  <main class="chat-main" role="main">
+    <section class="chat-messages-area" aria-label="Chat messages">
+      <!-- Messages rendered by ChatIsland -->
+      <slot />
+    </section>
+  </main>
 
-	<!-- Input Section with Inline Settings -->
-	<div class="px-6 py-4 border-t border-[#c7c4d7] bg-[#f9f9ff]">
-		<!-- Main Input Card -->
-		<div class="relative bg-white border border-[#c7c4d7] rounded-2xl overflow-hidden focus-within:border-[#6366f1] focus-within:ring-2 focus-within:ring-[#6366f1]/20 transition shadow-sm hover:shadow-md">
-			<!-- Textarea with paperclip icon -->
-			<div class="relative px-5 pt-4 pb-2">
-				<!-- Paperclip icon -->
-				<div class="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10">
-					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18.84 5.6l-8.58 8.58a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-				</div>
-				<textarea
-					placeholder="Ask anything about the documents..."
-					rows="2"
-					class="w-full pl-8 pr-4 py-2 bg-white text-[#111c2d] rounded-2xl focus:outline-none resize-none font-inherit text-base transition placeholder-gray-400"
-				></textarea>
-			</div>
+  <!-- Input Section -->
+  <footer class="chat-input-section" role="contentinfo">
+    <form class="chat-input-form" onsubmit="return false;">
+      <!-- Input card -->
+      <div class="chat-input-card">
+        <!-- Textarea with paperclip -->
+        <div class="chat-input-wrapper">
+          <!-- Paperclip icon (decorative) -->
+          <span class="chat-input-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18.84 5.6l-8.58 8.58a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+            </svg>
+          </span>
+          <textarea
+            id="chat-input"
+            class="chat-textarea"
+            placeholder="Ask anything about the documents..."
+            rows="2"
+            aria-label="Type your message"
+          ></textarea>
+        </div>
 
-			<!-- Bottom Section: Controls on Left, Button on Right -->
-			<div class="flex items-center justify-between px-5 py-3 bg-white border-t border-gray-200">
-				<!-- Settings Controls -->
-				<div class="flex items-center justify-start gap-6">
-					<!-- Results (K) Toggle -->
-					<div class="flex items-center gap-2">
-						<label class="relative inline-flex items-center cursor-pointer">
-							<input type="checkbox" id="resultsToggle" class="sr-only peer results-toggle" />
-							<div class="w-8 h-4 bg-gray-300 rounded-full peer-checked:bg-indigo-500 transition peer-focus:ring-2 peer-focus:ring-indigo-500/30"></div>
-							<div class="absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full transition peer-checked:translate-x-4"></div>
-						</label>
-						<span class="text-xs font-medium text-gray-600 whitespace-nowrap">Results (K)</span>
-					</div>
+        <!-- Bottom row: settings + send -->
+        <div class="chat-input-footer">
+          <!-- Settings controls -->
+          <div class="chat-settings">
+            <!-- Results (K) Toggle -->
+            <label class="chat-toggle" aria-label="Results (K)">
+              <input type="checkbox" id="results-toggle" class="sr-only" />
+              <span class="chat-toggle__track">
+                <span class="chat-toggle__thumb"></span>
+              </span>
+              <span class="chat-toggle__label">Results (K)</span>
+            </label>
 
-					<!-- Creativity Toggle -->
-					<div class="flex items-center gap-2">
-						<label class="relative inline-flex items-center cursor-pointer">
-							<input type="checkbox" id="creativityToggle" class="sr-only peer creativity-toggle" />
-							<div class="w-8 h-4 bg-gray-300 rounded-full peer-checked:bg-indigo-500 transition peer-focus:ring-2 peer-focus:ring-indigo-500/30"></div>
-							<div class="absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full transition peer-checked:translate-x-4"></div>
-						</label>
-						<span class="text-xs font-medium text-gray-600 whitespace-nowrap">Creativity</span>
-					</div>
+            <!-- Creativity Toggle -->
+            <label class="chat-toggle" aria-label="Creativity">
+              <input type="checkbox" id="creativity-toggle" class="sr-only" />
+              <span class="chat-toggle__track">
+                <span class="chat-toggle__thumb"></span>
+              </span>
+              <span class="chat-toggle__label">Creativity</span>
+            </label>
 
-					<!-- Show Sources Checkbox -->
-					<label class="flex items-center gap-2 cursor-pointer">
-						<input type="checkbox" id="includeSources" name="includeSources" checked class="w-3.5 h-3.5 cursor-pointer accent-indigo-600 rounded" />
-						<span class="text-xs font-medium text-gray-600 whitespace-nowrap">Show Sources</span>
-					</label>
-				</div>
+            <!-- Show Sources -->
+            <label class="chat-checkbox" aria-label="Show sources">
+              <input type="checkbox" id="include-sources" checked />
+              <span class="chat-checkbox__box" aria-hidden="true"></span>
+              <span class="chat-checkbox__label">Show Sources</span>
+            </label>
+          </div>
 
-				<!-- Send Button -->
-				<button
-					type="button"
-					aria-label="Send message"
-					class="w-9 h-9 flex items-center justify-center rounded-full bg-[#6366f1] text-white transition-all hover:bg-[#4648d4] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl ml-4 flex-shrink-0"
-				>
-					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
-				</button>
-			</div>
-		</div>
+          <!-- Send button -->
+          <button
+            type="button"
+            id="send-btn"
+            class="chat-send-btn"
+            aria-label="Send message"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m5 12 7-7 7 7"/>
+              <path d="M12 19V5"/>
+            </svg>
+          </button>
+        </div>
+      </div>
 
-		<!-- Hint text and disclaimer -->
-		<div class="text-xs text-gray-400 mt-2 px-1 flex flex-col items-center">
-			<span class="hidden sm:inline">Shift + Enter for new line</span>
-			<p class="text-xs text-gray-400 text-center mt-3">FW Agent may provide inaccurate information. Verify critical data.</p>
-		</div>
-	</div>
+      <!-- Hint text -->
+      <p class="chat-hint">Shift + Enter for new line</p>
 
-	<!-- Hidden sliders for actual values -->
-	<div class="hidden">
-		<input
-			type="range"
-			id="topK"
-			name="topK"
-			min="1"
-			max="20"
-			value="5"
-			class="topk-slider"
-		/>
-		<input
-			type="range"
-			id="temperature"
-			name="temperature"
-			min="0"
-			max="1"
-			step="0.1"
-			value="0.7"
-			class="temperature-slider"
-		/>
-	</div>
+      <!-- Disclaimer -->
+      <p class="chat-disclaimer">FW Agent may provide inaccurate information. Verify critical data.</p>
+    </form>
+  </footer>
 </div>
 
-<script>
-	// Results toggle
-	const topKInput = document.querySelector('input[name="topK"]') as HTMLInputElement;
-	const resultsToggle = document.getElementById('resultsToggle') as HTMLInputElement;
-	
-	if (topKInput && resultsToggle) {
-		resultsToggle.addEventListener('change', () => {
-			topKInput.value = resultsToggle.checked ? '10' : '5';
-		});
-	}
+<style>
+  /* ============================================
+     Layout
+     ============================================ */
+  .chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100%;
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
 
-	// Creativity toggle
-	const tempInput = document.querySelector('input[name="temperature"]') as HTMLInputElement;
-	const creativityToggle = document.getElementById('creativityToggle') as HTMLInputElement;
-	
-	if (tempInput && creativityToggle) {
-		creativityToggle.addEventListener('change', () => {
-			tempInput.value = creativityToggle.checked ? '0.9' : '0.7';
-		});
-	}
+  /* ============================================
+     Header
+     ============================================ */
+  .chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4) var(--space-6);
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface);
+  }
 
-	// Auto-expand textarea
-	const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
-	if (textarea) {
-		textarea.addEventListener('input', () => {
-			textarea.style.height = 'auto';
-			textarea.style.height = Math.min(textarea.scrollHeight, 96) + 'px';
-		});
+  .chat-header__brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
 
-		// Handle Shift+Enter for new line, Enter to send
-		textarea.addEventListener('keydown', (e: KeyboardEvent) => {
-			if (e.key === 'Enter' && !e.shiftKey) {
-				e.preventDefault();
-				const sendBtn = document.querySelector('button[aria-label="Send message"]') as HTMLButtonElement;
-				if (sendBtn) sendBtn.click();
-			}
-		});
-	}
-</script>
+  .chat-header__title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0;
+  }
+
+  .chat-header__status {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    margin: 0;
+  }
+
+  /* ============================================
+     Main Content
+     ============================================ */
+  .chat-main {
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .chat-messages-area {
+    height: 100%;
+    background: var(--color-bg);
+  }
+
+  /* ============================================
+     Input Section
+     ============================================ */
+  .chat-input-section {
+    padding: var(--space-4) var(--space-6);
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface);
+  }
+
+  .chat-input-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  }
+
+  .chat-input-card:focus-within {
+    border-color: var(--color-border-focus);
+    box-shadow: 0 0 0 3px var(--color-primary-subtle);
+  }
+
+  /* Input wrapper */
+  .chat-input-wrapper {
+    position: relative;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .chat-input-icon {
+    position: absolute;
+    left: var(--space-4);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-text-muted);
+    pointer-events: none;
+  }
+
+  .chat-textarea {
+    width: 100%;
+    padding: var(--space-2) var(--space-4) var(--space-2) var(--space-8);
+    border: none;
+    background: transparent;
+    color: var(--color-text);
+    font-family: inherit;
+    font-size: 1rem;
+    line-height: 1.5;
+    resize: none;
+  }
+
+  .chat-textarea:focus {
+    outline: none;
+  }
+
+  .chat-textarea::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  /* Input footer */
+  .chat-input-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+    border-top: 1px solid var(--color-border);
+  }
+
+  /* ============================================
+     Settings Controls
+     ============================================ */
+  .chat-settings {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  /* Toggle switch */
+  .chat-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    cursor: pointer;
+  }
+
+  .chat-toggle__track {
+    position: relative;
+    width: 2rem;
+    height: 1rem;
+    background: var(--color-border);
+    border-radius: var(--radius-full);
+    transition: background var(--transition-fast);
+  }
+
+  .chat-toggle input:checked + .chat-toggle__track {
+    background: var(--color-primary);
+  }
+
+  .chat-toggle__thumb {
+    position: absolute;
+    left: 2px;
+    top: 2px;
+    width: 0.75rem;
+    height: 0.75rem;
+    background: white;
+    border-radius: 50%;
+    transition: transform var(--transition-fast);
+  }
+
+  .chat-toggle input:checked + .chat-toggle__track .chat-toggle__thumb {
+    transform: translateX(1rem);
+  }
+
+  .chat-toggle input:focus-visible + .chat-toggle__track {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: 2px;
+  }
+
+  .chat-toggle__label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+  }
+
+  /* Checkbox */
+  .chat-checkbox {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    cursor: pointer;
+  }
+
+  .chat-checkbox input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .chat-checkbox__box {
+    width: 0.875rem;
+    height: 0.875rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.25rem;
+    background: var(--color-surface);
+    transition: background var(--transition-fast), border-color var(--transition-fast);
+  }
+
+  .chat-checkbox input:checked + .chat-checkbox__box {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+  }
+
+  .chat-checkbox input:checked + .chat-checkbox__box::after {
+    content: '';
+    display: block;
+    width: 5px;
+    height: 9px;
+    margin: 1px auto;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  .chat-checkbox input:focus-visible + .chat-checkbox__box {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: 2px;
+  }
+
+  .chat-checkbox__label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+  }
+
+  /* ============================================
+     Send Button
+     ============================================ */
+  .chat-send-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background var(--transition-fast), box-shadow var(--transition-fast);
+    flex-shrink: 0;
+  }
+
+  .chat-send-btn:hover:not(:disabled) {
+    background: var(--color-primary-hover);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .chat-send-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .chat-send-btn:focus-visible {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: 2px;
+  }
+
+  /* ============================================
+     Hint & Disclaimer
+     ============================================ */
+  .chat-hint {
+    margin-top: var(--space-2);
+    padding-left: var(--space-1);
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  .chat-disclaimer {
+    margin-top: var(--space-2);
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  /* ============================================
+     Status
+     ============================================ */
+  .status-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--radius-full);
+  }
+
+  .status-dot--online {
+    background: var(--color-success);
+    animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .status-dot--offline {
+    background: var(--color-error);
+    animation: none;
+  }
+
+  .status-text {
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .status-text--online {
+    color: var(--color-text-secondary);
+  }
+
+  .status-text--offline {
+    color: var(--color-error);
+  }
+
+  @keyframes pulse-soft {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+</style>
