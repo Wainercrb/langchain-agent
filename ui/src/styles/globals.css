@@ -1,11 +1,12 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  --color-dark-bg: #ffffff;
-  --color-dark-card: #f8f9fa;
-  --color-dark-border: #e5e7eb;
-  --color-dark-text: #1f2937;
-  --color-dark-text-secondary: #6b7280;
+  --color-dark-bg: #f9f9ff;
+  --color-dark-card: #e7eeff;
+  --color-dark-border: #c7c4d7;
+  --color-dark-text: #111c2d;
+  --color-dark-text-secondary: #626567;
 }
 
 html,
@@ -15,6 +16,7 @@ body {
   margin: 0;
   width: 100%;
   height: 100%;
+  font-family: 'Inter', sans-serif;
 }
 
 /* Scrollbar styling for webkit browsers */
@@ -23,26 +25,26 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f3f4f6;
+  background: #e7eeff;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: #c7c4d7;
   border-radius: 0.25rem;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: #a8b5e0;
 }
 
 /* Button styles */
 .btn-primary {
   @apply px-6 py-3 text-white rounded-lg font-medium cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
-  background: rgb(37, 99, 235);
+  background: #6366f1;
 }
 
 .btn-primary:hover {
-  background: rgb(29, 78, 216);
+  background: #4648d4;
 }
 
 .btn-secondary {
@@ -52,35 +54,39 @@ body {
 }
 
 .btn-secondary:hover {
-  border-color: rgb(37, 99, 235);
-  color: rgb(37, 99, 235);
+  border-color: #6366f1;
+  color: #6366f1;
 }
 
 /* Input base style */
 .input-base {
-  @apply px-3 py-2 rounded-lg focus:outline-none focus:ring-3 focus:ring-blue-600/10;
+  @apply px-3 py-2 rounded-lg focus:outline-none focus:ring-3;
   background-color: var(--color-dark-bg);
   border: 1px solid var(--color-dark-border);
   color: var(--color-dark-text);
 }
 
 .input-base:focus {
-  border-color: rgb(37, 99, 235);
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
 /* Message bubble styles */
 .message-bubble {
-  @apply max-w-4xl px-4 py-3 rounded-2xl break-words;
+  @apply max-w-4xl px-4 py-3 break-words;
+  border-radius: 16px;
 }
 
 .message-user {
-  background-color: rgb(37, 99, 235);
+  background-color: #6366f1;
   color: white;
+  border-radius: 16px 16px 8px 16px;
 }
 
 .message-assistant {
-  background-color: var(--color-dark-border);
-  color: var(--color-dark-text);
+  background-color: #f1f3f4;
+  color: #111c2d;
+  border-radius: 16px 16px 16px 8px;
 }
 
 /* Range slider styling */
@@ -98,15 +104,15 @@ input[type="range"]::-webkit-slider-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #3b82f6;
+  background: #6366f1;
   cursor: pointer;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
   transition: all 0.2s;
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
-  background: #2563eb;
-  box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.2);
+  background: #4648d4;
+  box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.2);
 }
 
 input[type="range"]::-webkit-slider-track {
@@ -119,16 +125,16 @@ input[type="range"]::-moz-range-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #3b82f6;
+  background: #6366f1;
   border: none;
   cursor: pointer;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
   transition: all 0.2s;
 }
 
 input[type="range"]::-moz-range-thumb:hover {
-  background: #2563eb;
-  box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.2);
+  background: #4648d4;
+  box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.2);
 }
 
 input[type="range"]::-moz-range-track {
@@ -140,7 +146,7 @@ input[type="range"]::-moz-range-track {
 
 /* Checkbox styling */
 input[type="checkbox"] {
-  accent-color: #3b82f6;
+  accent-color: #6366f1;
 }
 
 /* Textarea custom styling */
@@ -149,14 +155,15 @@ textarea::placeholder {
 }
 
 textarea {
-  @apply px-3 py-2 rounded-lg focus:outline-none focus:ring-3 focus:ring-blue-600/10;
+  @apply px-3 py-2 rounded-lg focus:outline-none focus:ring-3;
   background-color: var(--color-dark-bg);
   border: 1px solid var(--color-dark-border);
   color: var(--color-dark-text);
 }
 
 textarea:focus {
-  border-color: rgb(37, 99, 235);
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
 /* Animation for online indicator */
