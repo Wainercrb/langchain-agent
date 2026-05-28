@@ -3,12 +3,14 @@
 ---
 
 <div class="chat-island" role="log" aria-live="polite" aria-label="Chat messages">
-  <div class="messages-container" id="messages-container">
-    <!-- Empty state -->
-    <div class="empty-state" id="empty-state">
-      <div class="empty-state__content">
-        <p class="empty-state__title">Start a conversation...</p>
-        <p class="empty-state__hint">Ask anything about the documents</p>
+  <div class="chat-body">
+    <div class="messages-container" id="messages-container">
+      <!-- Empty state -->
+      <div class="empty-state" id="empty-state">
+        <div class="empty-state__content">
+          <p class="empty-state__title">Start a conversation...</p>
+          <p class="empty-state__hint">Ask anything about the documents</p>
+        </div>
       </div>
     </div>
   </div>
@@ -392,10 +394,19 @@
     height: 100%;
   }
 
+  .chat-body {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-width: 1024px;  /* Stitch container-max */
+    margin: 0 auto;
+    width: 100%;
+  }
+
   .messages-container {
     flex: 1;
     overflow-y: auto;
-    padding: var(--space-4) var(--space-6);
+    padding: var(--space-4) 0;  /* No horizontal padding — chat-body handles it */
     display: flex;
     flex-direction: column;
     gap: var(--chat-gap);  /* 1.25rem — Stitch design system */

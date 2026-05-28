@@ -5,18 +5,20 @@
 <div class="chat-container">
   <!-- Header -->
   <header class="chat-header">
-    <div class="chat-header__brand">
-      <div class="chat-header__title-group">
-        <h1 class="chat-header__title">FW Agent</h1>
-        <p class="chat-header__status">
-          <span class="status-dot" id="status-dot" aria-hidden="true"></span>
-          <span id="status-text">System Online</span>
-        </p>
-      </div>
-      <div class="chat-header__bolt" aria-hidden="true">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>
-        </svg>
+    <div class="chat-header__content">
+      <div class="chat-header__brand">
+        <div class="chat-header__title-group">
+          <h1 class="chat-header__title">FW Agent</h1>
+          <p class="chat-header__status">
+            <span class="status-dot" id="status-dot" aria-hidden="true"></span>
+            <span id="status-text">System Online</span>
+          </p>
+        </div>
+        <div class="chat-header__bolt" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>
+          </svg>
+        </div>
       </div>
     </div>
   </header>
@@ -24,27 +26,43 @@
   <!-- Main content area -->
   <main class="chat-main" role="main">
     <section class="chat-messages-area" aria-label="Chat messages">
-      <slot />
+      <div class="chat-body">
+        <slot />
+      </div>
     </section>
   </main>
 
   <!-- Toggles Row (ABOVE input per mockup) -->
   <div class="chat-toggles-row">
-    <label class="chat-toggle" aria-label="Results (K)">
-      <input type="checkbox" id="results-toggle" class="sr-only" />
-      <span class="chat-toggle__track">
-        <span class="chat-toggle__thumb"></span>
-      </span>
-      <span class="chat-toggle__label">Results (K)</span>
-    </label>
+    <div class="chat-toggles-row__content">
+    <!-- Results (K) — number input -->
+    <div class="chat-number-input" aria-label="Results (K)">
+      <label class="chat-number-input__label" for="results-input">Results (K)</label>
+      <input
+        type="number"
+        id="results-input"
+        class="chat-number-input__field"
+        min="1"
+        max="20"
+        value="3"
+        aria-label="Number of results"
+      />
+    </div>
 
-    <label class="chat-toggle" aria-label="Creativity">
-      <input type="checkbox" id="creativity-toggle" class="sr-only" />
-      <span class="chat-toggle__track">
-        <span class="chat-toggle__thumb"></span>
-      </span>
-      <span class="chat-toggle__label">Creativity</span>
-    </label>
+    <!-- Creativity — number input -->
+    <div class="chat-number-input" aria-label="Creativity">
+      <label class="chat-number-input__label" for="creativity-input">Creativity</label>
+      <input
+        type="number"
+        id="creativity-input"
+        class="chat-number-input__field"
+        min="0"
+        max="1"
+        step="0.1"
+        value="0.7"
+        aria-label="Creativity level"
+      />
+    </div>
 
     <label class="chat-checkbox" aria-label="Show Sources">
       <input type="checkbox" id="include-sources" checked />
@@ -55,7 +73,8 @@
 
   <!-- Input Section -->
   <footer class="chat-input-section" role="contentinfo">
-    <div class="chat-input-card">
+    <div class="chat-input-section__content">
+      <div class="chat-input-card">
       <!-- Paperclip icon (decorative, LEFT) -->
       <span class="chat-input-icon" aria-hidden="true">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -87,9 +106,10 @@
     </div>
 
     <!-- Hint text and disclaimer -->
-    <div class="chat-footer-text">
-      <span>Shift + Enter for new line</span>
-      <p class="chat-disclaimer">FW Agent may provide inaccurate information. Verify critical data.</p>
+      <div class="chat-footer-text">
+        <span>Shift + Enter for new line</span>
+        <p class="chat-disclaimer">FW Agent may provide inaccurate information. Verify critical data.</p>
+      </div>
     </div>
   </footer>
 </div>
@@ -113,9 +133,18 @@
   .chat-header {
     display: flex;
     align-items: center;
+    justify-content: center;  /* Center title */
     padding: var(--space-4) var(--space-6);
     background: var(--color-surface);
     border-bottom: 1px solid var(--color-border);
+  }
+
+  .chat-header__content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 1024px;  /* Stitch container-max */
   }
 
   .chat-header__brand {
@@ -128,6 +157,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
+    align-items: center;  /* Center text in title group */
   }
 
   .chat-header__title {
@@ -167,16 +197,70 @@
     background: var(--color-bg);
   }
 
+  .chat-body {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-width: 1024px;  /* Stitch container-max */
+    margin: 0 auto;
+  }
+
   /* ============================================
      Toggles Row (ABOVE input per mockup)
      ============================================ */
   .chat-toggles-row {
     display: flex;
     align-items: center;
-    gap: var(--space-4);
+    justify-content: center;
     padding: var(--space-3) var(--space-6);
     background: var(--color-surface);
     border-top: 1px solid var(--color-border);
+  }
+
+  .chat-toggles-row__content {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    width: 100%;
+    max-width: 1024px;  /* Stitch container-max */
+  }
+
+  /* Number input (Stitch style) */
+  .chat-number-input {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .chat-number-input__label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+  }
+
+  .chat-number-input__field {
+    width: 4rem;  /* Wider for number input */
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-align: center;
+    transition: border-color var(--transition-fast);
+  }
+
+  .chat-number-input__field:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-subtle);
+  }
+
+  .chat-number-input__field::-webkit-inner-spin-button,
+  .chat-number-input__field::-webkit-outer-spin-button {
+    opacity: 1;
   }
 
   /* Toggle switch */
@@ -283,8 +367,19 @@
      Input Section
      ============================================ */
   .chat-input-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     padding: var(--space-3) var(--space-6) var(--space-4);
     background: var(--color-surface);
+  }
+
+  .chat-input-section__content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 1024px;  /* Stitch container-max */
   }
 
   .chat-input-card {
@@ -295,6 +390,7 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);  /* 8px — Stitch: "Chat Bar: 8px radius" */
     padding: var(--space-2) var(--space-3);
+    width: 100%;  /* Full width of content wrapper */
     transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
   }
 
