@@ -15,8 +15,18 @@
           </p>
         </div>
         <div class="chat-header__bolt" aria-hidden="true">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path>
           </svg>
         </div>
       </div>
@@ -33,490 +43,512 @@
   <!-- Toggles Row (ABOVE input per mockup) -->
   <div class="chat-toggles-row">
     <div class="chat-toggles-row__content">
-    <!-- Results (K) — number input -->
-    <div class="chat-number-input" aria-label="Results (K)">
-      <label class="chat-number-input__label" for="results-input">Results (K)</label>
-      <input
-        type="number"
-        id="results-input"
-        class="chat-number-input__field"
-        min="1"
-        max="20"
-        value="3"
-        aria-label="Number of results"
-      />
+      <!-- Results (K) — number input -->
+      <div class="chat-number-input" aria-label="Results (K)">
+        <label class="chat-number-input__label" for="results-input"
+          >Results (K)</label
+        >
+        <input
+          type="number"
+          id="results-input"
+          class="chat-number-input__field"
+          min="1"
+          max="20"
+          value="3"
+          aria-label="Number of results"
+        />
+      </div>
+
+      <!-- Creativity — number input -->
+      <div class="chat-number-input" aria-label="Creativity">
+        <label class="chat-number-input__label" for="creativity-input"
+          >Creativity</label
+        >
+        <input
+          type="number"
+          id="creativity-input"
+          class="chat-number-input__field"
+          min="0"
+          max="1"
+          step="0.1"
+          value="0.7"
+          aria-label="Creativity level"
+        />
+      </div>
+
+      <label class="chat-checkbox" aria-label="Show Sources">
+        <input type="checkbox" id="include-sources" checked />
+        <span class="chat-checkbox__box" aria-hidden="true"></span>
+        <span class="chat-checkbox__label">Show Sources</span>
+      </label>
     </div>
 
-    <!-- Creativity — number input -->
-    <div class="chat-number-input" aria-label="Creativity">
-      <label class="chat-number-input__label" for="creativity-input">Creativity</label>
-      <input
-        type="number"
-        id="creativity-input"
-        class="chat-number-input__field"
-        min="0"
-        max="1"
-        step="0.1"
-        value="0.7"
-        aria-label="Creativity level"
-      />
-    </div>
+    <!-- Input Section -->
+    <footer class="chat-input-section" role="contentinfo">
+      <div class="chat-input-section__content">
+        <div class="chat-input-card">
+          <!-- Textarea -->
+          <textarea
+            id="chat-input"
+            class="chat-textarea"
+            placeholder="Ask anything..."
+            rows="1"
+            aria-label="Type your message"></textarea>
 
-    <label class="chat-checkbox" aria-label="Show Sources">
-      <input type="checkbox" id="include-sources" checked />
-      <span class="chat-checkbox__box" aria-hidden="true"></span>
-      <span class="chat-checkbox__label">Show Sources</span>
-    </label>
+          <!-- Send button (RIGHT, inside input card) -->
+          <button
+            type="button"
+            id="send-btn"
+            class="chat-send-btn"
+            aria-label="Send message"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m5 12 7-7 7 7"></path>
+              <path d="M12 19V5"></path>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Hint text and disclaimer -->
+        <div class="chat-footer-text">
+          <span>Shift + Enter for new line</span>
+          <p class="chat-disclaimer">
+            FW Agent may provide inaccurate information. Verify critical data.
+          </p>
+        </div>
+      </div>
+    </footer>
   </div>
 
-  <!-- Input Section -->
-  <footer class="chat-input-section" role="contentinfo">
-    <div class="chat-input-section__content">
-      <div class="chat-input-card">
-      <!-- Paperclip icon (decorative, LEFT) -->
-      <span class="chat-input-icon" aria-hidden="true">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18.84 5.6l-8.58 8.58a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-        </svg>
-      </span>
-
-      <!-- Textarea -->
-      <textarea
-        id="chat-input"
-        class="chat-textarea"
-        placeholder="Ask anything..."
-        rows="1"
-        aria-label="Type your message"
-      ></textarea>
-
-      <!-- Send button (RIGHT, inside input card) -->
-      <button
-        type="button"
-        id="send-btn"
-        class="chat-send-btn"
-        aria-label="Send message"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="m5 12 7-7 7 7"/>
-          <path d="M12 19V5"/>
-        </svg>
-      </button>
-    </div>
-
-    <!-- Hint text and disclaimer -->
-      <div class="chat-footer-text">
-        <span>Shift + Enter for new line</span>
-        <p class="chat-disclaimer">FW Agent may provide inaccurate information. Verify critical data.</p>
-      </div>
-    </div>
-  </footer>
-</div>
-
-<style>
-  /* ============================================
+  <style>
+    /* ============================================
      Layout
      ============================================ */
-  .chat-container {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    width: 100%;
-    background: var(--color-bg);
-    color: var(--color-text);
-  }
+    .chat-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100%;
+      background: var(--color-bg);
+      color: var(--color-text);
+    }
 
-  /* ============================================
+    /* ============================================
      Header
      ============================================ */
-  .chat-header {
-    display: flex;
-    align-items: center;
-    justify-content: center;  /* Center title */
-    padding: var(--space-4) var(--space-6);
-    background: var(--color-surface);
-    border-bottom: 1px solid var(--color-border);
-  }
+    .chat-header {
+      display: flex;
+      align-items: center;
+      justify-content: center; /* Center title */
+      padding: var(--space-4) var(--space-6);
+      background: var(--color-surface);
+      border-bottom: 1px solid var(--color-border);
+    }
 
-  .chat-header__content {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    max-width: 1024px;  /* Stitch container-max */
-  }
+    .chat-header__content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      max-width: 1024px; /* Stitch container-max */
+    }
 
-  .chat-header__brand {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-  }
+    .chat-header__brand {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
 
-  .chat-header__title-group {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    align-items: center;  /* Center text in title group */
-  }
+    .chat-header__title-group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+      align-items: center; /* Center text in title group */
+    }
 
-  .chat-header__title {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--color-text);
-    margin: 0;
-    line-height: 1.2;
-  }
+    .chat-header__title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--color-text);
+      margin: 0;
+      line-height: 1.2;
+    }
 
-  .chat-header__status {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
-    margin: 0;
-  }
+    .chat-header__status {
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
+      font-size: 0.75rem;
+      color: var(--color-text-secondary);
+      margin: 0;
+    }
 
-  .chat-header__bolt {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-primary);
-  }
+    .chat-header__bolt {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-primary);
+    }
 
-  /* ============================================
+    /* ============================================
      Main Content
      ============================================ */
-  .chat-main {
-    flex: 1;
-    overflow: hidden;
-  }
+    .chat-main {
+      flex: 1;
+      overflow: hidden;
+    }
 
-  .chat-messages-area {
-    height: 100%;
-    background: var(--color-bg);
-    display: flex;
-    flex-direction: column;
-  }
+    .chat-messages-area {
+      height: 100%;
+      background: var(--color-bg);
+      display: flex;
+      flex-direction: column;
+    }
 
-  .chat-body {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    max-width: 1024px;  /* Stitch container-max */
-    margin: 0 auto;
-    width: 100%;
-  }
+    .chat-body {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      max-width: 1024px; /* Stitch container-max */
+      margin: 0 auto;
+      width: 100%;
+    }
 
-  /* ============================================
+    /* ============================================
      Toggles Row (ABOVE input per mockup)
      ============================================ */
-  .chat-toggles-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--space-3) var(--space-6);
-    background: var(--color-surface);
-    border-top: 1px solid var(--color-border);
-  }
+    .chat-toggles-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      padding: var(--space-3) var(--space-6);
+      background: var(--color-surface);
+      border-top: 1px solid var(--color-border);
+    }
 
-  .chat-toggles-row__content {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-    width: 100%;
-    max-width: 1024px;  /* Stitch container-max */
-  }
+    .chat-toggles-row__content {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      width: 100%;
+      max-width: 1024px; /* Stitch container-max */
+    }
 
-  /* Number input (Stitch style) */
-  .chat-number-input {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-  }
+    /* Number input (Stitch style) */
+    .chat-number-input {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
 
-  .chat-number-input__label {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--color-text-secondary);
-    white-space: nowrap;
-  }
+    .chat-number-input__label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--color-text-secondary);
+      white-space: nowrap;
+    }
 
-  .chat-number-input__field {
-    width: 4rem;  /* Wider for number input */
-    padding: var(--space-1) var(--space-2);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    background: var(--color-surface);
-    color: var(--color-text);
-    font-size: 0.75rem;
-    font-weight: 500;
-    text-align: center;
-    transition: border-color var(--transition-fast);
-  }
+    .chat-number-input__field {
+      width: 4rem; /* Wider for number input */
+      padding: var(--space-1) var(--space-2);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface);
+      color: var(--color-text);
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-align: center;
+      transition: border-color var(--transition-fast);
+    }
 
-  .chat-number-input__field:focus {
-    outline: none;
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--color-primary-subtle);
-  }
+    .chat-number-input__field:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px var(--color-primary-subtle);
+    }
 
-  .chat-number-input__field::-webkit-inner-spin-button,
-  .chat-number-input__field::-webkit-outer-spin-button {
-    opacity: 1;
-  }
+    .chat-number-input__field::-webkit-inner-spin-button,
+    .chat-number-input__field::-webkit-outer-spin-button {
+      opacity: 1;
+    }
 
-  /* Toggle switch */
-  .chat-toggle {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    cursor: pointer;
-  }
+    /* Toggle switch */
+    .chat-toggle {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      cursor: pointer;
+    }
 
-  .chat-toggle__track {
-    position: relative;
-    width: 2rem;
-    height: 1rem;
-    background: var(--color-border);
-    border-radius: var(--radius-full);
-    transition: background var(--transition-fast);
-  }
+    .chat-toggle__track {
+      position: relative;
+      width: 2rem;
+      height: 1rem;
+      background: var(--color-border);
+      border-radius: var(--radius-full);
+      transition: background var(--transition-fast);
+    }
 
-  .chat-toggle input:checked + .chat-toggle__track {
-    background: var(--color-primary);
-  }
+    .chat-toggle input:checked + .chat-toggle__track {
+      background: var(--color-primary);
+    }
 
-  .chat-toggle__thumb {
-    position: absolute;
-    left: 2px;
-    top: 2px;
-    width: 0.75rem;
-    height: 0.75rem;
-    background: white;
-    border-radius: 50%;
-    transition: transform var(--transition-fast);
-  }
+    .chat-toggle__thumb {
+      position: absolute;
+      left: 2px;
+      top: 2px;
+      width: 0.75rem;
+      height: 0.75rem;
+      background: white;
+      border-radius: 50%;
+      transition: transform var(--transition-fast);
+    }
 
-  .chat-toggle input:checked + .chat-toggle__track .chat-toggle__thumb {
-    transform: translateX(1rem);
-  }
+    .chat-toggle input:checked + .chat-toggle__track .chat-toggle__thumb {
+      transform: translateX(1rem);
+    }
 
-  .chat-toggle input:focus-visible + .chat-toggle__track {
-    outline: 2px solid var(--color-border-focus);
-    outline-offset: 2px;
-  }
+    .chat-toggle input:focus-visible + .chat-toggle__track {
+      outline: 2px solid var(--color-border-focus);
+      outline-offset: 2px;
+    }
 
-  .chat-toggle__label {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--color-text-secondary);
-    white-space: nowrap;
-  }
+    .chat-toggle__label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--color-text-secondary);
+      white-space: nowrap;
+    }
 
-  /* Checkbox */
-  .chat-checkbox {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    cursor: pointer;
-  }
+    /* Checkbox */
+    .chat-checkbox {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      cursor: pointer;
+    }
 
-  .chat-checkbox input {
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
-  }
+    .chat-checkbox input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
 
-  .chat-checkbox__box {
-    width: 0.875rem;
-    height: 0.875rem;
-    border: 1px solid var(--color-border);
-    border-radius: 0.25rem;
-    background: var(--color-surface);
-    transition: background var(--transition-fast), border-color var(--transition-fast);
-  }
+    .chat-checkbox__box {
+      width: 0.875rem;
+      height: 0.875rem;
+      border: 1px solid var(--color-border);
+      border-radius: 0.25rem;
+      background: var(--color-surface);
+      transition:
+        background var(--transition-fast),
+        border-color var(--transition-fast);
+    }
 
-  .chat-checkbox input:checked + .chat-checkbox__box {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-  }
+    .chat-checkbox input:checked + .chat-checkbox__box {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+    }
 
-  .chat-checkbox input:checked + .chat-checkbox__box::after {
-    content: '';
-    display: block;
-    width: 5px;
-    height: 9px;
-    margin: 1px auto;
-    border: solid white;
-    border-width: 0 2px 2px 0;
-    transform: rotate(45deg);
-  }
+    .chat-checkbox input:checked + .chat-checkbox__box::after {
+      content: "";
+      display: block;
+      width: 5px;
+      height: 9px;
+      margin: 1px auto;
+      border: solid white;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
 
-  .chat-checkbox input:focus-visible + .chat-checkbox__box {
-    outline: 2px solid var(--color-border-focus);
-    outline-offset: 2px;
-  }
+    .chat-checkbox input:focus-visible + .chat-checkbox__box {
+      outline: 2px solid var(--color-border-focus);
+      outline-offset: 2px;
+    }
 
-  .chat-checkbox__label {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--color-text-secondary);
-    white-space: nowrap;
-  }
+    .chat-checkbox__label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--color-text-secondary);
+      white-space: nowrap;
+    }
 
-/* ============================================
+    /* ============================================
      Input Section
      ============================================ */
-  .chat-input-section {
-    padding: var(--space-3) var(--space-6) var(--space-4);
-    background: var(--color-surface);
-  }
+    .chat-input-section {
+      padding: var(--space-3) var(--space-6) var(--space-4);
+      background: var(--color-surface);
+    }
 
-  .chat-input-section__content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    max-width: 1024px;
-    margin: 0 auto;  /* Center the content wrapper */
-  }
+    .chat-input-section__content {
+      /* display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-width: 1024px; */
+      
+    }
 
-  .chat-input-card {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);  /* 8px — Stitch: "Chat Bar: 8px radius" */
-    padding: var(--space-2) var(--space-3);
-    width: 100%;  /* Full width of content wrapper */
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-  }
+    .chat-input-card {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(
+        --radius-sm
+      ); /* 8px — Stitch: "Chat Bar: 8px radius" */
+      padding: var(--space-2) var(--space-3);
+      width: 100%; /* Full width of content wrapper */
+      transition:
+        border-color var(--transition-fast),
+        box-shadow var(--transition-fast);
+    }
 
-  .chat-input-section__content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-    max-width: 1024px;  /* Stitch container-max */
-  }
+    .chat-input-section__content {
+     
+    }
 
-  .chat-input-card {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);  /* 8px — Stitch: "Chat Bar: 8px radius" */
-    padding: var(--space-2) var(--space-3);
-    width: 100%;  /* Full width of content wrapper */
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-  }
+    .chat-input-card {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(
+        --radius-sm
+      ); /* 8px — Stitch: "Chat Bar: 8px radius" */
+      padding: var(--space-2) var(--space-3);
+      width: 100%; /* Full width of content wrapper */
+      transition:
+        border-color var(--transition-fast),
+        box-shadow var(--transition-fast);
+    }
 
-  .chat-input-card:focus-within {
-    border-color: var(--color-border-focus);
-    box-shadow: 0 0 0 3px var(--color-primary-subtle);
-  }
+    .chat-input-card:focus-within {
+      border-color: var(--color-border-focus);
+      box-shadow: 0 0 0 3px var(--color-primary-subtle);
+    }
 
-  .chat-input-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-text-muted);
-    flex-shrink: 0;
-  }
+    .chat-input-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-text-muted);
+      flex-shrink: 0;
+    }
 
-  .chat-textarea {
-    flex: 1;
-    border: none;
-    background: transparent;
-    color: var(--color-text);
-    font-family: inherit;
-    font-size: 1rem;
-    line-height: 1.5;
-    resize: none;
-    padding: var(--space-1) 0;
-    min-height: 1.5rem;
-    max-height: 6rem;
-  }
+    .chat-textarea {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: var(--color-text);
+      font-family: inherit;
+      font-size: 1rem;
+      line-height: 1.5;
+      resize: none;
+      padding: var(--space-1) 0;
+      min-height: 1.5rem;
+      max-height: 6rem;
+    }
 
-  .chat-textarea:focus {
-    outline: none;
-  }
+    .chat-textarea:focus {
+      outline: none;
+    }
 
-  .chat-textarea::placeholder {
-    color: var(--color-text-muted);
-  }
+    .chat-textarea::placeholder {
+      color: var(--color-text-muted);
+    }
 
-  /* ============================================
+    /* ============================================
      Send Button
      ============================================ */
-  .chat-send-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    background: var(--color-primary);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: background var(--transition-fast);
-    flex-shrink: 0;
-  }
+    .chat-send-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      background: var(--color-primary);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: background var(--transition-fast);
+      flex-shrink: 0;
+    }
 
-  .chat-send-btn:hover:not(:disabled) {
-    background: var(--color-primary-hover);
-  }
+    .chat-send-btn:hover:not(:disabled) {
+      background: var(--color-primary-hover);
+    }
 
-  .chat-send-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
+    .chat-send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
 
-  .chat-send-btn:focus-visible {
-    outline: 2px solid var(--color-border-focus);
-    outline-offset: 2px;
-  }
+    .chat-send-btn:focus-visible {
+      outline: 2px solid var(--color-border-focus);
+      outline-offset: 2px;
+    }
 
-  /* ============================================
+    /* ============================================
      Footer Text
      ============================================ */
-  .chat-footer-text {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-1);
-    margin-top: var(--space-2);
-    width: 100%;  /* Full width to center properly */
-  }
+    .chat-footer-text {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-1);
+      margin-top: var(--space-2);
+      width: 100%; /* Full width to center properly */
+    }
 
-  .chat-footer-text > span {
-    font-size: 0.75rem;
-    color: var(--color-text-muted);
-    text-align: center;  /* Center text */
-  }
+    .chat-footer-text > span {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      text-align: center; /* Center text */
+    }
 
-  .chat-disclaimer {
-    margin: 0;
-    font-size: 0.75rem;
-    color: var(--color-text-muted);
-    text-align: center;  /* Center text */
-  }
+    .chat-disclaimer {
+      margin: 0;
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      text-align: center; /* Center text */
+    }
 
-  /* ============================================
+    /* ============================================
      Status
      ============================================ */
-  .status-dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    background: var(--color-success);
-    border-radius: 50%;
-    animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
+    .status-dot {
+      width: 0.5rem;
+      height: 0.5rem;
+      background: var(--color-success);
+      border-radius: 50%;
+      animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
 
-  @keyframes pulse-soft {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
-  }
-</style>
+    @keyframes pulse-soft {
+      0%,
+      100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.6;
+      }
+    }
+  </style>
+</div>

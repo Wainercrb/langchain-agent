@@ -5,15 +5,19 @@ import { z } from 'zod';
 // ============================================
 
 export const SourceSchema = z.object({
-  content: z.string(),
+  document_id: z.string(),
+  filename: z.string(),
   similarity_score: z.number(),
+  version_date: z.string().nullable().optional(),
+  content_preview: z.string(),
+  chunk_id: z.string(),
   metadata: z.record(z.unknown()).optional(),
 });
 
 export const ChatResponseSchema = z.object({
   response: z.string(),
   query: z.string(),
-  sources: z.array(SourceSchema).optional().default([]),
+  sources: z.array(SourceSchema).nullable().optional().default(null),
   execution_time_ms: z.number(),
   model: z.string(),
   run_id: z.string().nullable(),
@@ -47,15 +51,19 @@ export interface ChatRequest {
 }
 
 export interface Source {
-  content: string;
+  document_id: string;
+  filename: string;
   similarity_score: number;
+  version_date?: string | null;
+  content_preview: string;
+  chunk_id: string;
   metadata?: Record<string, unknown>;
 }
 
 export interface ChatResponse {
   response: string;
   query: string;
-  sources: Source[];
+  sources: Source[] | null;
   execution_time_ms: number;
   model: string;
   run_id: string | null;
@@ -152,6 +160,8 @@ async function sendChat(request: ChatRequest): Promise<ChatResponse> {
   } catch (error) {
     if (error instanceof z.ZodError) {
       console.error('API response validation error:', error.errors);
+      // Log the actual response for debugging
+      console.error('Actual response:', JSON.stringify(data, null, 2));
     }
     throw new Error('Invalid response from server');
   }
