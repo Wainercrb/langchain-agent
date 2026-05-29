@@ -1,12 +1,23 @@
+import os
 import time
 import uuid
 from datetime import datetime
 from typing import List, Optional
 
+from langsmith import traceable
+
 from models import ChatResponse, RetrievedDocument, SourceDocument
 
 from ..retrieval.retriever import Retriever
+from config import settings
 from services.container import logger
+
+# Configure LangSmith environment if tracing is enabled.
+# LangChain auto-detects LANGCHAIN_TRACING_V2 + LANGCHAIN_API_KEY from env.
+# Users can also set LANGCHAIN_TRACING_V2=true directly in their .env.
+if settings.enable_langsmith_tracing:
+    os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
+    os.environ.setdefault("LANGCHAIN_PROJECT", settings.langsmith_project or "langchain-agent")
 
 
 class RAGChain:
@@ -15,6 +26,7 @@ class RAGChain:
         self.llm = llm
         logger.info("RAGChain initialized")
 
+    @traceable(name="RAGChain.invoke", run_type="chain")
     def invoke(
         self,
         query: str,

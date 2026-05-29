@@ -64,4 +64,14 @@ from services.feedback import LangSmithFeedbackProvider
 
 feedback_service = LangSmithFeedbackProvider()
 
+# ── Alerts ────────────────────────────────────────────────────────────
+from services.alerts import DiscordAlertProvider
+
+# Mañana: cambiá DiscordAlertProvider por SlackAlertProvider o TeamsAlertProvider
+alert_service = DiscordAlertProvider(
+    webhook_url=settings.discord_webhook_url,
+    rate_limit_per_minute=settings.alert_rate_limit_per_minute,
+    enabled_severities=settings.alert_enabled_severities,
+)
+
 

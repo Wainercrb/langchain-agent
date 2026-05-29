@@ -1,9 +1,10 @@
 """Configuration management using Pydantic Settings — centraliza todas las variables de entorno."""
 
+import os
 from pathlib import Path
 from typing import Optional
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -51,13 +52,30 @@ class Settings(BaseSettings):
 
     # ── Alerts ────────────────────────────────────────────────────────
     discord_webhook_url: Optional[str] = Field(default=None, alias="DISCORD_WEBHOOK_URL")
+    alert_rate_limit_per_minute: int = Field(default=5, alias="ALERT_RATE_LIMIT_PER_MINUTE")
+    alert_enabled_severities: str = Field(default="ERROR,CRITICAL", alias="ALERT_ENABLED_SEVERITIES")
 
     # ── LLM Resilience ────────────────────────────────────────────────
     llm_timeout_seconds: int = Field(default=60, alias="LLM_TIMEOUT_SECONDS")
     llm_max_retries: int = Field(default=3, alias="LLM_MAX_RETRIES")
 
-    # ── LangSmith / Feedback ──────────────────────────────────────────
+    # ── LangSmith / Tracing ────────────────────────────────────────────
     langsmith_api_key: str = Field(default="", alias="LANGSMITH_API_KEY")
+    langsmith_project: Optional[str] = Field(default=None, alias="LANGSMITH_PROJECT")
+    enable_langsmith_tracing: bool = Field(default=False, alias="ENABLE_LANGSMITH_TRACING")
+
+    @model_validator(mode="after")
+    def _backward_compat_langsmith(self) -> "Settings":
+        """Support legacy env var names for LangSmith tracing.
+
+        If ENABLE_LANGSMITH_TRACING is not set, fall back to LANGSMITH_TRACING
+        or LANGCHAIN_TRACING_V2 so existing .env files keep working.
+        """
+        if not self.enable_langsmith_tracing:
+            legacy = os.getenv("LANGSMITH_TRACING", os.getenv("LANGCHAIN_TRACING_V2", "false"))
+            if legacy.lower() in ("true", "1", "yes", "on"):
+                self.enable_langsmith_tracing = True
+        return self
 
     model_config = {
         "env_file": ".env",

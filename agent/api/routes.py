@@ -1,3 +1,4 @@
+import threading
 import time
 from datetime import datetime
 
@@ -7,8 +8,53 @@ from fastapi.responses import JSONResponse
 from rag.core.chain import RAGChain
 
 from .dependencies import check_health, get_feedback_service, get_rag_chain
-from models import ChatRequest, ChatResponse, ErrorResponse, FeedbackRequest, HealthResponse
+from config import settings
+from models import ChatRequest, ChatResponse, ErrorResponse, FeedbackRequest, HealthResponse, MetricsResponse
 from services.container import logger
+
+
+# ── Simple In-Memory Metrics ─────────────────────────────────────────
+# LangSmith handles the heavy observability; this is a lightweight health-
+# check friendly endpoint with basic counters.
+
+
+class _SimpleMetrics:
+    """Thread-safe in-memory request/error/latency counters.
+
+    Restart loss is acceptable per spec — these are for operational
+    awareness, not billing or auditing.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._request_count = 0
+        self._error_count = 0
+        self._total_latency_ms = 0.0
+
+    def record_request(self, latency_ms: float) -> None:
+        with self._lock:
+            self._request_count += 1
+            self._total_latency_ms += latency_ms
+
+    def record_error(self) -> None:
+        with self._lock:
+            self._error_count += 1
+
+    def snapshot(self) -> dict:
+        with self._lock:
+            avg_latency = (
+                round(self._total_latency_ms / self._request_count, 2)
+                if self._request_count > 0
+                else 0.0
+            )
+            return {
+                "request_count": self._request_count,
+                "error_count": self._error_count,
+                "avg_latency_ms": avg_latency,
+            }
+
+
+_metrics = _SimpleMetrics()
 
 
 router = APIRouter(prefix="/v1", tags=["chat"])
@@ -71,6 +117,8 @@ async def chat(
             f"sources={len(response.sources or [])}"
         )
 
+        _metrics.record_request(execution_time_ms)
+
         return ChatResponse(
             response=response.response,
             query=request.query,
@@ -82,6 +130,7 @@ async def chat(
 
     except ValueError as e:
         logger.error(f"Chat validation error: {str(e)}")
+        _metrics.record_error()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
@@ -93,6 +142,7 @@ async def chat(
 
     except Exception as e:
         logger.error(f"Chat error: {str(e)}", exc_info=True)
+        _metrics.record_error()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
@@ -155,6 +205,39 @@ async def feedback(
                 "timestamp": datetime.utcnow().isoformat(),
             },
         )
+
+
+@router.get(
+    "/metrics",
+    response_model=MetricsResponse,
+    status_code=200,
+)
+async def metrics() -> MetricsResponse:
+    """
+    Return lightweight operational counters since process startup.
+
+    LangSmith handles the comprehensive observability dashboards;
+    this endpoint provides simple request/error/latency counters
+    that are health-check friendly.
+
+    Returns:
+        MetricsResponse with request_count, error_count, avg_latency_ms,
+        and langsmith_dashboard_url (if tracing is configured).
+    """
+    data = _metrics.snapshot()
+
+    langsmith_url = None
+    if settings.enable_langsmith_tracing and settings.langsmith_api_key:
+        # LangSmith dashboard URL pattern for a project
+        project = settings.langsmith_project or "langchain-agent"
+        langsmith_url = f"https://smith.langchain.com/o/default/projects/p/{project}"
+
+    return MetricsResponse(
+        request_count=data["request_count"],
+        error_count=data["error_count"],
+        avg_latency_ms=data["avg_latency_ms"],
+        langsmith_dashboard_url=langsmith_url,
+    )
 
 
 @router.get(

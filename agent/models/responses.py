@@ -8,6 +8,41 @@ from pydantic import BaseModel, ConfigDict, Field
 from .document import SourceDocument
 
 
+class MetricsResponse(BaseModel):
+    """
+    Response model for GET /v1/metrics endpoint.
+
+    Provides lightweight operational counters. LangSmith handles the
+    comprehensive observability dashboards.
+
+    Attributes:
+        request_count: Total number of requests handled since startup
+        error_count: Total number of errors since startup
+        avg_latency_ms: Average request latency in milliseconds
+        langsmith_dashboard_url: Link to LangSmith project dashboard (if configured)
+    """
+
+    request_count: int = Field(
+        default=0,
+        ge=0,
+        description="Total number of requests handled since startup",
+    )
+    error_count: int = Field(
+        default=0,
+        ge=0,
+        description="Total number of errors since startup",
+    )
+    avg_latency_ms: float = Field(
+        default=0.0,
+        ge=0,
+        description="Average request latency in milliseconds",
+    )
+    langsmith_dashboard_url: Optional[str] = Field(
+        default=None,
+        description="Link to LangSmith project dashboard (null if tracing disabled)",
+    )
+
+
 class ChatResponse(BaseModel):
     """
     Response model for POST /v1/chat endpoint.

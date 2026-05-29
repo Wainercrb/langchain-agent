@@ -8,8 +8,9 @@ from datetime import datetime
 
 from api import router
 from config import settings
-from services.container import logger
+from services.container import alert_service, logger
 from utils.correlation import set_correlation_id, get_correlation_id
+from utils.exceptions import RAGException, Severity
 
 app = FastAPI(title="LangChain Agent RAG API", version="1.0.0", docs_url="/docs")
 
@@ -38,8 +39,39 @@ app.include_router(router)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled exception: {exc}")
-    return JSONResponse(status_code=500, content={"error": "internal_error", "timestamp": datetime.utcnow().isoformat()})
+    """Global exception handler with alert dispatch.
+
+    Convention:
+        - Generic Exception → CRITICAL (unexpected)
+        - TransientLLMError   → WARNING
+        - PermanentLLMError   → ERROR
+        - Other RAGException  → ERROR
+    """
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+
+    # Map exception to alert severity
+    if isinstance(exc, RAGException):
+        alert_severity = exc.severity
+    else:
+        alert_severity = Severity.CRITICAL
+
+    await alert_service.alert(
+        severity=alert_severity,
+        message=str(exc)[:200] or "Unhandled server exception",
+        error=exc,
+        metadata={
+            "path": str(request.url.path),
+            "method": request.method,
+        },
+    )
+
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "internal_error",
+            "timestamp": datetime.utcnow().isoformat(),
+        },
+    )
 
 
 if __name__ == "__main__":
