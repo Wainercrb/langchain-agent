@@ -24,24 +24,26 @@ logger.info(f"Using database: {db_direct_url[:30]}...")
 config.set_main_option("sqlalchemy.url", db_direct_url)
 target_metadata = None
 
+
 def run_migrations_offline() -> None:
     logger.info("Running migrations offline...")
-    context.configure(url=db_direct_url,
-                    target_metadata=target_metadata,
-                    literal_binds=True,
-                    dialect_opts={"paramstyle": "named"}
+    context.configure(
+        url=db_direct_url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
     )
-    
+
     with context.begin_transaction():
         context.run_migrations()
-    
+
     logger.info("Offline migrations complete")
 
 
 def run_migrations_online() -> None:
     logger.info("Connecting to database...")
     connectable = create_engine(db_direct_url)
-    
+
     with connectable.connect() as connection:
         logger.info("Running migrations online...")
         context.configure(connection=connection, target_metadata=target_metadata)

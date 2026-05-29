@@ -1,8 +1,8 @@
 """Composition root — single place to wire all pluggable service instances.
 
-Cambiá las instancias de abajo para cambiar implementaciones en toda la app.
+Change the instances below to swap implementations across the whole app.
 
-Ejemplos:
+Examples:
     # LLM
     llm = GeminiProvider(model="gemini-2.5-flash", ...)
     # llm = OpenAIProvider(model="gpt-4", api_key="sk-...")
@@ -18,14 +18,13 @@ Ejemplos:
     # with rag.* modules that also import services.container.logger).
 """
 
-
 from config import settings
 
 # ── Logger ─────────────────────────────────────────────────────────
-from services.logging import logger
+from services.logging import logger  # noqa: F401 — re-exported as shared singleton
 
 # ── LLM ──────────────────────────────────────────────────────────────
-from services.llm import GoogleProvider, OpenAIProvider, OpenRouterProvider
+from services.llm import OpenRouterProvider
 
 # llm = GoogleProvider(
 #     model=settings.gemini_model,
@@ -70,7 +69,7 @@ feedback_service = LangSmithFeedbackProvider()
 # ── Alerts ────────────────────────────────────────────────────────────
 from services.alerts import DiscordAlertProvider
 
-# Mañana: cambiá DiscordAlertProvider por SlackAlertProvider o TeamsAlertProvider
+# Future: swap DiscordAlertProvider for SlackAlertProvider or TeamsAlertProvider
 alert_service = DiscordAlertProvider(
     webhook_url=settings.discord_webhook_url,
     rate_limit_per_minute=settings.alert_rate_limit_per_minute,

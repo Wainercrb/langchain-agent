@@ -1,6 +1,7 @@
-"""Supabase pgvector vector store — implementa VectorStoreBase usando Supabase."""
+"""Supabase pgvector vector store — implements VectorStoreBase using Supabase."""
+
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from services.vector_store.base import VectorStoreBase
@@ -15,9 +16,7 @@ class VectorStore(VectorStoreBase):
         self.client = supabase_client
         logger.info("VectorStore initialized")
 
-    def find_document_by_hash(
-        self, content_hash: str
-    ) -> Optional[Dict[str, Any]]:
+    def find_document_by_hash(self, content_hash: str) -> Optional[Dict[str, Any]]:
         """Look up a document by its content_hash.
 
         Args:
@@ -55,7 +54,7 @@ class VectorStore(VectorStoreBase):
             version_date = (
                 version_date.isoformat()
                 if isinstance(version_date, datetime)
-                else (version_date or datetime.utcnow().isoformat())
+                else (version_date or datetime.now(timezone.utc).isoformat())
             )
             doc_id = str(uuid.uuid4())
             metadata = metadata or {}
@@ -65,7 +64,7 @@ class VectorStore(VectorStoreBase):
                 "filename": filename,
                 "version_date": version_date,
                 "metadata": metadata,
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
             }
             if content_hash is not None:
                 insert_data["content_hash"] = content_hash
@@ -91,13 +90,15 @@ class VectorStore(VectorStoreBase):
                     "text": chunk["text"],
                     "embedding": chunk["embedding"],
                     "metadata": chunk.get("metadata", {}),
-                    "created_at": datetime.utcnow().isoformat(),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
                 }
                 for idx, chunk in enumerate(chunks)
             ]
 
             self.client.table("document_chunks").insert(chunk_records).execute()
-            logger.info(f"Inserted {len(chunk_records)} chunks for document {document_id}")
+            logger.info(
+                f"Inserted {len(chunk_records)} chunks for document {document_id}"
+            )
             return len(chunk_records)
         except Exception as e:
             raise DocumentStoreError(
@@ -132,16 +133,18 @@ class VectorStore(VectorStoreBase):
             # Map out_* column names back to standard names
             mapped_results = []
             for r in results:
-                mapped_results.append({
-                    "id": r.get("out_id"),
-                    "document_id": r.get("out_document_id"),
-                    "text": r.get("out_text"),
-                    "chunk_index": r.get("out_chunk_index"),
-                    "metadata": r.get("out_metadata"),
-                    "filename": r.get("out_filename"),
-                    "version_date": r.get("out_version_date"),
-                    "similarity_score": r.get("out_similarity_score"),
-                })
+                mapped_results.append(
+                    {
+                        "id": r.get("out_id"),
+                        "document_id": r.get("out_document_id"),
+                        "text": r.get("out_text"),
+                        "chunk_index": r.get("out_chunk_index"),
+                        "metadata": r.get("out_metadata"),
+                        "filename": r.get("out_filename"),
+                        "version_date": r.get("out_version_date"),
+                        "similarity_score": r.get("out_similarity_score"),
+                    }
+                )
             results = mapped_results
 
             top_score = f"{results[0]['similarity_score']:.3f}" if results else "N/A"
@@ -171,11 +174,13 @@ class VectorStore(VectorStoreBase):
                     "status": status,
                     "chunk_count": chunk_count,
                     "error_message": error_message,
-                    "processed_at": datetime.utcnow().isoformat(),
+                    "processed_at": datetime.now(timezone.utc).isoformat(),
                 }
             ).execute()
 
-            logger.info(f"Logged ingestion: {filename} ({status}, {chunk_count} chunks)")
+            logger.info(
+                f"Logged ingestion: {filename} ({status}, {chunk_count} chunks)"
+            )
         except Exception as e:
             raise DocumentStoreError(
                 message=f"Failed to log ingestion: {str(e)}",
@@ -184,7 +189,12 @@ class VectorStore(VectorStoreBase):
 
     async def health_check(self) -> bool:
         try:
-            response = self.client.table("documents").select("id", count="exact").limit(1).execute()
+            response = (
+                self.client.table("documents")
+                .select("id", count="exact")
+                .limit(1)
+                .execute()
+            )
             logger.info("Health check passed: database is healthy")
             return True
         except Exception as e:

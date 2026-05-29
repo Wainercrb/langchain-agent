@@ -1,7 +1,7 @@
 """Abstract alert provider interface.
 
-Strategy Pattern: swap Discord ↔ Slack ↔ Teams cambiando la clase
-concreta que se cablea en services/container.py.
+Strategy Pattern: swap Discord ↔ Slack ↔ Teams by changing the
+concrete class wired in services/container.py.
 """
 
 from abc import ABC, abstractmethod
@@ -13,7 +13,7 @@ from utils.exceptions import Severity
 class AlertProvider(ABC):
     """Abstract base for pluggable alert backends.
 
-    Cada implementación decide cómo se envía la alerta
+    Each implementation decides how alerts are sent
     (Discord embed, Slack block, Teams card, etc.).
     """
 
@@ -28,10 +28,10 @@ class AlertProvider(ABC):
         """Send an alert via the concrete backend.
 
         Args:
-            severity: Nivel de severidad del alerta.
-            message: Mensaje legible por humanos.
-            error: Excepción original (opcional).
-            metadata: Datos extra (opcional).
+            severity: Alert severity level.
+            message: Human-readable message.
+            error: Original exception (optional).
+            metadata: Extra data (optional).
         """
         pass
 

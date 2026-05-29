@@ -2,11 +2,8 @@
 
 import hashlib
 import shutil
-import sys
 import time
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent))
 
 from config import settings
 from services.container import embeddings, vector_store
@@ -23,7 +20,7 @@ def process_file(file_path: Path) -> None:
 
     existing = vector_store.find_document_by_hash(content_hash)
     if existing is not None:
-        print(f"  Skipping (unchanged)")
+        print("  Skipping (unchanged)")
         shutil.move(str(file_path), str(settings.processed_dir / file_path.name))
         return
 
@@ -45,7 +42,7 @@ def process_file(file_path: Path) -> None:
     chunks = [c for c in chunks if c.strip()]
 
     if not chunks:
-        print(f"  Failed: No content after splitting")
+        print("  Failed: No content after splitting")
         shutil.move(str(file_path), str(settings.failed_dir / file_path.name))
         return
 
@@ -57,12 +54,9 @@ def process_file(file_path: Path) -> None:
         vector_store.log_ingestion(file_path.name, "failure", error_message=str(e))
         return
 
-    doc_id = vector_store.insert_document(
-        file_path.name, content_hash=content_hash
-    )
+    doc_id = vector_store.insert_document(file_path.name, content_hash=content_hash)
     chunk_records = [
-        {"text": chunks[i], "embedding": vectors[i]}
-        for i in range(len(chunks))
+        {"text": chunks[i], "embedding": vectors[i]} for i in range(len(chunks))
     ]
     count = vector_store.insert_chunks(doc_id, chunk_records)
     vector_store.log_ingestion(file_path.name, "success", chunk_count=count)
@@ -78,13 +72,18 @@ def main() -> None:
     settings.processed_dir.mkdir(parents=True, exist_ok=True)
     settings.failed_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"Watching {settings.knowledge_dir} every {settings.cron_interval_minutes}min")
+    print(
+        f"Watching {settings.knowledge_dir} every {settings.cron_interval_minutes}min"
+    )
 
     while True:
-        files = sorted([
-            f for f in settings.knowledge_dir.iterdir()
-            if f.is_file() and not f.name.startswith(".")
-        ])
+        files = sorted(
+            [
+                f
+                for f in settings.knowledge_dir.iterdir()
+                if f.is_file() and not f.name.startswith(".")
+            ]
+        )
 
         if files:
             for f in files:

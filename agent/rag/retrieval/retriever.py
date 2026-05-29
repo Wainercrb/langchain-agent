@@ -7,7 +7,6 @@ from ..utils import filter_by_threshold
 from services.container import logger
 
 
-
 class Retriever:
     def __init__(self, vector_store, embeddings):
         self.vector_store = vector_store
@@ -51,7 +50,9 @@ class Retriever:
                 for result in filtered
             ]
 
-            logger.info(f"Retrieve complete: returned {len(retrieved_documents)} documents")
+            logger.info(
+                f"Retrieve complete: returned {len(retrieved_documents)} documents"
+            )
             return retrieved_documents
 
         except Exception as e:

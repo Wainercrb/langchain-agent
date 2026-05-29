@@ -13,7 +13,6 @@ from pydantic import BaseModel, Field
 from models import RetrievedDocument
 from services.container import logger
 
-
 # Phrases to strip from user queries before semantic search.
 # These are conversational "filler" that hurt embedding quality.
 _QUERY_NOISE_PATTERNS = [

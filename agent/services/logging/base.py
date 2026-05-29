@@ -1,4 +1,4 @@
-"""Abstract logger backend — define el contrato para cualquier sistema de logs."""
+"""Abstract logger backend — defines the contract for any logging system."""
 
 from abc import ABC, abstractmethod
 
@@ -6,8 +6,8 @@ from abc import ABC, abstractmethod
 class Logger(ABC):
     """Abstract base for pluggable logging backends.
 
-    Los métodos reflejan logging.Logger (debug, info, warning, error).
-    El backend se configura en el constructor y queda listo para usar.
+    Methods mirror logging.Logger (debug, info, warning, error).
+    The backend is configured in the constructor and ready to use.
     """
 
     @abstractmethod

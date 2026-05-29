@@ -1,4 +1,4 @@
-"""Abstract base for embedding providers — define el contrato para sistemas de embeddings."""
+"""Abstract base for embedding providers — defines the contract for embedding systems."""
 
 from abc import ABC, abstractmethod
 from typing import List
@@ -7,8 +7,8 @@ from typing import List
 class Embeddings(ABC):
     """Abstract base class for embedding providers.
 
-    Cualquier embedding provider (Google, OpenAI, HuggingFace) debe implementar
-    embed_query() y embed_documents().
+    Any embedding provider (Google, OpenAI, HuggingFace) must implement
+    embed_query() and embed_documents().
     """
 
     @abstractmethod

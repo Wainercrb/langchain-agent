@@ -13,7 +13,14 @@ from services.logging import logger
 class GoogleProvider(LLMProvider):
     """Google Gemini LLM provider."""
 
-    def __init__(self, model: str = "gemini-2.5-flash", temperature: float = 0.7, api_key: str = None, timeout: int = 60, **kwargs):
+    def __init__(
+        self,
+        model: str = "gemini-2.5-flash",
+        temperature: float = 0.7,
+        api_key: str = None,
+        timeout: int = 60,
+        **kwargs,
+    ):
         super().__init__(model=model, temperature=temperature, **kwargs)
         self._timeout = timeout
         self._llm = ChatGoogleGenerativeAI(
@@ -24,18 +31,42 @@ class GoogleProvider(LLMProvider):
         )
         logger.info(f"Google Gemini provider initialized: model={self.model}")
 
+    @property
+    def chat_model(self):
+        """Expose the underlying LangChain chat model for tool calling / agent usage."""
+        return self._llm
+
     @retry_llm()
     def invoke(self, messages: List[Dict[str, str]], **kwargs) -> LLMResponse:
         try:
             response = self._llm.invoke(messages, **kwargs)
             return LLMResponse(
-                content=response.content if hasattr(response, "content") else str(response),
+                content=(
+                    response.content if hasattr(response, "content") else str(response)
+                ),
                 model=self.model,
                 provider="gemini",
                 usage=getattr(response, "usage_metadata", None),
             )
         except Exception as e:
             error_msg = str(e)
-            if any(kw in error_msg.lower() for kw in ["authentication", "api key", "permission", "not found", "invalid"]):
-                raise PermanentLLMError(f"Google Gemini invoke failed: {error_msg}", provider="gemini", original_error=e)
-            raise TransientLLMError(f"Google Gemini invoke failed: {error_msg}", provider="gemini", original_error=e)
+            if any(
+                kw in error_msg.lower()
+                for kw in [
+                    "authentication",
+                    "api key",
+                    "permission",
+                    "not found",
+                    "invalid",
+                ]
+            ):
+                raise PermanentLLMError(
+                    f"Google Gemini invoke failed: {error_msg}",
+                    provider="gemini",
+                    original_error=e,
+                )
+            raise TransientLLMError(
+                f"Google Gemini invoke failed: {error_msg}",
+                provider="gemini",
+                original_error=e,
+            )

@@ -12,10 +12,7 @@ from pathlib import Path
 
 import psycopg2
 
-sys.path.insert(0, str(Path(__file__).parent))
-
 from config.settings import settings
-
 
 RESET_MODE = "--reset" in sys.argv
 
@@ -84,7 +81,8 @@ def run_migrations() -> int:
     print("Running migrations...")
     result = subprocess.run(
         [sys.executable, "-m", "alembic", "--config", str(ini), "upgrade", "head"],
-        env=env, timeout=120,
+        env=env,
+        timeout=120,
     )
     if result.returncode != 0:
         print("ERROR: Migration failed")

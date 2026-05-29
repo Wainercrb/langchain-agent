@@ -5,7 +5,6 @@ from typing import Any, Dict, Generator, List
 from services.logging import logger
 
 
-
 def filter_by_threshold(
     results: List[Dict[str, Any]], threshold: float
 ) -> Generator[Dict[str, Any], None, None]:
@@ -31,6 +30,3 @@ def filter_by_threshold(
                 f"Filtered out document {result.get('document_id')} "
                 f"(similarity {score} < {threshold})"
             )
-
-
-

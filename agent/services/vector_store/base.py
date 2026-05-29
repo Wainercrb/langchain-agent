@@ -1,4 +1,4 @@
-"""Abstract base for vector stores — define el contrato para bases de datos vectoriales."""
+"""Abstract base for vector stores — defines the contract for vector databases."""
 
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -8,8 +8,8 @@ from typing import Any, Dict, List, Optional
 class VectorStoreBase(ABC):
     """Abstract base class for vector stores.
 
-    Cualquier vector store (Supabase pgvector, Pinecone, Qdrant) debe implementar
-    estos métodos para integrarse con el sistema RAG.
+    Any vector store (Supabase pgvector, Pinecone, Qdrant) must implement
+    these methods to integrate with the RAG system.
     """
 
     @abstractmethod
@@ -47,9 +47,7 @@ class VectorStoreBase(ABC):
         pass
 
     @abstractmethod
-    def find_document_by_hash(
-        self, content_hash: str
-    ) -> Optional[Dict[str, Any]]:
+    def find_document_by_hash(self, content_hash: str) -> Optional[Dict[str, Any]]:
         """Look up a document by its content_hash.
 
         Args:

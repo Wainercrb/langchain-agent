@@ -98,8 +98,16 @@ class LLMProviderError(RAGException):
 class TransientLLMError(LLMProviderError):
     """LLM error that SHOULD be retried (rate limits, timeouts, 5xx)."""
 
-    def __init__(self, message: str, provider: str, original_error: Optional[Exception] = None):
-        super().__init__(message, provider, original_error, is_transient=True, error_code="LLM_TRANSIENT_ERROR")
+    def __init__(
+        self, message: str, provider: str, original_error: Optional[Exception] = None
+    ):
+        super().__init__(
+            message,
+            provider,
+            original_error,
+            is_transient=True,
+            error_code="LLM_TRANSIENT_ERROR",
+        )
 
     @property
     def severity(self) -> Severity:
@@ -109,12 +117,17 @@ class TransientLLMError(LLMProviderError):
 class PermanentLLMError(LLMProviderError):
     """LLM error that should NOT be retried (auth failures, invalid model, 4xx)."""
 
-    def __init__(self, message: str, provider: str, original_error: Optional[Exception] = None):
-        super().__init__(message, provider, original_error, is_transient=False, error_code="LLM_PERMANENT_ERROR")
+    def __init__(
+        self, message: str, provider: str, original_error: Optional[Exception] = None
+    ):
+        super().__init__(
+            message,
+            provider,
+            original_error,
+            is_transient=False,
+            error_code="LLM_PERMANENT_ERROR",
+        )
 
     @property
     def severity(self) -> Severity:
         return Severity.ERROR
-
-
-

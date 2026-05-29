@@ -1,60 +1,22 @@
-import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 
 from .dependencies import check_health, get_agent, get_feedback_service
+from .metrics import get_metrics
 from config import settings
-from models import ChatRequest, ChatResponse, ErrorResponse, FeedbackRequest, HealthResponse, MetricsResponse
+from models import (
+    ChatRequest,
+    ChatResponse,
+    ErrorResponse,
+    FeedbackRequest,
+    HealthResponse,
+    MetricsResponse,
+)
 from services.container import alert_service, logger
 from utils.exceptions import Severity
-
-
-# ── Simple In-Memory Metrics ─────────────────────────────────────────
-# LangSmith handles the heavy observability; this is a lightweight health-
-# check friendly endpoint with basic counters.
-
-
-class _SimpleMetrics:
-    """Thread-safe in-memory request/error/latency counters.
-
-    Restart loss is acceptable per spec — these are for operational
-    awareness, not billing or auditing.
-    """
-
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._request_count = 0
-        self._error_count = 0
-        self._total_latency_ms = 0.0
-
-    def record_request(self, latency_ms: float) -> None:
-        with self._lock:
-            self._request_count += 1
-            self._total_latency_ms += latency_ms
-
-    def record_error(self) -> None:
-        with self._lock:
-            self._error_count += 1
-
-    def snapshot(self) -> dict:
-        with self._lock:
-            avg_latency = (
-                round(self._total_latency_ms / self._request_count, 2)
-                if self._request_count > 0
-                else 0.0
-            )
-            return {
-                "request_count": self._request_count,
-                "error_count": self._error_count,
-                "avg_latency_ms": avg_latency,
-            }
-
-
-_metrics = _SimpleMetrics()
-
 
 router = APIRouter(prefix="/v1", tags=["chat"])
 
@@ -117,7 +79,7 @@ async def chat(
             f"sources={len(response.sources or [])}"
         )
 
-        _metrics.record_request(execution_time_ms)
+        get_metrics().record_request(execution_time_ms)
 
         return ChatResponse(
             response=response.response,
@@ -130,7 +92,7 @@ async def chat(
 
     except ValueError as e:
         logger.error(f"Chat validation error: {str(e)}")
-        _metrics.record_error()
+        get_metrics().record_error()
         await alert_service.send_alert(
             severity=Severity.WARNING,
             message=f"Chat validation error: {str(e)[:100]}",
@@ -142,13 +104,13 @@ async def chat(
             detail={
                 "error": "invalid_request",
                 "message": "Invalid request parameters",
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
 
     except Exception as e:
         logger.error(f"Chat error: {str(e)}", exc_info=True)
-        _metrics.record_error()
+        get_metrics().record_error()
         await alert_service.send_alert(
             severity=Severity.ERROR,
             message=f"Chat processing failed: {str(e)[:200]}",
@@ -160,7 +122,7 @@ async def chat(
             detail={
                 "error": "internal_error",
                 "message": "Failed to process query",
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
 
@@ -214,7 +176,7 @@ async def feedback(
             detail={
                 "error": "internal_error",
                 "message": "Failed to process feedback",
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
 
@@ -236,7 +198,7 @@ async def metrics() -> MetricsResponse:
         MetricsResponse with request_count, error_count, avg_latency_ms,
         and langsmith_dashboard_url (if tracing is configured).
     """
-    data = _metrics.snapshot()
+    data = get_metrics().snapshot()
 
     langsmith_url = None
     if settings.enable_langsmith_tracing and settings.langsmith_api_key:
@@ -285,7 +247,7 @@ async def health() -> HealthResponse:
 
     return HealthResponse(
         status=health_info["status"],
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
         db_connected=health_info.get("db_connected", False),
         llm_connected=health_info.get("llm_connected", False),
         embedding_connected=health_info.get("embedding_connected", False),

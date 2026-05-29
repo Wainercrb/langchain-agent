@@ -1,19 +1,17 @@
 """Service dependencies for the RAG API.
 
-Todos los singletons pluggeables viven en services/container.py.
-Este archivo ensambla el agente a partir de los componentes del container.
+All pluggable singletons live in services/container.py.
+This file assembles the agent from container components.
 
-Strategy Pattern: la lógica de qué agente se usa y qué tools están activas
-vive AQUÍ (en una función con imports locales) para evitar circular imports
-con rag.* que también importan services.container.logger.
+Strategy Pattern: the logic of which agent is used and which tools are active
+lives HERE (in a function with local imports) to avoid circular imports
+with rag.* which also import services.container.logger.
 """
-
-import warnings
 
 from services.container import llm, vector_store, embeddings, logger, feedback_service
 
-
 # ── Agent Assembly (local imports avoid circular deps) ───────────────
+
 
 def _build_agent():
     """Build the configured Agent strategy.
@@ -72,19 +70,6 @@ def get_agent():
     return _agent_instance
 
 
-def get_rag_chain():
-    """Return the pre-wired Agent singleton (legacy alias).
-
-    Deprecated: Use get_agent() directly.
-    """
-    warnings.warn(
-        "get_rag_chain() is deprecated. Use get_agent() directly.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return get_agent()
-
-
 def get_feedback_service():
     """Return the FeedbackService singleton from container."""
     return feedback_service
@@ -108,7 +93,7 @@ async def check_health() -> dict:
 
     # LLM check (lightweight — verify provider is initialized)
     try:
-        health["llm_connected"] = llm is not None and hasattr(llm, '_llm')
+        health["llm_connected"] = llm is not None and hasattr(llm, "_llm")
     except Exception as e:
         logger.error(f"LLM health check failed: {str(e)}")
 

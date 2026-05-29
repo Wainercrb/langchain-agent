@@ -4,21 +4,18 @@ The LLM decides which tools to call (or none) based on the query.
 Tools are INJECTED via constructor — the container decides which tools are active.
 """
 
-import os
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import BaseTool
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langsmith import traceable
 
-from config import settings
 from models import ChatResponse, SourceDocument
 from services.agent.base import Agent
 from services.container import logger
-
 
 SYSTEM_PROMPT = """You are a helpful assistant that answers questions based on available tools.
 

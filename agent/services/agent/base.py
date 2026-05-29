@@ -10,7 +10,6 @@ Changing agent strategy = changing ONE line in container.py.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional
 
 from models import ChatResponse
 

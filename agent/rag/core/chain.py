@@ -1,4 +1,3 @@
-import os
 import time
 import uuid
 from datetime import datetime
@@ -9,15 +8,7 @@ from langsmith import traceable
 from models import ChatResponse, RetrievedDocument, SourceDocument
 
 from ..retrieval.retriever import Retriever
-from config import settings
 from services.container import logger
-
-# Configure LangSmith environment if tracing is enabled.
-# LangChain auto-detects LANGCHAIN_TRACING_V2 + LANGCHAIN_API_KEY from env.
-# Users can also set LANGCHAIN_TRACING_V2=true directly in their .env.
-if settings.enable_langsmith_tracing:
-    os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
-    os.environ.setdefault("LANGCHAIN_PROJECT", settings.langsmith_project or "langchain-agent")
 
 
 class RAGChain:
@@ -45,7 +36,9 @@ class RAGChain:
             )
 
             retrieved = self.retriever.retrieve(
-                query=query, top_k=top_k, version_filter=version_filter,
+                query=query,
+                top_k=top_k,
+                version_filter=version_filter,
                 latest_only=latest_only,
             )
             logger.debug(f"Retrieved {len(retrieved)} documents")
@@ -74,12 +67,14 @@ class RAGChain:
                 ],
             )
             response_text = (
-                llm_response.content if hasattr(llm_response, "content") else str(llm_response)
+                llm_response.content
+                if hasattr(llm_response, "content")
+                else str(llm_response)
             )
             logger.debug(f"LLM response received: {len(response_text)} chars")
 
             # Log token usage if available
-            if hasattr(llm_response, 'usage') and llm_response.usage:
+            if hasattr(llm_response, "usage") and llm_response.usage:
                 logger.info(
                     f"Token usage: prompt={llm_response.usage.get('prompt_tokens', 'N/A')}, "
                     f"completion={llm_response.usage.get('completion_tokens', 'N/A')}, "

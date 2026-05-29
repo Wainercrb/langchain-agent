@@ -1,9 +1,7 @@
 """Abstract LLM provider interface for pluggable AI backends."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
-
-from utils.exceptions import LLMProviderError, TransientLLMError, PermanentLLMError
+from typing import Dict, List, Optional
 
 
 class LLMProvider(ABC):
@@ -17,20 +15,31 @@ class LLMProvider(ABC):
         self.temperature = temperature
         self.config = kwargs
 
+    @property
+    @abstractmethod
+    def chat_model(self):
+        """Expose the underlying LangChain chat model for tool calling.
+
+        All providers must expose their native ChatModel instance so that
+        tool-calling agents can use bind_tools() and other LangChain protocols
+        that operate on the raw model object rather than the LLMResponse wrapper.
+        """
+        ...
+
     @abstractmethod
     def invoke(self, messages: List[Dict[str, str]], **kwargs) -> "LLMResponse":
         """Generate response from messages.
 
         Args:
-            messages: List of dicts con 'role' y 'content'
-                     Ej: [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}]
+            messages: List of dicts with 'role' and 'content'
+                     E.g.: [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}]
             **kwargs: Additional keyword arguments forwarded to the underlying LLM call
 
         Returns:
             LLMResponse with content and metadata
 
         Raises:
-            LLMProviderError: si el provider falla
+            LLMProviderError: if the provider fails
         """
         pass
 
@@ -41,7 +50,14 @@ class LLMProvider(ABC):
 class LLMResponse:
     """Standardized response from LLM provider."""
 
-    def __init__(self, content: str, model: str, provider: str, usage: Optional[Dict[str, int]] = None, **metadata):
+    def __init__(
+        self,
+        content: str,
+        model: str,
+        provider: str,
+        usage: Optional[Dict[str, int]] = None,
+        **metadata,
+    ):
         self.content = content
         self.model = model
         self.provider = provider

@@ -36,8 +36,12 @@ class Settings(BaseSettings):
     cron_interval_minutes: int = Field(default=5, alias="CRON_INTERVAL_MINUTES")
 
     # ── Paths ────────────────────────────────────────────────────────
-    knowledge_dir: Path = Field(default=Path("./knowledge/raw_docs"), alias="KNOWLEDGE_DIR")
-    processed_dir: Path = Field(default=Path("./knowledge/processed"), alias="PROCESSED_DIR")
+    knowledge_dir: Path = Field(
+        default=Path("./knowledge/raw_docs"), alias="KNOWLEDGE_DIR"
+    )
+    processed_dir: Path = Field(
+        default=Path("./knowledge/processed"), alias="PROCESSED_DIR"
+    )
     failed_dir: Path = Field(default=Path("./knowledge/failed"), alias="FAILED_DIR")
 
     # ── Embeddings ───────────────────────────────────────────────────
@@ -51,8 +55,12 @@ class Settings(BaseSettings):
     log_file: Optional[str] = Field(default=None, alias="LOG_FILE")
 
     # ── Alerts ────────────────────────────────────────────────────────
-    discord_webhook_url: Optional[str] = Field(default=None, alias="DISCORD_WEBHOOK_URL")
-    alert_rate_limit_per_minute: int = Field(default=5, alias="ALERT_RATE_LIMIT_PER_MINUTE")
+    discord_webhook_url: Optional[str] = Field(
+        default=None, alias="DISCORD_WEBHOOK_URL"
+    )
+    alert_rate_limit_per_minute: int = Field(
+        default=5, alias="ALERT_RATE_LIMIT_PER_MINUTE"
+    )
 
     # ── LLM Resilience ────────────────────────────────────────────────
     llm_timeout_seconds: int = Field(default=60, alias="LLM_TIMEOUT_SECONDS")
@@ -68,9 +76,9 @@ class Settings(BaseSettings):
     # ── LangSmith / Tracing ────────────────────────────────────────────
     langsmith_api_key: str = Field(default="", alias="LANGSMITH_API_KEY")
     langsmith_project: Optional[str] = Field(default=None, alias="LANGSMITH_PROJECT")
-    enable_langsmith_tracing: bool = Field(default=False, alias="ENABLE_LANGSMITH_TRACING")
-
-
+    enable_langsmith_tracing: bool = Field(
+        default=False, alias="ENABLE_LANGSMITH_TRACING"
+    )
 
     @model_validator(mode="after")
     def _backward_compat_langsmith(self) -> "Settings":
@@ -80,7 +88,9 @@ class Settings(BaseSettings):
         or LANGCHAIN_TRACING_V2 so existing .env files keep working.
         """
         if not self.enable_langsmith_tracing:
-            legacy = os.getenv("LANGSMITH_TRACING", os.getenv("LANGCHAIN_TRACING_V2", "false"))
+            legacy = os.getenv(
+                "LANGSMITH_TRACING", os.getenv("LANGCHAIN_TRACING_V2", "false")
+            )
             if legacy.lower() in ("true", "1", "yes", "on"):
                 self.enable_langsmith_tracing = True
         return self
@@ -91,5 +101,6 @@ class Settings(BaseSettings):
         "populate_by_name": True,
         "extra": "ignore",
     }
+
 
 settings = Settings()

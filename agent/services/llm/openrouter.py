@@ -13,7 +13,15 @@ from services.logging import logger
 class OpenRouterProvider(LLMProvider):
     """OpenRouter LLM provider (OpenAI-compatible gateway)."""
 
-    def __init__(self, model: str = "openai/gpt-4o", temperature: float = 0.7, max_tokens: int = 4000, api_key: str = None, timeout: int = 60, **kwargs):
+    def __init__(
+        self,
+        model: str = "openai/gpt-4o",
+        temperature: float = 0.7,
+        max_tokens: int = 4000,
+        api_key: str = None,
+        timeout: int = 60,
+        **kwargs,
+    ):
         super().__init__(model=model, temperature=temperature, **kwargs)
         self._timeout = timeout
         self._llm = ChatOpenAI(
@@ -41,13 +49,32 @@ class OpenRouterProvider(LLMProvider):
         try:
             response = self._llm.invoke(messages, **kwargs)
             return LLMResponse(
-                content=response.content if hasattr(response, "content") else str(response),
+                content=(
+                    response.content if hasattr(response, "content") else str(response)
+                ),
                 model=self.model,
                 provider="openrouter",
                 usage=getattr(response, "usage_metadata", None),
             )
         except Exception as e:
             error_msg = str(e)
-            if any(kw in error_msg.lower() for kw in ["authentication", "api key", "permission", "not found", "invalid"]):
-                raise PermanentLLMError(f"OpenRouter invoke failed: {error_msg}", provider="openrouter", original_error=e)
-            raise TransientLLMError(f"OpenRouter invoke failed: {error_msg}", provider="openrouter", original_error=e)
+            if any(
+                kw in error_msg.lower()
+                for kw in [
+                    "authentication",
+                    "api key",
+                    "permission",
+                    "not found",
+                    "invalid",
+                ]
+            ):
+                raise PermanentLLMError(
+                    f"OpenRouter invoke failed: {error_msg}",
+                    provider="openrouter",
+                    original_error=e,
+                )
+            raise TransientLLMError(
+                f"OpenRouter invoke failed: {error_msg}",
+                provider="openrouter",
+                original_error=e,
+            )

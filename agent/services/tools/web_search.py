@@ -26,7 +26,9 @@ def _format_search_results(results: list) -> str:
         # DDGS returns "body" / "href"; legacy tests use "snippet" / "link"
         snippet = r.get("body") or r.get("snippet", "No description available")
         link = r.get("href") or r.get("link", "")
-        formatted.append(f"[Result {i}] {title}\n  Snippet: {snippet}\n  Link: {link}\n")
+        formatted.append(
+            f"[Result {i}] {title}\n  Snippet: {snippet}\n  Link: {link}\n"
+        )
 
     return "\n".join(formatted)
 

@@ -4,11 +4,10 @@ import re
 from abc import ABC, abstractmethod
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Dict, List
+from typing import List
 
 from services.logging import logger
 from utils.exceptions import IngestionError
-
 
 
 class FileParser(ABC):

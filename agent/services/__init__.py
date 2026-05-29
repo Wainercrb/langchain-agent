@@ -1,9 +1,9 @@
 """Services layer — pluggable backends (Strategy Pattern).
 
-Lo que se swappea vive acá:
+Swappable backends live here:
   - llm / embeddings / vector_store / parsers / logging
 
-Razon pura (no swappable) vive en rag/ y api/.
+Pure logic (not swappable) lives in rag/ and api/.
 """
 
 from .llm import (

@@ -1,9 +1,9 @@
-"""Discord webhook alert provider with built-in rate limiting and dedup.
+"""Discord webhook alert provider with rate limiting and dedup decorators.
 
 Combines transport (Discord embeds) with flow control (severity filter,
 sliding-window rate limit, fingerprint dedup) in one class.
 
-Uso normal:
+Normal usage:
     from services.alerts import DiscordAlertProvider, Severity
     provider = DiscordAlertProvider(
         webhook_url="...",
@@ -15,7 +15,7 @@ Uso normal:
 
 import hashlib
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import httpx
@@ -25,14 +25,62 @@ from utils.exceptions import Severity
 
 from .base import AlertProvider
 
-
 # Severities that trigger Discord alerts — hardcoded, not env-configurable.
 # Add or remove levels here (code change) rather than via environment variables.
 ENABLED_SEVERITIES = {"ERROR", "CRITICAL"}
 
 
+# ── Decorator Functions ──────────────────────────────────────────────
+
+
+def _rate_limited(
+    fingerprint: str,
+    window: list,
+    rate_limit: int,
+    window_seconds: int,
+    now: float,
+) -> bool:
+    """Sliding-window rate limiter.
+
+    Returns True if the call is allowed (within limit), False if rate-limited.
+    Mutates *window* in place by appending *now* and purging expired entries.
+    """
+    cutoff = now - window_seconds
+    # Purge expired entries
+    while window and window[0] < cutoff:
+        window.pop(0)
+
+    if len(window) >= rate_limit:
+        return False
+
+    window.append(now)
+    return True
+
+
+def _deduplicated(
+    fingerprint: str,
+    dedup_cache: dict,
+    cooldown: int,
+    now: float,
+) -> bool:
+    """Cooldown-based deduplication.
+
+    Returns True if the call is allowed (not seen recently), False if deduplicated.
+    Mutates *dedup_cache* in place by storing *now* for *fingerprint*.
+    """
+    last_sent = dedup_cache.get(fingerprint)
+    if last_sent is not None and (now - last_sent) < cooldown:
+        return False
+
+    dedup_cache[fingerprint] = now
+    return True
+
+
+# ── Main Provider Class ──────────────────────────────────────────────
+
+
 class DiscordAlertProvider(AlertProvider):
-    """Envía alertas como embeds de Discord con rate limiting y dedup."""
+    """Sends alerts as Discord embeds with rate limiting and dedup."""
 
     def __init__(
         self,
@@ -58,7 +106,7 @@ class DiscordAlertProvider(AlertProvider):
         error: Optional[Exception] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """Envía alerta a Discord si pasa los filtros de severidad, dedup y rate limit."""
+        """Send alert to Discord if it passes severity, dedup, and rate limit filters."""
         fingerprint = self._fingerprint(severity, message, error)
 
         if not self._should_send(severity, fingerprint):
@@ -81,7 +129,7 @@ class DiscordAlertProvider(AlertProvider):
         except Exception as e:
             logger.error(f"Discord webhook failed: {e}")
 
-    # ── Rate Limiting / Dedup ─────────────────────────────────────────
+    # ── Rate Limiting / Dedup (composes decorator functions) ──────────
 
     def _should_send(self, severity: Severity, fingerprint: str) -> bool:
         """Check whether this alert should be dispatched.
@@ -97,11 +145,15 @@ class DiscordAlertProvider(AlertProvider):
         now = time.time()
 
         # Dedup gate
-        last_sent = self._dedup_cache.get(fingerprint)
-        if last_sent is not None and (now - last_sent) < self._dedup_cooldown:
+        if not _deduplicated(
+            fingerprint,
+            self._dedup_cache,
+            self._dedup_cooldown,
+            now,
+        ):
             logger.debug(
                 f"Alert dedup'd: fingerprint={fingerprint[:12]}, "
-                f"last_sent={datetime.utcfromtimestamp(last_sent).isoformat()}"
+                f"last_sent={datetime.fromtimestamp(now, tz=timezone.utc).isoformat()}"
             )
             return False
 
@@ -110,26 +162,23 @@ class DiscordAlertProvider(AlertProvider):
             self._sliding_window[fingerprint] = []
 
         window = self._sliding_window[fingerprint]
-        cutoff = now - self._window_seconds
-        # Purge expired entries
-        while window and window[0] < cutoff:
-            window.pop(0)
-
-        if len(window) >= self._rate_limit:
+        if not _rate_limited(
+            fingerprint, window, self._rate_limit, self._window_seconds, now
+        ):
             logger.debug(
                 f"Alert rate-limited: fingerprint={fingerprint[:12]}, "
                 f"current_count={len(window)}, limit={self._rate_limit}"
             )
             return False
 
-        window.append(now)
-        self._dedup_cache[fingerprint] = now
         return True
 
     # ── Helpers ───────────────────────────────────────────────────────
 
     @staticmethod
-    def _fingerprint(severity: Severity, message: str, error: Optional[Exception]) -> str:
+    def _fingerprint(
+        severity: Severity, message: str, error: Optional[Exception]
+    ) -> str:
         """Create a stable fingerprint for deduplication."""
         error_type = type(error).__name__ if error is not None else "NO_ERROR"
         key = f"{severity.value}:{error_type}:{message[:50]}"
@@ -142,11 +191,11 @@ class DiscordAlertProvider(AlertProvider):
         error: Optional[Exception] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> dict:
-        """Construye el payload JSON para Discord embeds."""
+        """Build the JSON payload for Discord embeds."""
         color_map = {
-            Severity.INFO: 0x3498DB,      # blue
-            Severity.WARNING: 0xF39C12,   # amber
-            Severity.ERROR: 0xE74C3C,     # red
+            Severity.INFO: 0x3498DB,  # blue
+            Severity.WARNING: 0xF39C12,  # amber
+            Severity.ERROR: 0xE74C3C,  # red
             Severity.CRITICAL: 0x992D22,  # dark red
         }
 
@@ -154,14 +203,18 @@ class DiscordAlertProvider(AlertProvider):
             "title": f"[{severity.value}] {message[:80]}",
             "description": message[:2000],
             "color": color_map.get(severity, 0x000000),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         fields: list = []
 
         if error is not None:
-            fields.append({"name": "Error Type", "value": type(error).__name__, "inline": True})
-            fields.append({"name": "Details", "value": str(error)[:1000], "inline": False})
+            fields.append(
+                {"name": "Error Type", "value": type(error).__name__, "inline": True}
+            )
+            fields.append(
+                {"name": "Details", "value": str(error)[:1000], "inline": False}
+            )
 
         if metadata:
             for k, v in metadata.items():

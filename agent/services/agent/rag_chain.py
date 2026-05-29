@@ -18,9 +18,30 @@ class RAGChainAgent(Agent):
     def __init__(self, chain: RAGChain):
         self._chain = chain
 
-    def invoke(self, **kwargs):
-        """Delegate directly to the wrapped RAGChain."""
-        return self._chain.invoke(**kwargs)
+    def invoke(
+        self,
+        query: str,
+        top_k: int = 5,
+        temperature: float = 0.7,
+        include_sources: bool = True,
+        latest_only: bool = True,
+    ):
+        """Delegate directly to the wrapped RAGChain.
+
+        Args:
+            query: Natural language question.
+            top_k: Number of documents to retrieve.
+            temperature: LLM creativity level.
+            include_sources: Whether to include source documents in response.
+            latest_only: Only use latest document versions.
+        """
+        return self._chain.invoke(
+            query=query,
+            top_k=top_k,
+            temperature=temperature,
+            include_sources=include_sources,
+            latest_only=latest_only,
+        )
 
     def __repr__(self) -> str:
         return f"RAGChainAgent(chain={self._chain!r})"
