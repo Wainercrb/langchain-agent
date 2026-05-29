@@ -3,7 +3,6 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from config import settings
 from models import ChatResponse, RetrievedDocument, SourceDocument
 
 from ..retrieval.retriever import Retriever
@@ -23,17 +22,19 @@ class RAGChain:
         temperature: float = 0.7,
         include_sources: bool = True,
         version_filter: Optional[datetime] = None,
+        latest_only: bool = True,
     ) -> ChatResponse:
         start_time = time.time()
         try:
             logger.info(
                 f"RAGChain.invoke: query={query[:50]}..., top_k={top_k}, "
                 f"temperature={temperature}, include_sources={include_sources}, "
-                f"version_filter={version_filter}"
+                f"version_filter={version_filter}, latest_only={latest_only}"
             )
 
             retrieved = self.retriever.retrieve(
-                query=query, top_k=top_k, version_filter=version_filter
+                query=query, top_k=top_k, version_filter=version_filter,
+                latest_only=latest_only,
             )
             logger.debug(f"Retrieved {len(retrieved)} documents")
 

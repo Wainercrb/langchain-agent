@@ -38,6 +38,10 @@ class ChatRequest(BaseModel):
         le=1.0,
         description="LLM temperature (0.0=deterministic, 1.0=creative)",
     )
+    latest_only: bool = Field(
+        default=True,
+        description="Only retrieve latest document versions",
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -46,6 +50,7 @@ class ChatRequest(BaseModel):
                 "top_k": 5,
                 "include_sources": True,
                 "temperature": 0.7,
+                "latest_only": True,
             }
         }
     )

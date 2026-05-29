@@ -158,6 +158,30 @@ def test_retrieve_returns_correct_model(retriever):
         assert hasattr(doc, "version_date")
 
 
+def test_retrieve_passes_latest_only_true(retriever, mock_vector_store):
+    """Test that latest_only=True is passed to vector store search."""
+    result = retriever.retrieve("query", latest_only=True)
+
+    call_args = mock_vector_store.search_similar.call_args
+    assert call_args[1]["latest_only"] is True
+
+
+def test_retrieve_passes_latest_only_false(retriever, mock_vector_store):
+    """Test that latest_only=False is passed to vector store search."""
+    result = retriever.retrieve("query", latest_only=False)
+
+    call_args = mock_vector_store.search_similar.call_args
+    assert call_args[1]["latest_only"] is False
+
+
+def test_retrieve_default_latest_only(retriever, mock_vector_store):
+    """Test that latest_only defaults to False for backwards compat."""
+    result = retriever.retrieve("query")
+
+    call_args = mock_vector_store.search_similar.call_args
+    assert call_args[1]["latest_only"] is False
+
+
 def test_retrieve_ordered_by_similarity(retriever):
     """Test that retrieve returns results ordered by similarity (highest first)."""
     result = retriever.retrieve("query")

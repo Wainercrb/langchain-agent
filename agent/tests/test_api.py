@@ -283,6 +283,48 @@ def test_chat_endpoint_returns_json(client):
 # ============ Request Validation Tests ============
 
 
+def test_chat_endpoint_with_latest_only_true(client):
+    """Test POST /v1/chat accepts latest_only=True."""
+    response = client.post(
+        "/v1/chat",
+        json={"query": "test", "latest_only": True},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["query"] == "test"
+
+
+def test_chat_endpoint_with_latest_only_false(client):
+    """Test POST /v1/chat accepts latest_only=False."""
+    response = client.post(
+        "/v1/chat",
+        json={"query": "test", "latest_only": False},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["query"] == "test"
+
+
+def test_chat_endpoint_latest_only_default_true(client):
+    """Test latest_only defaults to True when not provided."""
+    response = client.post("/v1/chat", json={"query": "test"})
+
+    assert response.status_code == 200
+    # The default should be True — no error means it was accepted
+
+
+def test_chat_endpoint_latest_only_invalid_type(client):
+    """Test POST /v1/chat returns 422 for non-boolean latest_only."""
+    response = client.post(
+        "/v1/chat",
+        json={"query": "test", "latest_only": "yes"},
+    )
+
+    assert response.status_code == 422
+
+
 def test_chat_request_validation_structure(client):
     """Test ChatRequest Pydantic validation."""
     # Valid request

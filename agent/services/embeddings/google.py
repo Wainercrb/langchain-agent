@@ -31,26 +31,15 @@ class GoogleEmbeddingsWrapper(Embeddings):
             logger.error(f"Failed to initialize embeddings: {str(e)}")
             raise
 
-    def _reduce_embedding_dimension(self, embedding: List[float]) -> List[float]:
-        if len(embedding) <= self.target_dimension:
-            return embedding
-
-        reduced = embedding[: self.target_dimension]
-        norm = sum(x * x for x in reduced) ** 0.5
-        if norm > 0:
-            reduced = [x / norm for x in reduced]
-
-        return reduced
-
     def _embed_single(self, text: str) -> List[float]:
         self.rate_limiter.wait_if_needed()
-        response = self.genai.embed_content(model=f"models/{self.model}", content=text)
-        embedding = response["embedding"]
-        return (
-            self._reduce_embedding_dimension(embedding)
-            if len(embedding) > self.target_dimension
-            else embedding
+        response = self.genai.embed_content(
+            model=f"models/{self.model}",
+            content=text,
+            output_dimensionality=self.target_dimension,
         )
+        embedding = response["embedding"]
+        return embedding
 
     def embed_documents(self, texts: List[str], batch_size: int = 10) -> List[List[float]]:
         results = []

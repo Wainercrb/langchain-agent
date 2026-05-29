@@ -230,6 +230,31 @@ def test_invoke_llm_response_string_conversion(rag_chain, mock_llm):
     assert response.response == "Test response"
 
 
+def test_invoke_passes_latest_only_true(rag_chain, mock_retriever):
+    """Test that latest_only=True is passed to retriever."""
+    rag_chain.invoke("query", latest_only=True)
+
+    call_args = mock_retriever.retrieve.call_args
+    assert call_args[1]["latest_only"] is True
+
+
+def test_invoke_passes_latest_only_false(rag_chain, mock_retriever):
+    """Test that latest_only=False is passed to retriever."""
+    rag_chain.invoke("query", latest_only=False)
+
+    call_args = mock_retriever.retrieve.call_args
+    assert call_args[1]["latest_only"] is False
+
+
+def test_invoke_default_latest_only_true(rag_chain, mock_retriever):
+    """Test that latest_only defaults to True in RAGChain for backward-compat default."""
+    rag_chain.invoke("query")
+
+    call_args = mock_retriever.retrieve.call_args
+    # RAGChain default is True (aligns with system prompt claim of recent docs)
+    assert call_args[1]["latest_only"] is True
+
+
 def test_invoke_multiple_calls_independent(rag_chain, mock_retriever):
     """Test that multiple invoke calls are independent."""
     response1 = rag_chain.invoke("query 1", top_k=5)

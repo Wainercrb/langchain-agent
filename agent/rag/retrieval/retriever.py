@@ -20,11 +20,13 @@ class Retriever:
         top_k: int = 5,
         similarity_threshold: float = 0.5,
         version_filter: Optional[datetime] = None,
+        latest_only: bool = False,
     ) -> List[RetrievedDocument]:
         try:
             logger.debug(
                 f"Retrieve called: query={query[:50]}..., top_k={top_k}, "
-                f"threshold={similarity_threshold}, version_filter={version_filter}"
+                f"threshold={similarity_threshold}, version_filter={version_filter}, "
+                f"latest_only={latest_only}"
             )
 
             query_embedding = self.embeddings.embed_query(query)
@@ -32,6 +34,7 @@ class Retriever:
                 query_embedding=query_embedding,
                 top_k=top_k,
                 version_filter=version_filter,
+                latest_only=latest_only,
             )
 
             filtered = list(filter_by_threshold(search_results, similarity_threshold))

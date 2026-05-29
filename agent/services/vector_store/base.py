@@ -28,6 +28,7 @@ class VectorStoreBase(ABC):
         query_embedding: List[float],
         top_k: int = 5,
         version_filter: Optional[datetime] = None,
+        latest_only: bool = False,
     ) -> List[Dict[str, Any]]:
         """Search for similar documents.
 
@@ -36,10 +37,26 @@ class VectorStoreBase(ABC):
             top_k: Number of top results to return.
             version_filter: Optional minimum version date. Only documents
                 with version_date >= version_filter are considered.
+            latest_only: If True, only return chunks from the latest version
+                of each document (determined dynamically via SQL CTE).
 
         Returns:
             List of result dictionaries with keys: id, document_id, text,
             chunk_index, metadata, filename, version_date, similarity_score.
+        """
+        pass
+
+    @abstractmethod
+    def find_document_by_hash(
+        self, content_hash: str
+    ) -> Optional[Dict[str, Any]]:
+        """Look up a document by its content_hash.
+
+        Args:
+            content_hash: SHA-256 hex digest of the file bytes.
+
+        Returns:
+            Document dict or None if no match found.
         """
         pass
 

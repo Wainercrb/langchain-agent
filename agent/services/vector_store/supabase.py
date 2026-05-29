@@ -15,11 +15,41 @@ class VectorStore(VectorStoreBase):
         self.client = supabase_client
         logger.info("VectorStore initialized")
 
+    def find_document_by_hash(
+        self, content_hash: str
+    ) -> Optional[Dict[str, Any]]:
+        """Look up a document by its content_hash.
+
+        Args:
+            content_hash: SHA-256 hex digest of the file bytes.
+
+        Returns:
+            Document dict or None if no match found.
+        """
+        try:
+            response = (
+                self.client.table("documents")
+                .select("id, filename, content_hash, version_date")
+                .eq("content_hash", content_hash)
+                .order("version_date", desc=True)
+                .limit(1)
+                .execute()
+            )
+            results = response.data or []
+            return results[0] if results else None
+        except Exception as e:
+            raise DocumentStoreError(
+                message=f"Failed to find document by hash: {str(e)}",
+                error_code="DOCUMENT_HASH_LOOKUP_ERROR",
+                details={"content_hash": content_hash},
+            )
+
     def insert_document(
         self,
         filename: str,
         version_date: Optional[datetime] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        content_hash: Optional[str] = None,
     ) -> str:
         try:
             version_date = (
@@ -30,15 +60,17 @@ class VectorStore(VectorStoreBase):
             doc_id = str(uuid.uuid4())
             metadata = metadata or {}
 
-            self.client.table("documents").insert(
-                {
-                    "id": doc_id,
-                    "filename": filename,
-                    "version_date": version_date,
-                    "metadata": metadata,
-                    "created_at": datetime.utcnow().isoformat(),
-                }
-            ).execute()
+            insert_data = {
+                "id": doc_id,
+                "filename": filename,
+                "version_date": version_date,
+                "metadata": metadata,
+                "created_at": datetime.utcnow().isoformat(),
+            }
+            if content_hash is not None:
+                insert_data["content_hash"] = content_hash
+
+            self.client.table("documents").insert(insert_data).execute()
 
             logger.info(f"Inserted document: {filename} (id={doc_id})")
             return doc_id
@@ -79,11 +111,13 @@ class VectorStore(VectorStoreBase):
         query_embedding: List[float],
         top_k: int = 5,
         version_filter: Optional[datetime] = None,
+        latest_only: bool = False,
     ) -> List[Dict[str, Any]]:
         try:
             rpc_params = {
                 "query_embedding": query_embedding,
                 "top_k": top_k,
+                "latest_only": latest_only,
             }
             if version_filter is not None:
                 rpc_params["version_filter"] = (
@@ -95,6 +129,20 @@ class VectorStore(VectorStoreBase):
             response = self.client.rpc("search_similar_chunks", rpc_params).execute()
 
             results = response.data or []
+            # Map out_* column names back to standard names
+            mapped_results = []
+            for r in results:
+                mapped_results.append({
+                    "id": r.get("out_id"),
+                    "document_id": r.get("out_document_id"),
+                    "text": r.get("out_text"),
+                    "chunk_index": r.get("out_chunk_index"),
+                    "metadata": r.get("out_metadata"),
+                    "filename": r.get("out_filename"),
+                    "version_date": r.get("out_version_date"),
+                    "similarity_score": r.get("out_similarity_score"),
+                })
+            results = mapped_results
 
             top_score = f"{results[0]['similarity_score']:.3f}" if results else "N/A"
             logger.info(
