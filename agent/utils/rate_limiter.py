@@ -16,9 +16,7 @@ class RateLimiter:
 
     def wait_if_needed(self):
         """Check quota and wait if necessary to stay within rate limit."""
-        from services.logging import Console  # lazy: evita circular import
-
-        logger = Console()
+        from services.logging import logger  # lazy: evita circular import
         current_time = time.time()
 
         # Remove timestamps older than 60 seconds

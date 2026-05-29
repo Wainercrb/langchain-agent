@@ -4,7 +4,7 @@ Todos los singletons pluggeables viven en services/container.py.
 """
 
 
-from services.container import llm, vector_store, embeddings, logger
+from services.container import llm, vector_store, embeddings, logger, feedback_service
 
 
 
@@ -26,17 +26,19 @@ def get_rag_chain():
     """Create a new RAGChain instance per request."""
     try:
         from rag.core.chain import RAGChain
-        from services.container import tracing_callback
 
-        callbacks = [tracing_callback] if tracing_callback else []
         return RAGChain(
             retriever=get_retriever(),
             llm=llm,
-            callbacks=callbacks,
         )
     except Exception as e:
         logger.error(f"Failed to create RAGChain: {str(e)}", exc_info=True)
         raise
+
+
+def get_feedback_service():
+    """Return the FeedbackService singleton from container."""
+    return feedback_service
 
 
 async def check_health() -> dict:

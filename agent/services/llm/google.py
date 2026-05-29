@@ -7,9 +7,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from .base import LLMProvider, LLMResponse
 from utils.exceptions import TransientLLMError, PermanentLLMError
 from utils.retry import retry_llm
-from services.logging import Console
-
-logger = Console()
+from services.logging import logger
 
 
 class GoogleProvider(LLMProvider):

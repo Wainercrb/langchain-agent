@@ -1,28 +1,21 @@
-"""Feedback service wrapping LangSmith Native Feedback API.
-
-Isolates API routes from LangSmith SDK details. Follows the same
-container-friendly pattern as other services in agent/services/.
-"""
+"""LangSmith feedback provider implementation."""
 
 from typing import Literal, Optional
 
 from langsmith import Client as LangSmithClient
 
 from models.feedback import FeedbackResponse
-from services.logging import Console
+from services.logging import logger
 
-logger = Console()
+from .base import FeedbackProvider
 
 
-class FeedbackService:
-    """Service for recording user feedback via LangSmith.
+class LangSmithFeedbackProvider(FeedbackProvider):
+    """Records user feedback via LangSmith Native Feedback API.
 
-    Encapsulates langsmith.Client().create_feedback() behind a simple
-    record_feedback() interface. Returns a FeedbackResponse that the
-    API layer maps to the appropriate HTTP status code.
-
-    Attributes:
-        _client: LangSmith API client instance
+    Wraps langsmith.Client().create_feedback() behind the FeedbackProvider
+    contract. If LangSmith is unreachable, the error is caught and logged
+    server-side, returning status="accepted" for graceful degradation.
     """
 
     def __init__(self) -> None:
@@ -41,11 +34,8 @@ class FeedbackService:
             - "like"    → score=1.0
             - "dislike" → score=0.0
 
-        If LangSmith is unreachable or raises an exception, the error is
-        caught and logged server-side, returning status="accepted".
-
         Args:
-            run_id: LangSmith run ID to associate feedback with
+            run_id: LangSmith run ID for feedback correlation
             feedback_type: "like" (score=1.0) or "dislike" (score=0.0)
             comment: Optional user comment (max 1000 chars per FeedbackRequest)
 

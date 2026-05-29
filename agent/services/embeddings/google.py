@@ -6,9 +6,7 @@ from config import settings
 from services.embeddings.base import Embeddings
 from utils import RateLimiter
 from utils.exceptions import EmbeddingError
-from services.logging import Console
-
-logger = Console()
+from services.logging import logger
 
 
 class GoogleEmbeddingsWrapper(Embeddings):

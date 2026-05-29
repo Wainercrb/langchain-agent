@@ -6,10 +6,8 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Dict, List
 
-from services.logging import Console
+from services.logging import logger
 from utils.exceptions import IngestionError
-
-logger = Console()
 
 
 

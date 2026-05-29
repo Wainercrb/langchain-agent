@@ -5,9 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from services.vector_store.base import VectorStoreBase
 from utils.exceptions import DocumentStoreError
-from services.logging import Console
-
-logger = Console()
+from services.logging import logger
 
 
 class VectorStore(VectorStoreBase):

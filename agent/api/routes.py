@@ -6,10 +6,9 @@ from fastapi.responses import JSONResponse
 
 from rag.core.chain import RAGChain
 
-from .dependencies import check_health, get_rag_chain
+from .dependencies import check_health, get_feedback_service, get_rag_chain
 from models import ChatRequest, ChatResponse, ErrorResponse, FeedbackRequest, HealthResponse
 from services.container import logger
-from services.feedback import FeedbackService
 
 
 router = APIRouter(prefix="/v1", tags=["chat"])
@@ -111,7 +110,10 @@ async def chat(
         422: {"model": ErrorResponse, "description": "Validation error"},
     },
 )
-async def feedback(request: FeedbackRequest) -> dict:
+async def feedback(
+    request: FeedbackRequest,
+    service=Depends(get_feedback_service),
+) -> dict:
     """Record user feedback (like/dislike) correlated to a LangSmith run_id.
 
     Accepts feedback via the LangSmith Native Feedback API. If LangSmith is
@@ -131,7 +133,6 @@ async def feedback(request: FeedbackRequest) -> dict:
         HTTPException (422): Validation error in request parameters
     """
     try:
-        service = FeedbackService()
         result = service.record_feedback(
             run_id=request.run_id,
             feedback_type=request.feedback_type,

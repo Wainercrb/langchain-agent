@@ -56,9 +56,7 @@ class Settings(BaseSettings):
     llm_timeout_seconds: int = Field(default=60, alias="LLM_TIMEOUT_SECONDS")
     llm_max_retries: int = Field(default=3, alias="LLM_MAX_RETRIES")
 
-    # ── LangSmith / Observability ─────────────────────────────────────
-    langchain_tracing_v2: bool = Field(default=False, alias="LANGCHAIN_TRACING_V2")
-    langchain_project: str = Field(default="langchain-agent", alias="LANGCHAIN_PROJECT")
+    # ── LangSmith / Feedback ──────────────────────────────────────────
     langsmith_api_key: str = Field(default="", alias="LANGSMITH_API_KEY")
 
     model_config = {

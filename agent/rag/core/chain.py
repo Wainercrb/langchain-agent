@@ -3,8 +3,6 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from langchain_core.runnables.config import RunnableConfig
-
 from config import settings
 from models import ChatResponse, RetrievedDocument, SourceDocument
 
@@ -13,10 +11,9 @@ from services.container import logger
 
 
 class RAGChain:
-    def __init__(self, retriever: Retriever, llm, callbacks=None):
+    def __init__(self, retriever: Retriever, llm):
         self.retriever = retriever
         self.llm = llm
-        self.callbacks = callbacks or []
         logger.info("RAGChain initialized")
 
     def invoke(
@@ -57,16 +54,11 @@ class RAGChain:
 
             logger.debug("Constructed prompts for LLM")
 
-            config = RunnableConfig()
-            if self.callbacks:
-                config["callbacks"] = self.callbacks
-
             llm_response = self.llm.invoke(
                 [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                config=config,
             )
             response_text = (
                 llm_response.content if hasattr(llm_response, "content") else str(llm_response)
@@ -81,12 +73,7 @@ class RAGChain:
                     f"total={llm_response.usage.get('total_tokens', 'N/A')}"
                 )
 
-            # Extract run_id from LangSmith tracer if available
-            run_id = None
-            if hasattr(llm_response, 'response_metadata'):
-                run_id = llm_response.response_metadata.get('run_id')
-            if not run_id:
-                run_id = str(uuid.uuid4())
+            run_id = str(uuid.uuid4())
 
             execution_time_ms = (time.time() - start_time) * 1000
 

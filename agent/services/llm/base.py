@@ -25,7 +25,6 @@ class LLMProvider(ABC):
             messages: List of dicts con 'role' y 'content'
                      Ej: [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}]
             **kwargs: Additional keyword arguments forwarded to the underlying LLM call
-                     (e.g. langsmith_extra for LangSmith run tracking)
 
         Returns:
             LLMResponse with content and metadata

@@ -1,21 +1,21 @@
 ---
-// ChatIsland — Client-side interactive chat component
+// ChatIsland — Client-side interactive chat component (Tailwind CSS only)
 ---
 
-<div class="chat-island" role="log" aria-live="polite" aria-label="Chat messages">
-    <div class="messages-container" id="messages-container">
+<div class="flex flex-col h-full" role="log" aria-live="polite" aria-label="Chat messages">
+    <div class="flex flex-col gap-5 flex-1" id="messages-container">
       <!-- Empty state -->
-      <div class="empty-state" id="empty-state">
-        <div class="empty-state__content">
-          <p class="empty-state__title">Start a conversation...</p>
-          <p class="empty-state__hint">Ask anything about the documents</p>
+      <div class="flex items-center justify-center flex-1 text-center" id="empty-state">
+        <div class="text-[var(--color-text-secondary)]">
+          <p class="text-base font-medium mb-2 text-[var(--color-text)]">Start a conversation...</p>
+          <p class="text-xs text-[var(--color-text-muted)]">Ask anything about the documents</p>
         </div>
       </div>
     </div>
 </div>
 
 <script>
-  import { chatWithAgent, checkHealth, submitFeedback, validateSettings } from '../utils/api';
+  import { chatWithAgent, submitFeedback, validateSettings, checkHealth } from '../utils/api';
   import type { ChatResponse } from '../utils/api';
 
   // ============================================
@@ -49,88 +49,28 @@
     settings: loadSettings(),
   };
 
-  let healthInterval: number | undefined;
   let resizeTimeout: number | undefined;
+  let healthCheckInterval: number | undefined;
 
   // ============================================
-  // Mock Data (remove when backend is complete)
+  // Health Check
   // ============================================
 
-  function loadMockData() {
-    const mockMessages: ChatMessage[] = [
-      {
-        id: '1',
-        role: 'user',
-        content: 'Hello, can you help me understand the enrollment requirements?',
-        timestamp: new Date(),
-        sources: [],
-        executionTime: 0,
-        model: '',
-        runId: null,
-      },
-      {
-        id: '2',
-        role: 'assistant',
-        content: 'Hello! I\'d be happy to help you understand the enrollment requirements. Based on our records, you\'ll need to complete the online application form, provide identification documents, and meet the prerequisite coursework requirements. Would you like me to detail each step?',
-        timestamp: new Date(),
-        sources: [
-          {
-            document_id: '550e8400-e29b-41d4-a716-446655440000',
-            filename: 'enrollment_guide.pdf',
-            similarity_score: 0.92,
-            version_date: '2025-01-15T10:30:00',
-            content_preview: 'Enrollment Guidelines: To enroll in our program, you need to follow these steps...',
-            chunk_id: '550e8400-e29b-41d4-a716-446655440001',
-          },
-        ],
-        executionTime: 1234,
-        model: 'gemini-2.5-flash',
-        runId: 'mock-run-id-1',
-      },
-      {
-        id: '3',
-        role: 'user',
-        content: 'Yes please, detail each step for me.',
-        timestamp: new Date(),
-        sources: [],
-        executionTime: 0,
-        model: '',
-        runId: null,
-      },
-      {
-        id: '4',
-        role: 'assistant',
-        content: 'Absolutely! Here are the enrollment steps:\n\n1. **Online Application**: Complete the application form at our portal.\n2. **Document Submission**: Upload your ID and transcripts.\n3. **Prerequisites**: Complete the required coursework.\n4. **Interview**: Schedule an interview with an advisor.\n5. **Enrollment Fee**: Pay the enrollment deposit.\n\nWould you like more details on any specific step?',
-        timestamp: new Date(),
-        sources: [
-          {
-            document_id: '550e8400-e29b-41d4-a716-446655440002',
-            filename: 'admissions_checklist.pdf',
-            similarity_score: 0.88,
-            version_date: '2025-02-01T14:00:00',
-            content_preview: 'Admissions Checklist: Follow these steps to complete your enrollment...',
-            chunk_id: '550e8400-e29b-41d4-a716-446655440003',
-          },
-        ],
-        executionTime: 2156,
-        model: 'gemini-2.5-flash',
-        runId: 'mock-run-id-2',
-      },
-    ];
-
-    // Add mock messages to state
-    state.messages = mockMessages;
-
-    // Render mock messages to DOM
-    const container = document.getElementById('messages-container');
-    const emptyState = document.getElementById('empty-state');
-    if (emptyState) emptyState.remove();
-    if (container) {
-      container.innerHTML = '';  // Clear loading/empty state
-      mockMessages.forEach(msg => {
-        container.appendChild(renderMessage(msg));
-      });
-      container.scrollTop = container.scrollHeight;
+  async function updateHealthStatus() {
+    const dot = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    try {
+      const isHealthy = await checkHealth();
+      if (isHealthy) {
+        if (dot) dot.style.backgroundColor = 'var(--color-success)';
+        if (text) text.textContent = 'System Online';
+      } else {
+        if (dot) dot.style.backgroundColor = 'var(--color-error)';
+        if (text) text.textContent = 'System Offline';
+      }
+    } catch {
+      if (dot) dot.style.backgroundColor = 'var(--color-error)';
+      if (text) text.textContent = 'System Offline';
     }
   }
 
@@ -174,57 +114,103 @@
   };
 
   // ============================================
-  // Render Message
+  // Render Message (Tailwind utility classes)
   // ============================================
 
   function renderMessage(message: ChatMessage): HTMLElement {
     const wrapper = document.createElement('div');
-    wrapper.className = `message message--${message.role}`;
+    if (message.role === 'user') {
+      wrapper.className = 'flex flex-col w-full gap-2 items-end animate-[message-fade-in_0.4s_ease-out_forwards]';
+    } else {
+      wrapper.className = 'flex flex-col w-full gap-2 items-start animate-[message-fade-in_0.4s_ease-out_forwards]';
+    }
 
     if (message.role === 'assistant') {
-      // AI message: label "FW Agent" with bolt + content bubble
+      // AI message label
       const label = document.createElement('div');
-      label.className = 'message__label';
-      label.innerHTML = `<span class="message__label-icon" aria-hidden="true">${icons.bolt}</span><span class="message__label-text">FW Agent</span>`;
+      label.className = 'flex items-center gap-2 mb-2 ml-1';
+      label.innerHTML = `<span class="w-6 h-6 rounded-full bg-[var(--color-ai-bubble)] flex items-center justify-center text-[#626567]" aria-hidden="true">${icons.bolt}</span><span class="text-[11px] font-semibold tracking-widest text-[var(--color-text-secondary)]">FW Agent</span>`;
 
+      // AI bubble
       const bubble = document.createElement('div');
-      bubble.className = 'message__bubble';
+      bubble.className = 'max-w-[85%] p-4 break-words bg-[var(--color-ai-bubble)] rounded-[0.75rem_0.75rem_0.75rem_0.25rem] border border-[rgba(199,196,215,0.3)] shadow-[var(--shadow-sm)]';
 
       const content = document.createElement('p');
-      content.className = 'message__content';
+      content.className = 'm-0 text-base leading-[1.625]';
       content.textContent = message.content;
-      bubble.appendChild(content);
 
-      // Attached Files (mockup style)
+      // Action buttons
+      const actions = document.createElement('div');
+      actions.className = 'flex justify-end gap-2 mt-6';
+
+      // Copy
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'flex items-center justify-center w-8 h-8 p-0 bg-transparent border-none rounded-full text-[var(--color-text-secondary)] cursor-pointer transition-all duration-150 hover:text-[var(--color-primary)] hover:bg-[rgba(17,28,45,0.05)] active:scale-90 focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2';
+      copyBtn.setAttribute('aria-label', 'Copy message');
+      copyBtn.type = 'button';
+      copyBtn.innerHTML = icons.copy;
+      copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(message.content).then(() => {
+          copyBtn.style.color = 'var(--color-success)';
+          setTimeout(() => { copyBtn.style.color = ''; }, 2000);
+        });
+      });
+      actions.appendChild(copyBtn);
+
+      if (message.runId) {
+        // Thumb up
+        const likeBtn = document.createElement('button');
+        likeBtn.className = 'flex items-center justify-center w-8 h-8 p-0 bg-transparent border-none rounded-full text-[var(--color-text-secondary)] cursor-pointer transition-all duration-150 hover:text-[var(--color-primary)] hover:bg-[rgba(17,28,45,0.05)] active:scale-90 focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2';
+        likeBtn.setAttribute('aria-label', 'Like response');
+        likeBtn.type = 'button';
+        likeBtn.innerHTML = icons.thumbUp;
+      likeBtn.addEventListener('click', () => handleFeedback(message.runId!, 'like', likeBtn));
+      actions.appendChild(likeBtn);
+
+      // Thumb down
+      const dislikeBtn = document.createElement('button');
+      dislikeBtn.className = 'flex items-center justify-center w-8 h-8 p-0 bg-transparent border-none rounded-full text-[var(--color-text-secondary)] cursor-pointer transition-all duration-150 hover:text-[var(--color-primary)] hover:bg-[rgba(17,28,45,0.05)] active:scale-90 focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2';
+      dislikeBtn.setAttribute('aria-label', 'Dislike response');
+      dislikeBtn.type = 'button';
+      dislikeBtn.innerHTML = icons.thumbDown;
+      dislikeBtn.addEventListener('click', () => handleFeedback(message.runId!, 'dislike', dislikeBtn));
+        actions.appendChild(dislikeBtn);
+      }
+
+      // Assemble bubble: content → actions → files (bottom)
+      bubble.appendChild(content);
+      bubble.appendChild(actions);
+
+      // Attached Files (bottom of bubble, after actions)
       if (message.sources && message.sources.length > 0 && state.settings.includeSources) {
         const filesSection = document.createElement('div');
-        filesSection.className = 'message__files';
+        filesSection.className = 'mt-6 pt-6 border-t border-[rgba(199,196,215,0.3)]';
 
         const filesHeader = document.createElement('div');
-        filesHeader.className = 'message__files-header';
+        filesHeader.className = 'text-[10px] font-semibold tracking-widest uppercase text-[var(--color-text-secondary)] mb-2';
         filesHeader.textContent = 'Attached Files';
         filesSection.appendChild(filesHeader);
 
         message.sources.forEach(src => {
           const fileItem = document.createElement('div');
-          fileItem.className = 'message__file';
+          fileItem.className = 'flex items-center gap-2 px-3 py-1.5 bg-[var(--color-surface-container-low)] border border-[rgba(199,196,215,0.3)] rounded-full mb-2 cursor-pointer transition-colors duration-150 hover:bg-[var(--color-surface-elevated)]';
 
           const fileIcon = document.createElement('span');
-          fileIcon.className = 'message__file-icon';
+          fileIcon.className = 'flex items-center text-[var(--color-primary)] shrink-0';
           fileIcon.innerHTML = icons.description;
           fileItem.appendChild(fileIcon);
 
           const fileInfo = document.createElement('div');
-          fileInfo.className = 'message__file-info';
+          fileInfo.className = 'flex flex-col';
 
           const fileName = document.createElement('span');
-          fileName.className = 'message__file-name';
+          fileName.className = 'text-xs font-medium text-[var(--color-text)]';
           fileName.textContent = src.filename || 'Document';
           fileInfo.appendChild(fileName);
 
           const fileMeta = document.createElement('span');
-          fileMeta.className = 'message__file-meta';
-          fileMeta.textContent = 'PDF • 2.4 MB';
+          fileMeta.className = 'text-[9px] text-[var(--color-text-secondary)] leading-none';
+          fileMeta.textContent = `Score: ${(src.similarity_score * 100).toFixed(1)}%`;
           fileInfo.appendChild(fileMeta);
 
           fileItem.appendChild(fileInfo);
@@ -234,55 +220,15 @@
         bubble.appendChild(filesSection);
       }
 
-      // Action buttons
-      const actions = document.createElement('div');
-      actions.className = 'message__actions';
-
-      // Copy
-      const copyBtn = document.createElement('button');
-      copyBtn.className = 'message__action-btn';
-      copyBtn.setAttribute('aria-label', 'Copy message');
-      copyBtn.type = 'button';
-      copyBtn.innerHTML = icons.copy;
-      copyBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(message.content).then(() => {
-          copyBtn.setAttribute('data-copied', 'true');
-          setTimeout(() => copyBtn.removeAttribute('data-copied'), 2000);
-        });
-      });
-      actions.appendChild(copyBtn);
-
-      if (message.runId) {
-        // Thumb up
-        const likeBtn = document.createElement('button');
-        likeBtn.className = 'message__action-btn';
-        likeBtn.setAttribute('aria-label', 'Like response');
-        likeBtn.type = 'button';
-        likeBtn.innerHTML = icons.thumbUp;
-        likeBtn.addEventListener('click', () => handleFeedback(message.runId!, 'like'));
-        actions.appendChild(likeBtn);
-
-        // Thumb down
-        const dislikeBtn = document.createElement('button');
-        dislikeBtn.className = 'message__action-btn';
-        dislikeBtn.setAttribute('aria-label', 'Dislike response');
-        dislikeBtn.type = 'button';
-        dislikeBtn.innerHTML = icons.thumbDown;
-        dislikeBtn.addEventListener('click', () => handleFeedback(message.runId!, 'dislike'));
-        actions.appendChild(dislikeBtn);
-      }
-
-      bubble.appendChild(content);
       wrapper.appendChild(label);
       wrapper.appendChild(bubble);
-      wrapper.appendChild(actions);
     } else {
-      // User message: simple bubble
+      // User message
       const bubble = document.createElement('div');
-      bubble.className = 'message__bubble message__bubble--user';
+      bubble.className = 'max-w-[85%] p-4 break-words bg-[var(--color-primary)] text-white rounded-[0.75rem_0.75rem_0.25rem_0.75rem] border border-[rgba(70,72,212,0.2)] shadow-[var(--shadow-md)]';
 
       const content = document.createElement('p');
-      content.className = 'message__content';
+      content.className = 'm-0 text-base leading-[1.625] text-white';
       content.textContent = message.content;
       bubble.appendChild(content);
 
@@ -305,14 +251,14 @@
 
   function showLoading(): HTMLElement {
     const wrapper = document.createElement('div');
-    wrapper.className = 'message message--assistant';
+    wrapper.className = 'flex flex-col w-full gap-2 items-start animate-[message-fade-in_0.4s_ease-out_forwards]';
     wrapper.innerHTML = `
-      <div class="message__label">
-        <span class="message__label-icon" aria-hidden="true">${icons.bolt}</span>
-        <span class="message__label-text">FW Agent</span>
+      <div class="flex items-center gap-2 mb-2 ml-1">
+        <span class="w-6 h-6 rounded-full bg-[var(--color-ai-bubble)] flex items-center justify-center text-[#626567]" aria-hidden="true">${icons.bolt}</span>
+        <span class="text-[11px] font-semibold tracking-widest text-[var(--color-text-secondary)]">FW Agent</span>
       </div>
-      <div class="message__bubble">
-        <p class="message__content">Thinking...</p>
+      <div class="max-w-[85%] p-4 break-words bg-[var(--color-ai-bubble)] rounded-[0.75rem_0.75rem_0.75rem_0.25rem] border border-[rgba(199,196,215,0.3)] shadow-[var(--shadow-sm)]">
+        <p class="m-0 text-base leading-[1.625]">Thinking...</p>
       </div>
     `;
     const container = document.getElementById('messages-container');
@@ -331,12 +277,33 @@
   // Event Handlers
   // ============================================
 
-  async function handleFeedback(runId: string, type: 'like' | 'dislike') {
+  async function handleFeedback(runId: string, type: 'like' | 'dislike', btn: HTMLButtonElement) {
     try {
+      btn.disabled = true;
       await submitFeedback(runId, type);
+      // Visual feedback: change color to primary to indicate recorded
+      btn.style.color = 'var(--color-primary)';
+      btn.style.background = 'rgba(70, 72, 212, 0.1)';
+      showToast(`${type === 'like' ? 'Liked' : 'Disliked'} — Feedback recorded`);
     } catch (error) {
       console.error('Feedback error:', error);
+      showToast('Failed to record feedback', 'error');
+      btn.disabled = false;
     }
+  }
+
+  function showToast(message: string, variant: 'success' | 'error' = 'success') {
+    const toast = document.createElement('div');
+    const bgColor = variant === 'success' ? 'rgba(16, 185, 129, 0.9)' : 'rgba(186, 26, 26, 0.9)';
+    toast.className = 'fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg text-white text-sm font-medium shadow-lg animate-[message-fade-in_0.3s_ease-out_forwards] z-50';
+    toast.style.backgroundColor = bgColor;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transition = 'opacity 0.3s ease';
+      setTimeout(() => toast.remove(), 300);
+    }, 2000);
   }
 
   async function handleSend() {
@@ -372,8 +339,9 @@
         content: response.response,
         timestamp: new Date(),
         sources: response.sources?.map(s => ({
-          filename: (s.metadata?.filename as string) || 'Document',
+          filename: s.filename || 'Document',
           similarity_score: s.similarity_score,
+          content: (s as any).content_preview || '',
         })),
         executionTime: response.execution_time_ms,
         model: response.model,
@@ -395,23 +363,6 @@
     }
   }
 
-  async function updateHealth() {
-    const isHealthy = await checkHealth();
-    const statusDot = document.getElementById('status-dot');
-    const statusText = document.getElementById('status-text');
-    const sendBtn = document.getElementById('send-btn') as HTMLButtonElement;
-    const input = document.getElementById('chat-input') as HTMLTextAreaElement;
-
-    if (statusDot) {
-      statusDot.style.background = isHealthy ? 'var(--color-success)' : 'var(--color-error)';
-    }
-    if (statusText) {
-      statusText.textContent = isHealthy ? 'System Online' : 'Offline';
-    }
-    if (sendBtn) sendBtn.disabled = !isHealthy || state.isLoading;
-    if (input) input.disabled = !isHealthy || state.isLoading;
-  }
-
   // ============================================
   // Init
   // ============================================
@@ -427,17 +378,32 @@
     });
 
     // Settings
-    document.getElementById('results-toggle')?.addEventListener('change', (e) => {
-      state.settings.topK = (e.target as HTMLInputElement).checked ? 10 : 5;
-      saveSettings();
+    const resultsInput = document.getElementById('results-badge') as HTMLInputElement;
+    const creativityInput = document.getElementById('creativity-badge') as HTMLInputElement;
+    const includeSourcesInput = document.getElementById('include-sources') as HTMLInputElement;
+
+    // Initialize values from state
+    if (resultsInput) resultsInput.value = String(state.settings.topK);
+    if (creativityInput) creativityInput.value = String(state.settings.temperature);
+    if (includeSourcesInput) includeSourcesInput.checked = state.settings.includeSources;
+
+    resultsInput?.addEventListener('change', (e) => {
+      const val = parseInt((e.target as HTMLInputElement).value, 10);
+      if (!isNaN(val) && val >= 1 && val <= 20) {
+        state.settings.topK = val;
+        saveSettings();
+      }
     });
 
-    document.getElementById('creativity-toggle')?.addEventListener('change', (e) => {
-      state.settings.temperature = (e.target as HTMLInputElement).checked ? 0.9 : 0.7;
-      saveSettings();
+    creativityInput?.addEventListener('change', (e) => {
+      const val = parseFloat((e.target as HTMLInputElement).value);
+      if (!isNaN(val) && val >= 0 && val <= 1) {
+        state.settings.temperature = val;
+        saveSettings();
+      }
     });
 
-    document.getElementById('include-sources')?.addEventListener('change', (e) => {
+    includeSourcesInput?.addEventListener('change', (e) => {
       state.settings.includeSources = (e.target as HTMLInputElement).checked;
       saveSettings();
     });
@@ -452,229 +418,15 @@
       }, 100);
     });
 
-    // Load mock data for development (REMOVE when backend is complete)
-    loadMockData();
-
-    // Health check (disabled when using mock data)
-    // updateHealth();
-    // healthInterval = window.setInterval(updateHealth, 5000);
+    // Health check every 60 seconds
+    updateHealthStatus(); // Run immediately on load
+    healthCheckInterval = window.setInterval(updateHealthStatus, 60000);
   }
 
   window.addEventListener('beforeunload', () => {
-    if (healthInterval) clearInterval(healthInterval);
     if (resizeTimeout) clearTimeout(resizeTimeout);
+    if (healthCheckInterval) clearInterval(healthCheckInterval);
   });
 
   init();
 </script>
-
-<style>
-  /* ============================================
-     Layout
-     ============================================ */
-  .chat-island {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-  }
-
-  .messages-container {
-    flex: 1;
-    overflow-y: auto;
-    padding: var(--space-4) var(--space-6);
-    display: flex;
-    flex-direction: column;
-    gap: var(--chat-gap);  /* 1.25rem — Stitch design system */
-  }
-
-  /* ============================================
-     Empty State
-     ============================================ */
-  .empty-state {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-  }
-
-  .empty-state__content {
-    text-align: center;
-    color: var(--color-text-secondary);
-  }
-
-  .empty-state__title {
-    font-size: 1rem;
-    margin: 0 0 var(--space-1);
-  }
-
-  .empty-state__hint {
-    font-size: 0.75rem;
-    color: var(--color-text-muted);
-    margin: 0;
-  }
-
-  /* ============================================
-     Message
-     ============================================ */
-  .message {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    gap: var(--space-2);
-  }
-
-  .message--user {
-    align-items: flex-end;
-  }
-
-  .message--assistant {
-    align-items: flex-start;
-  }
-
-  .message__label {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
-    margin-bottom: var(--space-1);
-    padding: 0;
-  }
-
-  .message__label-icon {
-    display: flex;
-    align-items: center;
-    color: var(--color-primary);
-  }
-
-  .message__label-text {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--color-text-secondary);
-  }
-
-  .message__bubble {
-    max-width: 80%;
-    padding: var(--space-3) var(--space-4);
-    word-break: break-word;
-  }
-
-  .message--user .message__bubble {
-    margin-left: auto;  /* Push user bubble to the right */
-  }
-
-  .message--assistant .message__bubble {
-    margin-right: auto;  /* Keep AI bubble on the left */
-  }
-
-  .message__bubble--user {
-    background: var(--color-primary);
-    color: white;
-    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
-  }
-
-  .message__bubble:not(.message__bubble--user) {
-    background: var(--color-ai-bubble);  /* #f8fafc — Stitch secondary */
-    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-sm);
-  }
-
-  .message__content {
-    margin: 0;
-    font-size: 1rem;  /* Stitch body-lg: 16px */
-    line-height: 1.625;  /* 26px line-height */
-  }
-
-  .message__bubble--user .message__content {
-    color: white;
-  }
-
-  /* ============================================
-     Attached Files (Mockup style)
-     ============================================ */
-  .message__files {
-    margin-top: var(--space-3);
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--color-border);
-  }
-
-  .message__files-header {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--color-text-secondary);
-    margin-bottom: var(--space-2);
-  }
-
-  .message__file {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-2);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    margin-bottom: var(--space-1);
-  }
-
-  .message__file-icon {
-    display: flex;
-    align-items: center;
-    color: var(--color-text-muted);
-    flex-shrink: 0;
-  }
-
-  .message__file-info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .message__file-name {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--color-text);
-  }
-
-  .message__file-meta {
-    font-size: 0.625rem;
-    color: var(--color-text-muted);
-  }
-
-  /* ============================================
-     Action Buttons
-     ============================================ */
-  .message__actions {
-    display: flex;
-    gap: var(--space-1);
-    margin-top: var(--space-2);  /* Space between bubble and actions */
-    padding-left: var(--space-1);  /* Align with bubble start */
-  }
-
-  .message__action-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.75rem;
-    height: 1.75rem;
-    padding: 0;
-    background: transparent;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    color: var(--color-text-muted);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-  }
-
-  .message__action-btn:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    background: var(--color-primary-subtle);
-  }
-
-  .message__action-btn[data-copied="true"] {
-    border-color: var(--color-success);
-    color: var(--color-success);
-  }
-
-  .message__action-btn:focus-visible {
-    outline: 2px solid var(--color-border-focus);
-    outline-offset: 2px;
-  }
-</style>

@@ -1,14 +1,13 @@
-"""Logging services — Logger ABC + Console class.
-
-El container crea la instancia. Los módulos en el camino crítico de imports
-crean la suya local (stateless).
+"""Logging services — Logger ABC + Console class + singleton logger.
 
 Uso normal:
-    from services.container import logger
+    from services.logging import logger
     logger.info("mensaje")
 """
 
 from .base import Logger
 from .console import Console
 
-__all__ = ["Logger", "Console"]
+logger = Console()
+
+__all__ = ["Logger", "Console", "logger"]

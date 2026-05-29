@@ -2,9 +2,7 @@
 
 from typing import Any, Dict, Generator, List
 
-from services.logging import Console
-
-logger = Console()
+from services.logging import logger
 
 
 

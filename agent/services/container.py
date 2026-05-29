@@ -18,9 +18,8 @@ Ejemplos:
 
 from config import settings
 
-# ── Logger (creado primero, antes de imports de servicios) ────────────
-from services.logging import Console
-logger = Console()
+# ── Logger ─────────────────────────────────────────────────────────
+from services.logging import logger
 
 # ── LLM ──────────────────────────────────────────────────────────────
 from services.llm import GoogleProvider, OpenAIProvider, OpenRouterProvider
@@ -60,14 +59,9 @@ db_key = settings.supabase_key
 supabase_client = create_client(db_url, db_key)
 vector_store = VectorStore(supabase_client)
 
-# ── LangSmith Tracing ──────────────────────────────────────────────
-tracing_callback = None
-if settings.langchain_tracing_v2 and settings.langsmith_api_key:
-    try:
-        from langchain.callbacks.tracers.langchain import LangChainTracer
-        tracing_callback = LangChainTracer(project=settings.langchain_project)
-        logger.info(f"LangSmith tracing enabled: project={settings.langchain_project}")
-    except ImportError:
-        logger.warning("langsmith package not installed — tracing disabled")
-    except Exception as e:
-        logger.warning(f"LangSmith tracer init failed: {str(e)}")
+# ── Feedback ─────────────────────────────────────────────────────────
+from services.feedback import LangSmithFeedbackProvider
+
+feedback_service = LangSmithFeedbackProvider()
+
+
