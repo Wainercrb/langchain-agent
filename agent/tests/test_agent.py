@@ -217,6 +217,7 @@ class TestToolCallingAgentSources:
         agent = ToolCallingAgent(
             llm=MagicMock(),
             tools=[search_tool],
+            artifact_store=artifact_store,
         )
 
         # Simulate tool invocation populating the store
@@ -230,7 +231,7 @@ class TestToolCallingAgentSources:
         assert sources[0].filename == "enrollment_guide.pdf"
 
         # Store should be cleared after extraction
-        assert len(getattr(search_tool, "artifact_store", [])) == 0
+        assert len(artifact_store) == 0
 
     def test_no_sources_when_include_sources_false(self, mock_retriever):
         """Agent skips extraction when include_sources=False."""
@@ -296,7 +297,9 @@ class TestRAGChainAgent:
         )
 
         agent = RAGChainAgent(chain=mock_chain)
-        response = agent.invoke(query="test", top_k=3, temperature=0.5)
+        response = agent.invoke(
+            query="test", top_k=3, temperature=0.5, include_sources=True, latest_only=True
+        )
 
         mock_chain.invoke.assert_called_once_with(
             query="test", top_k=3, temperature=0.5, include_sources=True, latest_only=True
