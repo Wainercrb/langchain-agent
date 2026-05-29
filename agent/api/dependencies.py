@@ -1,39 +1,88 @@
 """Service dependencies for the RAG API.
 
 Todos los singletons pluggeables viven en services/container.py.
+Este archivo ensambla el agente a partir de los componentes del container.
+
+Strategy Pattern: la lógica de qué agente se usa y qué tools están activas
+vive AQUÍ (en una función con imports locales) para evitar circular imports
+con rag.* que también importan services.container.logger.
 """
 
+import warnings
 
 from services.container import llm, vector_store, embeddings, logger, feedback_service
 
 
+# ── Agent Assembly (local imports avoid circular deps) ───────────────
 
-def get_retriever():
-    """Create a new Retriever instance per request."""
-    try:
-        from rag.retrieval.retriever import Retriever
+def _build_agent():
+    """Build the configured Agent strategy.
 
-        return Retriever(
-            vector_store=vector_store,
-            embeddings=embeddings,
+    Local imports prevent circular dependencies since rag.* modules
+    import services.container.logger.
+    """
+    from rag.retrieval.retriever import Retriever
+    from rag.core.chain import RAGChain
+    from services.agent import ToolCallingAgent, RAGChainAgent
+    from services.tools import (
+        create_search_documents_tool,
+        web_search_tool,
+    )
+    from config import settings
+
+    retriever = Retriever(vector_store=vector_store, embeddings=embeddings)
+
+    if settings.use_tool_agent:
+        # Tool-calling agent — container decides which tools are active.
+        # To add/remove tools, edit this list. No changes in agent code needed.
+        _search_artifact_store = []
+        tools = [
+            create_search_documents_tool(
+                retriever=retriever,
+                artifact_store=_search_artifact_store,
+                default_latest_only=True,
+            ),
+            web_search_tool,
+        ]
+        return ToolCallingAgent(
+            llm=llm.chat_model,
+            tools=tools,
+            artifact_store=_search_artifact_store,
+            default_top_k=5,
         )
-    except Exception as e:
-        logger.error(f"Failed to create Retriever: {str(e)}", exc_info=True)
-        raise
+    else:
+        # Legacy RAG chain (always retrieves documents)
+        chain = RAGChain(retriever=retriever, llm=llm)
+        return RAGChainAgent(chain=chain)
+
+
+# Singleton agent instance (lazy assembly avoids circular imports at import time)
+_agent_instance = None
+
+
+def get_agent():
+    """Return the pre-wired Agent singleton.
+
+    The dependency layer decides the strategy (tool-calling vs legacy)
+    based on USE_TOOL_AGENT setting. The route is agnostic.
+    """
+    global _agent_instance
+    if _agent_instance is None:
+        _agent_instance = _build_agent()
+    return _agent_instance
 
 
 def get_rag_chain():
-    """Create a new RAGChain instance per request."""
-    try:
-        from rag.core.chain import RAGChain
+    """Return the pre-wired Agent singleton (legacy alias).
 
-        return RAGChain(
-            retriever=get_retriever(),
-            llm=llm,
-        )
-    except Exception as e:
-        logger.error(f"Failed to create RAGChain: {str(e)}", exc_info=True)
-        raise
+    Deprecated: Use get_agent() directly.
+    """
+    warnings.warn(
+        "get_rag_chain() is deprecated. Use get_agent() directly.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return get_agent()
 
 
 def get_feedback_service():
