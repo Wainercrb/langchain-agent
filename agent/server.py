@@ -55,7 +55,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     else:
         alert_severity = Severity.CRITICAL
 
-    await alert_service.alert(
+    await alert_service.send_alert(
         severity=alert_severity,
         message=str(exc)[:200] or "Unhandled server exception",
         error=exc,
@@ -72,6 +72,20 @@ async def global_exception_handler(request: Request, exc: Exception):
             "timestamp": datetime.utcnow().isoformat(),
         },
     )
+
+
+@app.get("/test-discord")
+async def test_discord():
+    """Trigger a test Discord alert to verify the webhook works.
+
+    Returns immediately; check your Discord channel for the alert.
+    """
+    await alert_service.send_alert(
+        severity=Severity.ERROR,
+        message="This is a test alert from langchain-agent",
+        metadata={"test": True, "source": "manual_test_endpoint"},
+    )
+    return {"status": "alert_sent", "check_your_discord": True}
 
 
 if __name__ == "__main__":

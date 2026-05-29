@@ -5,12 +5,11 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 
-from rag.core.chain import RAGChain
-
-from .dependencies import check_health, get_feedback_service, get_rag_chain
+from .dependencies import check_health, get_agent, get_feedback_service
 from config import settings
 from models import ChatRequest, ChatResponse, ErrorResponse, FeedbackRequest, HealthResponse, MetricsResponse
-from services.container import logger
+from services.container import alert_service, logger
+from utils.exceptions import Severity
 
 
 # ── Simple In-Memory Metrics ─────────────────────────────────────────
@@ -71,13 +70,14 @@ router = APIRouter(prefix="/v1", tags=["chat"])
 )
 async def chat(
     request: ChatRequest,
-    chain: RAGChain = Depends(get_rag_chain),
+    processor=Depends(get_agent),
 ) -> ChatResponse:
     """
-    Process a user query using RAG (Retrieval-Augmented Generation).
+    Process a user query using the configured agent strategy.
 
-    This endpoint retrieves relevant documents based on the query, uses them as context,
-    and generates a comprehensive answer via the LLM.
+    The container decides whether to use ToolCallingAgent (intelligent tool
+    selection) or RAGChainAgent (legacy always-retrieve). The endpoint is
+    agnostic — it just calls agent.invoke().
 
     Args:
         request: ChatRequest containing:
@@ -85,7 +85,7 @@ async def chat(
             - top_k: Number of documents to retrieve (1-20)
             - include_sources: Whether to return source documents
             - temperature: LLM response creativity (0.0-1.0)
-        chain: Injected RAGChain dependency for processing
+        processor: Injected Agent from container.
 
     Returns:
         ChatResponse containing:
@@ -103,7 +103,7 @@ async def chat(
     try:
         logger.info(f"Chat request: query={request.query[:50]}...")
 
-        response = chain.invoke(
+        response = processor.invoke(
             query=request.query,
             top_k=request.top_k,
             temperature=request.temperature,
@@ -131,6 +131,12 @@ async def chat(
     except ValueError as e:
         logger.error(f"Chat validation error: {str(e)}")
         _metrics.record_error()
+        await alert_service.send_alert(
+            severity=Severity.WARNING,
+            message=f"Chat validation error: {str(e)[:100]}",
+            error=e,
+            metadata={"path": "/v1/chat", "query": request.query[:50]},
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
@@ -143,6 +149,12 @@ async def chat(
     except Exception as e:
         logger.error(f"Chat error: {str(e)}", exc_info=True)
         _metrics.record_error()
+        await alert_service.send_alert(
+            severity=Severity.ERROR,
+            message=f"Chat processing failed: {str(e)[:200]}",
+            error=e,
+            metadata={"path": "/v1/chat", "query": request.query[:50]},
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={

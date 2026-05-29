@@ -26,6 +26,16 @@ class OpenRouterProvider(LLMProvider):
         )
         logger.info(f"OpenRouter provider initialized: model={self.model}")
 
+    @property
+    def chat_model(self):
+        """Expose the underlying LangChain chat model for tool calling / agent usage.
+
+        The agent needs the raw ChatOpenAI instance (not the LLMResponse-wrapped
+        version) because LangChain's tool calling / bind_tools protocol operates
+        on the native model object.
+        """
+        return self._llm
+
     @retry_llm()
     def invoke(self, messages: List[Dict[str, str]], **kwargs) -> LLMResponse:
         try:

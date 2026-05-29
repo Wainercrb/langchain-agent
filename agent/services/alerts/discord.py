@@ -26,6 +26,11 @@ from utils.exceptions import Severity
 from .base import AlertProvider
 
 
+# Severities that trigger Discord alerts — hardcoded, not env-configurable.
+# Add or remove levels here (code change) rather than via environment variables.
+ENABLED_SEVERITIES = {"ERROR", "CRITICAL"}
+
+
 class DiscordAlertProvider(AlertProvider):
     """Envía alertas como embeds de Discord con rate limiting y dedup."""
 
@@ -33,11 +38,10 @@ class DiscordAlertProvider(AlertProvider):
         self,
         webhook_url: Optional[str] = None,
         rate_limit_per_minute: int = 5,
-        enabled_severities: str = "ERROR,CRITICAL",
     ) -> None:
         self._webhook_url = webhook_url
         self._rate_limit = rate_limit_per_minute
-        self._enabled_severities = set(s.strip().upper() for s in enabled_severities.split(","))
+        self._enabled_severities = ENABLED_SEVERITIES
         self._window_seconds = 60
         # fingerprint -> list of timestamps (sliding window)
         self._sliding_window: Dict[str, list] = {}

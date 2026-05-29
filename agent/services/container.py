@@ -13,6 +13,9 @@ Ejemplos:
 
     # Embeddings
     # embeddings = OpenAIEmbeddingsProvider(api_key="...")
+
+    # Agent strategy is wired in api/dependencies.py (avoids circular imports
+    # with rag.* modules that also import services.container.logger).
 """
 
 
@@ -71,7 +74,4 @@ from services.alerts import DiscordAlertProvider
 alert_service = DiscordAlertProvider(
     webhook_url=settings.discord_webhook_url,
     rate_limit_per_minute=settings.alert_rate_limit_per_minute,
-    enabled_severities=settings.alert_enabled_severities,
 )
-
-

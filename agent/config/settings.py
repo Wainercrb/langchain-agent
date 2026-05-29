@@ -53,16 +53,24 @@ class Settings(BaseSettings):
     # ── Alerts ────────────────────────────────────────────────────────
     discord_webhook_url: Optional[str] = Field(default=None, alias="DISCORD_WEBHOOK_URL")
     alert_rate_limit_per_minute: int = Field(default=5, alias="ALERT_RATE_LIMIT_PER_MINUTE")
-    alert_enabled_severities: str = Field(default="ERROR,CRITICAL", alias="ALERT_ENABLED_SEVERITIES")
 
     # ── LLM Resilience ────────────────────────────────────────────────
     llm_timeout_seconds: int = Field(default=60, alias="LLM_TIMEOUT_SECONDS")
     llm_max_retries: int = Field(default=3, alias="LLM_MAX_RETRIES")
 
+    # ── Agent / Tool Calling ────────────────────────────────────────────
+    use_tool_agent: bool = Field(
+        default=False,
+        alias="USE_TOOL_AGENT",
+        description="Use the intelligent tool-calling agent instead of the hardcoded RAGChain",
+    )
+
     # ── LangSmith / Tracing ────────────────────────────────────────────
     langsmith_api_key: str = Field(default="", alias="LANGSMITH_API_KEY")
     langsmith_project: Optional[str] = Field(default=None, alias="LANGSMITH_PROJECT")
     enable_langsmith_tracing: bool = Field(default=False, alias="ENABLE_LANGSMITH_TRACING")
+
+
 
     @model_validator(mode="after")
     def _backward_compat_langsmith(self) -> "Settings":
