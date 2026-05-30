@@ -16,7 +16,7 @@ class RateLimiter:
 
     def wait_if_needed(self):
         """Check quota and wait if necessary to stay within rate limit."""
-        from services.logging import logger  # lazy: avoids circular import
+        from infrastructure.logging import logger  # lazy: avoids circular import
 
         current_time = time.time()
 

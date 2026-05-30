@@ -1,805 +1,494 @@
-# Langchain Agent - RAG Document Ingestion System
+# LangChain Agent — RAG API & Document Ingestion System
 
-Complete batch document ingestion system with automatic scheduling, vector embeddings, and Supabase pgvector storage.
+A production-ready Retrieval-Augmented Generation (RAG) system with a FastAPI chat API and batch document ingestion pipeline. Uses LangChain, Google Gemini embeddings, and Supabase pgvector for vector similarity search.
 
-## 🎯 Features
+## Features
 
-- ✅ **Cron-Based Ingestion**: Automatic processing every 5 minutes
-- ✅ **Multi-Format Support**: .txt, .md, .pdf, .docx, .csv
-- ✅ **Smart Deduplication**: MD5-based tracking prevents re-processing
-- ✅ **Version Management**: Multiple versions per document with timestamp-based retrieval
-- ✅ **Batch Embeddings**: Google Generative AI with automatic retry & backoff
-- ✅ **pgvector Search**: HNSW indexes for fast similarity search
-- ✅ **Alert Notifications**: Console + Discord webhook support
-- ✅ **Production Ready**: Structured logging, error handling, async support
+- **Chat API** — Query your documents with AI-generated answers and source citations
+- **Batch Ingestion** — Automatic document processing (parse, split, embed, store)
+- **Multi-Format Support** — `.txt`, `.md`, `.html`, `.pdf`, `.docx`, `.csv`
+- **Pluggable LLM Providers** — OpenRouter (default), Google Gemini, OpenAI
+- **Smart Deduplication** — SHA-256 content hashing prevents re-processing
+- **Vector Search** — Supabase pgvector with similarity threshold filtering
+- **Tool-Calling Agent** — LangChain agent with document search and web search tools
+- **Observability** — LangSmith tracing, structured JSON logging, Discord alerts
+- **User Feedback** — Like/dislike feedback captured via LangSmith
 
 ---
 
-## 📋 Quick Start (5 minutes)
+## Quick Start
 
-### 1️⃣ Prerequisites
+### Prerequisites
 
-- **Python 3.10+** (verify: `python --version`)
-- **Supabase Account** (free tier: https://supabase.com)
-- **Google API Key** (get from: https://aistudio.google.com/app/apikeys)
-- **Git** (for cloning)
+- **Python 3.11+**
+- **Supabase project** (free tier: https://supabase.com)
+- **Google API Key** (for embeddings: https://aistudio.google.com/app/apikeys)
+- **OpenRouter API Key** (for LLM: https://openrouter.ai/keys)
 
-### 2️⃣ Install & Setup
+### 1. Install
 
 ```bash
-# Clone repository
-cd c:\oper\me\langchain-agent
-
-# Create virtual environment
+cd agent
 python -m venv .venv
 
-# Activate virtual environment
-# On Windows:
+# Windows
 .\.venv\Scripts\Activate.ps1
 
-# Or on macOS/Linux:
+# macOS/Linux
 source .venv/bin/activate
 
-# Install dependencies
 pip install -r requirements.txt
-
-# Run complete setup (handles everything)
-python scripts/setup.py
 ```
 
-### 3️⃣ Configure Environment
+### 2. Configure
 
-During setup, you'll be prompted to configure `.env`. Edit it with your credentials:
+Create a `.env` file:
 
 ```bash
-# .env file (REQUIRED)
-GOOGLE_API_KEY=your_google_api_key_here
+# Required
+GOOGLE_API_KEY=your_google_api_key
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your_service_role_key_here
+SUPABASE_KEY=your_service_role_key
+SUPABASE_DIRECT_URL=postgresql://postgres:password@db.your-project.supabase.co:5432/postgres
 
-# Optional: Discord alerts
-DISCORD_WEBHOOK_URL=https://discordapp.com/api/webhooks/...
+# LLM Provider (OpenRouter)
+OPENROUTER_API_KEY=your_openrouter_key
+OPENROUTER_MODEL=openai/gpt-4o
 
-# Defaults (can be customized)
+# Optional
 CRON_INTERVAL_MINUTES=5
 CHUNK_SIZE=1000
 CHUNK_OVERLAP=200
 LOG_LEVEL=INFO
 ```
 
-### 4️⃣ Verify Setup
+### 3. Set Up Database
 
 ```bash
-# Check configuration
-python -c "from config import settings; print(settings)"
-
-# Test Supabase connection
-python scripts/setup_db.py
-
-# Check dependencies
-pip list | grep -E "langchain|supabase|apscheduler"
+python setupdb.py
 ```
 
-### 5️⃣ Start Processing
+This runs Alembic migrations to create the schema: `documents`, `document_chunks`, `ingestion_logs`, and the `search_documents` RPC function.
 
+### 4. Run
+
+**API Server** (chat interface):
 ```bash
-# Start the ingestion system
-python main.py
-
-# System will now:
-# - Run every 5 minutes
-# - Scan /knowledge/raw_docs/
-# - Process new files
-# - Move to /knowledge/processed/ or /knowledge/failed/
-# - Send alerts on completion
+python server.py
+# http://localhost:8000/docs — Swagger UI
 ```
 
-### 6️⃣ Test with Sample Files
-
+**Ingestion Pipeline** (document processing):
 ```bash
-# Drop a test file
-echo "This is a test document about Python programming." > knowledge/raw_docs/test.txt
+python cronjob.py
+# Watches knowledge/raw_docs/ and processes new files
+```
 
-# Watch the logs
-# System will process it in the next 5-minute cycle
-# Or manually trigger: python -c "from main import *"
+**Docker** (both services):
+```bash
+docker build -t langchain-agent .
+docker run -p 8000:8000 --env-file .env langchain-agent
 ```
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
-┌────────────────────────────────────────┐
-│ main.py                                │
-│ ├─ APScheduler (5-min interval)        │
-│ └─ IngestionJob                        │
-│    ├─ FileManager.scan_raw_docs()      │
-│    ├─ FileManager.detect_new_files()   │
-│    ├─ DocumentIngester.ingest_batch()  │
-│    │  ├─ DocumentProcessor.parse_file()│
-│    │  ├─ RecursiveCharacterTextSplitter│
-│    │  ├─ GoogleEmbeddingsWrapper       │
-│    │  └─ VectorStore.insert_chunks()   │
-│    ├─ FileManager.move_to_processed()  │
-│    └─ AlertService.send_alerts()       │
-├─ Supabase pgvector (backend)           │
-│                                      │
-└─ /knowledge/ (document folders)        │
+┌─────────────────────────────────────────────────────────────┐
+│                        Presentation                         │
+│  api/ — FastAPI routes, dependency injection, metrics       │
+├─────────────────────────────────────────────────────────────┤
+│                          Domain                             │
+│  domain/core/ — RAG chain orchestration (retrieve + generate)  │
+│  domain/retrieval/ — Vector search with threshold filtering    │
+│  domain/ingestion/ — Document ingestion pipeline               │
+├─────────────────────────────────────────────────────────────┤
+│                       Infrastructure                        │
+│  infrastructure/llm/ — LLM providers (OpenRouter, Gemini, OpenAI) │
+│  infrastructure/embeddings/ — Google Gemini embeddings            │
+│  infrastructure/vector_store/ — Supabase pgvector                 │
+│  infrastructure/parsers/ — Multi-format file parsers              │
+│  infrastructure/tools/ — LangChain tools (search, web search)     │
+│  infrastructure/agent/ — Agent strategies (tool-calling, RAG)     │
+│  infrastructure/alerts/ — Discord webhook alerts                  │
+│  infrastructure/feedback/ — LangSmith feedback                    │
+│  infrastructure/logging/ — Structured JSON logging                │
+│  infrastructure/container.py — Composition root (DI)              │
+├─────────────────────────────────────────────────────────────┤
+│                        Shared                               │
+│  config/settings.py — Pydantic Settings (env vars)          │
+│  models/ — Pydantic DTOs (request/response)                 │
+│  utils/ — Exceptions, retry, rate limiter, correlation IDs  │
+│  migrations/ — Alembic database migrations                  │
+└─────────────────────────────────────────────────────────────┘
 ```
+
+### Key Patterns
+
+- **Strategy Pattern** — Every pluggable service (LLM, embeddings, vector store, parsers, alerts, feedback, logging, agents) has an ABC with swappable implementations
+- **Composition Root** — `infrastructure/container.py` wires all singletons in one place
+- **Clean Architecture** — Domain logic (`domain/`) is independent of infrastructure (`infrastructure/`)
+- **Dependency Injection** — API layer receives dependencies via FastAPI `Depends()`
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```
-langchain-agent/
-├── config.py                    # Configuration & environment
-├── main.py                      # Entry point & scheduler
-├── requirements.txt       # Python dependencies
-├── schema.sql                   # Supabase schema
-├── .env.example                 # Environment template
-├── .env                         # Your actual config (git-ignored)
- │
-├── rag/
-│   ├── embeddings.py           # Google Embeddings API wrapper
-│   └── vector_store.py         # Supabase pgvector operations
+agent/
+├── server.py                  # FastAPI entry point (uvicorn)
+├── cronjob.py                 # Ingestion polling loop
+├── setupdb.py                 # Alembic migration runner
+├── requirements.txt           # Python dependencies
+├── alembic.ini                # Alembic configuration
+├── Dockerfile                 # Multi-stage Docker build
+├── .env                       # Environment variables (git-ignored)
 │
-├── services/
-│   ├── document_processor.py   # Multi-format file parsing
-│   ├── document_ingester.py    # Orchestration pipeline
-│   ├── file_manager.py         # File scanning & movement
-│   ├── state_tracker.py        # MD5 deduplication
-│   ├── version_manager.py      # Version date handling
-│   ├── alert_service.py        # Notifications (Discord/email)
-│   └── cron_scheduler.py       # APScheduler wrapper
+├── config/
+│   ├── __init__.py            # load_dotenv() + configure_tracing()
+│   └── settings.py            # Pydantic BaseSettings (all env vars)
 │
-├── api/                         # FastAPI routes (future)
+├── api/
+│   ├── routes.py              # /v1/chat, /v1/feedback, /v1/metrics, /v1/health
+│   ├── dependencies.py        # FastAPI Depends() wrappers
+│   └── metrics.py             # In-memory request/error/latency counters
+│
+├── models/
+│   ├── chat.py                # ChatRequest
+│   ├── responses.py           # ChatResponse, HealthResponse, MetricsResponse
+│   ├── feedback.py            # FeedbackRequest, FeedbackResponse
+│   ├── retrieval.py           # RetrievedDocument (internal)
+│   └── document.py            # SourceDocument (API-facing)
+│
+├── domain/
+│   ├── core/chain.py          # RAGChain: retrieve → format → generate
+│   ├── retrieval/retriever.py # Retriever: embed query → vector search → filter
+│   ├── ingestion/pipeline.py  # DocumentIngestionPipeline: parse → split → embed → store
+│   └── utils/filters.py       # Similarity threshold filtering
+│
+├── infrastructure/
+│   ├── container.py           # Composition root — wires all singletons
+│   ├── llm/                   # LLM providers (OpenRouter, Gemini, OpenAI)
+│   ├── embeddings/            # Google Gemini embeddings wrapper
+│   ├── vector_store/          # Supabase pgvector operations
+│   ├── parsers/               # File parsers (txt, md, html, pdf, docx, csv)
+│   ├── tools/                 # LangChain tools (search_documents, web_search)
+│   ├── agent/                 # Agent strategies (ToolCallingAgent, RAGChainAgent)
+│   ├── alerts/                # Discord webhook alerts (rate-limited, deduped)
+│   ├── feedback/              # LangSmith feedback provider
+│   └── logging/               # Structured JSON logging (console, file)
+│
 ├── utils/
-│   ├── exceptions.py           # Custom exception hierarchy
-│   ├── logging.py              # JSON structured logging
-│   └── file_utils.py           # File utility functions
+│   ├── exceptions.py          # RAGException hierarchy + Severity enum
+│   ├── correlation.py         # contextvars-based correlation IDs
+│   ├── retry.py               # tenacity retry decorator with exponential backoff
+│   ├── rate_limiter.py        # Sliding-window rate limiter
+│   └── formatting.py          # Shared document formatting utilities
 │
-├── scripts/
-│   ├── setup.py                # Complete project setup
-│   └── setup_db.py             # Database initialization
+├── migrations/
+│   ├── env.py                 # Alembic environment
+│   └── versions/              # Migration scripts
 │
-├── knowledge/
-│   ├── raw_docs/               # Input: new documents here
-│   ├── processed/              # Successful ingestions
-│   ├── failed/                 # Failed documents
- │
-└── tests/                       # Unit & integration tests (Phase 5)
+└── knowledge/
+    ├── raw_docs/              # Input: drop files here
+    ├── processed/             # Successfully ingested
+    └── failed/                # Failed ingestion
 ```
 
 ---
 
-## 🚀 Usage Examples
+## API Endpoints
 
-### Example 1: Drop a Document
+### POST /v1/chat — Query Documents with RAG
 
-```bash
-# Copy file to input folder
-cp my_document.pdf knowledge/raw_docs/
-
-# Wait for next cron run (max 5 minutes)
-# Or manually trigger via Discord command / REST API (future)
-
-# Check results
-ls knowledge/processed/          # Success
-ls knowledge/failed/             # Errors
-```
-
-### Example 2: Monitor Processing
-
-```bash
-# Watch logs in real-time
-# Check Discord channel for alerts
-# Review JSON logs for structured data:
-# - timestamp, level, logger, message
-# - module, function, line
-# - error details if exception occurred
-```
-
-### Example 3: Check State
-
-```python
-# Python REPL
-from services.state_tracker import StateTracker
-
-tracker = StateTracker()
-stats = tracker.get_stats()
-print(f"Processed files: {stats['total_processed']}")
-print(f"Total chunks: {stats['total_chunks']}")
-
-# List all tracked files
-for filename, info in tracker.get_stats().items():
-    print(f"{filename}: {info['chunk_count']} chunks")
-```
-
----
-
-## 🔧 Database Setup
-
-### Automatic (Recommended)
-
-```bash
-# Runs as part of: python scripts/setup.py
-python scripts/setup_db.py
-```
-
-**Methods used (in order):**
-1. **Direct PostgreSQL** (psycopg2) — Most reliable
-2. **Supabase API** — Fallback
-3. **Manual SQL** — Last resort
-
-### Manual Setup
-
-If automated setup fails:
-
-1. Open [Supabase Studio](https://app.supabase.com/)
-2. Navigate to: **SQL Editor** → **New Query**
-3. Copy contents of `schema.sql`
-4. Run the SQL
-5. Verify tables exist in **Schema** → **Tables**
-
----
-
-## 📊 Configuration
-
-### Environment Variables
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `GOOGLE_API_KEY` | ✅ Yes | — | Google Generative AI key |
-| `SUPABASE_URL` | ✅ Yes | — | Supabase project URL |
-| `SUPABASE_KEY` | ✅ Yes | — | Supabase service role key |
-| `CRON_INTERVAL_MINUTES` | ❌ No | `5` | Run frequency |
-| `CHUNK_SIZE` | ❌ No | `1000` | Text chunk size (chars) |
-| `CHUNK_OVERLAP` | ❌ No | `200` | Chunk overlap (chars) |
-| `EMBEDDING_RETRIES` | ❌ No | `3` | Retry attempts |
-| `DISCORD_WEBHOOK_URL` | ❌ No | — | Discord notifications |
-| `ALERT_EMAIL` | ❌ No | — | Email notifications |
-| `LOG_LEVEL` | ❌ No | `INFO` | Logging verbosity |
-| `LOG_FILE` | ❌ No | `app.log` | Log file path |
-| `KNOWLEDGE_DIR` | ❌ No | `./knowledge` | Document directory |
-
----
-
-## 🧪 Testing
-
-### Unit Tests
-
-```bash
-# Run all tests
-pytest tests/ -v
-
-# Run specific test file
-pytest tests/test_file_manager.py -v
-
-# Run with coverage
-pytest tests/ --cov=. --cov-report=html
-```
-
-### Manual Testing
-
-```bash
-# Test embeddings
-python -c "from rag.embeddings import GoogleEmbeddingsWrapper; \
-           from config import settings; \
-           emb = GoogleEmbeddingsWrapper(settings.google_api_key); \
-           result = emb.embed_query('test'); \
-           print(f'Embedding dimension: {len(result)}')"
-
-# Test document processor
-python -c "from services.document_processor import DocumentProcessor; \
-           proc = DocumentProcessor(); \
-           chunks = proc.chunk_text('Your test text here...'); \
-           print(f'Created {len(chunks)} chunks')"
-
-# Test file manager
-python -c "from services.file_manager import FileManager; \
-           from services.state_tracker import StateTracker; \
-           tracker = StateTracker(); \
-           fm = FileManager(tracker); \
-           files = fm.scan_raw_docs(); \
-           print(f'Found {len(files)} files')"
-```
-
----
-
-## 🐛 Troubleshooting
-
-### Issue: "GOOGLE_API_KEY not found"
-
-**Solution:**
-```bash
-# 1. Get key from: https://aistudio.google.com/app/apikeys
-# 2. Add to .env:
-echo "GOOGLE_API_KEY=your_key_here" >> .env
-# 3. Restart the application
-```
-
-### Issue: "Supabase connection failed"
-
-**Solution:**
-```bash
-# 1. Verify credentials in .env
-# 2. Check Supabase project is active
-# 3. Test connection:
-python -c "from supabase import create_client; \
-           from config import settings; \
-           client = create_client(settings.supabase_url, settings.supabase_key); \
-           print('Connected!')"
-```
-
-### Issue: "Table doesn't exist"
-
-**Solution:**
-```bash
-# Run database setup
-python scripts/setup_db.py
-
-# Or manually in Supabase Studio SQL Editor:
-\copy schema.sql
-```
-
-### Issue: "Files not processing"
-
-**Solution:**
-```bash
-# 1. Check .env configuration
-python -c "from config import settings; print(settings)"
-
-# 2. Check /knowledge/raw_docs/ has files
-ls knowledge/raw_docs/
-
-# 3. Check logs
-tail -f app.log
-
-# 4. Test manually
-python scripts/setup.py
-```
-
-### Issue: "psycopg2 not found"
-
-**Solution:**
-```bash
-# Install directly
-pip install psycopg2-binary
-
-# Or it's in requirements.txt:
-pip install -r requirements.txt
-```
-
----
-
-## 📈 Performance Tuning
-
-### Batch Size (Embeddings)
-
-```python
-# In config.py, adjust EMBEDDING_BATCH_SIZE
-# Larger = fewer API calls, but higher memory/latency
-# Default: 10 texts per batch (recommended for Google API)
-```
-
-### Chunk Size
-
-```python
-# CHUNK_SIZE=500  # Smaller chunks = more precise search
-# CHUNK_SIZE=2000 # Larger chunks = more context
-# Default: 1000 (balanced)
-```
-
-### Cron Interval
-
-```bash
-# CRON_INTERVAL_MINUTES=1  # Real-time processing (higher cost)
-# CRON_INTERVAL_MINUTES=5  # Balanced (default)
-# CRON_INTERVAL_MINUTES=60 # Batch overnight processing
-```
-
----
-
-## 🔐 Security Best Practices
-
-1. **Never commit .env** ✅ (already in .gitignore)
-2. **Use service role key** (not anon key for database ops)
-3. **Rotate API keys** regularly
-4. **Restrict file uploads** to trusted sources
-5. **Monitor ingestion logs** for failures
-6. **Enable pgvector indexes** for faster queries
-7. **Set CRON_INTERVAL_MINUTES** to appropriate value
-
----
-
-## 🚀 Deployment
-
-### Local Development
-
-```bash
-# Already covered in Quick Start above
-python main.py
-```
-
-### Production (Docker)
-
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-CMD ["python", "main.py"]
-```
-
-### Cloud Deployment
-
-- **Railway.app**: Supports Python + environment variables
-- **Render**: Native support for Python + cron
-- **AWS Lambda**: Use with scheduled CloudWatch events
-- **Google Cloud Run**: Jobs for scheduled execution
-- **Azure Container Instances**: Scheduled tasks
-
----
-
-## 📚 API Reference
-
-### DocumentIngester
-
-```python
-from services.document_ingester import DocumentIngester
-
-# Single file ingestion
-result = ingester.ingest_file(
-    file_path="path/to/document.pdf",
-    md5_hash="abc123...",
-    custom_version_date="2026-05-22"
-)
-
-# Batch ingestion
-results = ingester.ingest_batch(
-    files=["file1.txt", "file2.pdf"],
-    file_hashes={"file1.txt": "hash1", "file2.pdf": "hash2"}
-)
-```
-
-### VectorStore
-
-```python
-from rag.vector_store import VectorStore
-
-# Insert document
-doc_id = vector_store.insert_document(
-    filename="report.pdf",
-    version_date="2026-05-22",
-    metadata={"category": "reports"}
-)
-
-# Search
-results = vector_store.search_similar(
-    query_embedding=[...1536 dimensions...],
-    top_k=5
-)
-```
-
-### FileManager
-
-```python
-from services.file_manager import FileManager
-
-# Scan for new files
-files = file_manager.scan_raw_docs()
-
-# Detect changes
-new_files, hashes = file_manager.detect_new_files(files)
-
-# Move files
-file_manager.move_to_processed(Path("knowledge/raw_docs/file.txt"))
-file_manager.move_to_failed(Path("knowledge/raw_docs/file.txt"), "Parse error")
-```
-
----
-
-## 📝 Logging
-
-### View Logs
-
-```bash
-# Live logs (default console)
-python main.py
-
-# File logs
-tail -f app.log
-
-# JSON parsing (for monitoring systems)
-cat app.log | jq '.'
-```
-
-### Log Format
-
-```json
-{
-  "timestamp": "2026-05-22T14:30:45.123Z",
-  "level": "INFO",
-  "logger": "services.document_ingester",
-  "message": "Successfully ingested report.pdf",
-  "module": "document_ingester",
-  "function": "ingest_batch",
-  "line": 85,
-  "exception": null
-}
-```
-
----
-
-## 🌐 Retrieval API
-
-Query stored documents and get AI-generated answers with context.
-
-### Starting the API Server
-
-```bash
-# From project root
-python main.py
-
-# Server runs on http://localhost:8000
-# Swagger UI: http://localhost:8000/docs
-# ReDoc: http://localhost:8000/redoc
-```
-
-### API Documentation
-
-- **Interactive Swagger UI**: http://localhost:8000/docs
-- **ReDoc Documentation**: http://localhost:8000/redoc
-- **OpenAPI Schema**: http://localhost:8000/openapi.json
-
-### Endpoints
-
-#### POST /v1/chat — Query Documents with RAG
-
-Query stored documents and get AI-generated answers with sources.
-
-**Request:**
 ```bash
 curl -X POST http://localhost:8000/v1/chat \
   -H "Content-Type: application/json" \
   -d '{
     "query": "How do I enroll in the program?",
-    "top_k": 5,
-    "include_sources": true,
-    "temperature": 0.7
+    "top_k": 5
   }'
 ```
 
-**Parameters:**
-- `query` (string, required): Your question (1-2000 characters)
-- `top_k` (integer, default=5): Number of documents to retrieve (1-20)
-- `include_sources` (boolean, default=true): Include source document references
-- `temperature` (float, default=0.7): LLM creativity level (0.0=deterministic, 1.0=creative)
-
-**Response (200):**
+**Response:**
 ```json
 {
-  "response": "To enroll in the program, you need to: 1. Complete the online form... 2. Submit required documentation...",
-  "query": "How do I enroll in the program?",
+  "response": "To enroll in the program, you need to...",
   "sources": [
     {
-      "document_id": "550e8400-e29b-41d4-a716-446655440000",
       "filename": "enrollment_guide.pdf",
       "similarity_score": 0.95,
-      "version_date": "2025-01-15T10:30:00",
-      "content_preview": "Enrollment Guidelines: To enroll in our program, follow these steps...",
-      "chunk_id": "550e8400-e29b-41d4-a716-446655440001"
+      "content_preview": "Enrollment Guidelines: To enroll..."
     }
   ],
   "execution_time_ms": 2340.5,
-  "model": "gemini-2.5-flash"
+  "model": "openai/gpt-4o"
 }
 ```
 
-**Error (400) - Query Too Long:**
-```json
-{
-  "detail": {
-    "error": "invalid_request",
-    "message": "Query exceeds maximum length of 2000 characters",
-    "timestamp": "2025-01-15T12:00:00"
-  }
-}
+### POST /v1/feedback — Submit User Feedback
+
+```bash
+curl -X POST http://localhost:8000/v1/feedback \
+  -H "Content-Type: application/json" \
+  -d '{
+    "run_id": "abc-123",
+    "is_positive": true,
+    "comment": "Very helpful answer"
+  }'
 ```
 
-**Error (422) - Invalid Parameters:**
-```json
-{
-  "detail": [
-    {
-      "loc": ["body", "top_k"],
-      "msg": "ensure this value is less than or equal to 20",
-      "type": "value_error.number.not_le"
-    }
-  ]
-}
-```
+### GET /v1/health — Health Check
 
-#### GET /v1/health — Health Check
-
-Verify API and database connectivity.
-
-**Request:**
 ```bash
 curl http://localhost:8000/v1/health
 ```
 
-**Response (200):**
+**Response:**
 ```json
 {
   "status": "ok",
-  "timestamp": "2025-01-15T12:00:00",
-  "version": "1.0.0",
-  "db_connected": true
+  "db_connected": true,
+  "llm_connected": true,
+  "embedding_connected": true
 }
 ```
 
-**Response (200) - Error State:**
+### GET /v1/metrics — Request Metrics
+
+```bash
+curl http://localhost:8000/v1/metrics
+```
+
+**Response:**
 ```json
 {
-  "status": "error",
-  "timestamp": "2025-01-15T12:00:00",
-  "version": "1.0.0",
-  "db_connected": false
+  "total_requests": 1523,
+  "total_errors": 12,
+  "avg_latency_ms": 1842.3
 }
 ```
 
-### Python Client Example
+---
 
-```python
-import requests
-import json
+## Configuration
 
-BASE_URL = "http://localhost:8000"
+All settings are loaded from environment variables via `config/settings.py`.
 
-# Query documents
-response = requests.post(f"{BASE_URL}/v1/chat", json={
-    "query": "What are the enrollment requirements?",
-    "top_k": 5,
-    "include_sources": True,
-    "temperature": 0.7
-})
+### Required
 
-result = response.json()
-print(f"Answer: {result['response']}")
-print(f"Sources: {len(result.get('sources', []))} documents")
-print(f"Time: {result['execution_time_ms']:.0f}ms")
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_API_KEY` | Google Generative AI key (for embeddings) |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_KEY` | Supabase service role key |
+| `SUPABASE_DIRECT_URL` | Direct PostgreSQL connection string |
 
-# Check health
-health = requests.get(f"{BASE_URL}/v1/health").json()
-print(f"API Status: {health['status']}")
-print(f"DB Connected: {health['db_connected']}")
-```
+### LLM Provider
 
-### JavaScript/Fetch Example
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENROUTER_API_KEY` | — | OpenRouter API key |
+| `OPENROUTER_MODEL` | `openai/gpt-4o` | Model identifier |
+| `OPENROUTER_TEMPERATURE` | `0.7` | Temperature (0.0-1.0) |
+| `OPENROUTER_MAX_TOKENS` | `2000` | Max response tokens |
+| `LLM_TIMEOUT_SECONDS` | `60` | Request timeout |
 
-```javascript
-// Query documents
-const response = await fetch('http://localhost:8000/v1/chat', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    query: 'How do I enroll?',
-    top_k: 5,
-    include_sources: true,
-    temperature: 0.7
-  })
-});
+### Embeddings & Retrieval
 
-const data = await response.json();
-console.log('Answer:', data.response);
-console.log('Sources:', data.sources?.length || 0);
-console.log('Time:', data.execution_time_ms, 'ms');
-```
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CHUNK_SIZE` | `1000` | Text chunk size (characters) |
+| `CHUNK_OVERLAP` | `200` | Chunk overlap (characters) |
+| `EMBEDDING_RETRIES` | `3` | Retry attempts for embedding failures |
+| `SIMILARITY_THRESHOLD` | `0.7` | Minimum similarity score for retrieval |
 
-### Configuration
+### Ingestion
 
-Set environment variables in `.env`:
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CRON_INTERVAL_MINUTES` | `5` | Polling interval for new documents |
+| `KNOWLEDGE_DIR` | `./knowledge/raw_docs` | Input directory |
+| `PROCESSED_DIR` | `./knowledge/processed` | Successfully processed files |
+| `FAILED_DIR` | `./knowledge/failed` | Failed processing files |
+
+### Logging & Alerts
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOG_LEVEL` | `INFO` | Logging verbosity |
+| `LOGGER_BACKEND` | `console` | Logger type: `console` or `file` |
+| `LOG_FILE` | — | Log file path (if `LOGGER_BACKEND=file`) |
+| `DISCORD_WEBHOOK_URL` | — | Discord webhook for error alerts |
+| `ALERT_RATE_LIMIT_PER_MINUTE` | `5` | Max alerts per minute |
+
+### Agent Strategy
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `USE_TOOL_AGENT` | `true` | Use tool-calling agent (true) or RAG chain (false) |
+
+### CORS
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CORS_ORIGINS` | `http://localhost:3000,...` | Comma-separated allowed origins |
+
+### LangSmith Tracing
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LANGCHAIN_TRACING_V2` | `false` | Enable LangSmith tracing |
+| `LANGCHAIN_PROJECT` | `langchain-agent` | LangSmith project name |
+| `LANGCHAIN_API_KEY` | — | LangSmith API key |
+
+---
+
+## Document Ingestion
+
+### How It Works
+
+1. **Drop files** into `knowledge/raw_docs/`
+2. **`cronjob.py` polls** the directory every `CRON_INTERVAL_MINUTES`
+3. **Pipeline processes** each new file:
+   - **Parse** — Extract text using the appropriate parser (PDF, DOCX, etc.)
+   - **Split** — Break into chunks using `RecursiveCharacterTextSplitter`
+   - **Embed** — Generate vectors via Google Gemini embeddings (1536 dimensions)
+   - **Store** — Insert document + chunks into Supabase pgvector
+4. **Move files** to `knowledge/processed/` or `knowledge/failed/`
+5. **Deduplication** — SHA-256 content hashing prevents re-processing
+
+### Supported Formats
+
+| Format | Parser | Library |
+|--------|--------|---------|
+| `.txt` | `TextFileParser` | Built-in |
+| `.md` | `MarkdownParser` | Built-in |
+| `.html` | `HTMLParser` | Built-in |
+| `.pdf` | `PDFParser` | `pdfplumber` |
+| `.docx` | `DOCXParser` | `python-docx` |
+| `.csv` | `CSVParser` | Built-in |
+
+---
+
+## Development
+
+### Run Locally
 
 ```bash
-# Required
-GOOGLE_API_KEY=your_google_api_key
-SUPABASE_URL=your_supabase_url
-SUPABASE_KEY=your_supabase_key
+# Terminal 1: API server
+python server.py
 
-# Optional
-GEMINI_MODEL=gemini-2.5-flash
-GEMINI_TEMPERATURE=0.7
-LOG_LEVEL=INFO
+# Terminal 2: Ingestion pipeline
+python cronjob.py
 ```
 
-### Testing API
+### Run Tests
 
 ```bash
-# Run all tests
 pytest tests/ -v
-
-# Run only API tests
-pytest tests/test_api.py -v
-
-# Run with coverage
-pytest tests/test_api.py --cov=api --cov-report=html
 ```
 
-### Common Issues
+### Database Migrations
 
-**"Database connection failed"**
 ```bash
-# Verify database setup
-python scripts/setup_db.py
+# Run migrations
+python setupdb.py
 
-# Check Supabase credentials
+# Reset database (WARNING: deletes all data)
+python setupdb.py --reset
+```
+
+### Add a New LLM Provider
+
+1. Create `infrastructure/llm/your_provider.py`
+2. Implement the `LLMProvider` ABC from `infrastructure/llm/base.py`
+3. Add configuration to `config/settings.py`
+4. Wire it in `infrastructure/container.py`
+
+### Add a New File Parser
+
+1. Create `infrastructure/parsers/your_parser.py`
+2. Implement the `FileParser` ABC from `infrastructure/parsers/parser.py`
+3. Register it in `ParserFactory`
+
+---
+
+## Troubleshooting
+
+### "GOOGLE_API_KEY not found"
+
+```bash
+# Add to .env
+echo "GOOGLE_API_KEY=your_key_here" >> .env
+```
+
+### "Supabase connection failed"
+
+```bash
+# Verify credentials
 python -c "from config import settings; print(settings.supabase_url)"
+
+# Test direct connection
+python -c "from supabase import create_client; from config import settings; \
+           client = create_client(settings.supabase_url, settings.supabase_key); \
+           print('Connected!')"
 ```
 
-**"Query takes too long"**
+### "Table doesn't exist"
+
 ```bash
-# Ensure pgvector index exists
-# Check Supabase SQL Editor for index creation
-
-# Try reducing top_k
-curl -X POST http://localhost:8000/v1/chat \
-  -d '{"query": "...", "top_k": 3}'
+# Run migrations
+python setupdb.py
 ```
 
-**"No results returned"**
+### "Files not processing"
+
+```bash
+# Check knowledge directory
+ls knowledge/raw_docs/
+
+# Check logs
+# If LOGGER_BACKEND=console: check stdout
+# If LOGGER_BACKEND=file: tail -f <LOG_FILE>
+
+# Verify ingestion pipeline is running
+ps aux | grep cronjob
+```
+
+### "No results from chat API"
+
 ```bash
 # Check that documents have been ingested
-# Run batch processor first:
-python main.py &
+ls knowledge/processed/
 
-# Wait for documents to be processed, then query API
-curl http://localhost:8000/v1/health
+# Verify vector store has data
+# In Supabase Studio → Table Editor → document_chunks
 ```
 
 ---
 
-## 🤝 Contributing
+## Deployment
 
-Contributions welcome! Please:
+### Docker
 
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+```bash
+docker build -t langchain-agent .
+docker run -p 8000:8000 --env-file .env langchain-agent
+```
 
----
+The Dockerfile uses a multi-stage build with Python 3.11-slim and includes health checks.
 
-## 📄 License
+### Environment Variables
 
-MIT License - see LICENSE file for details
-
----
-
-## 🆘 Support
-
-- **Issues**: Create GitHub issue with details
-- **Docs**: See README.md and QUICKSTART.md
-- **Discord**: Join our community server
-- **Email**: support@example.com
+Pass all required environment variables via:
+- `.env` file (with `--env-file`)
+- Docker secrets
+- Your orchestration platform's secret management
 
 ---
 
-## 🎯 Roadmap
+## License
 
-- [ ] REST API for manual uploads
-- [ ] Web dashboard for monitoring
-- [ ] Support for more LLMs (OpenAI, Anthropic)
-- [ ] Advanced RAG retrieval (re-ranking, fusion)
-- [ ] Multi-tenant support
-- [ ] Distributed processing
-- [ ] Kubernetes deployment
-- [ ] GraphQL API
-
----
-
-**Happy document processing! 🚀**
+MIT

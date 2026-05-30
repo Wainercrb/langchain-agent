@@ -2,10 +2,10 @@
 
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Optional
 
-from pydantic import Field, model_validator
-from pydantic_settings import BaseSettings
+from pydantic import Field, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode
 
 
 class Settings(BaseSettings):
@@ -53,6 +53,24 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     logger_backend: str = Field(default="console", alias="LOGGER_BACKEND")
     log_file: Optional[str] = Field(default=None, alias="LOG_FILE")
+
+    # ── CORS ──────────────────────────────────────────────────────────
+    cors_origins: Annotated[list[str], NoDecode] = Field(
+        default=[
+            "http://localhost:4321",
+            "http://localhost:3000",
+            "http://127.0.0.1:4321",
+            "http://127.0.0.1:3000",
+        ],
+        alias="CORS_ORIGINS",
+    )
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, v: object) -> list[str]:
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v  # type: ignore[return-value]
 
     # ── Alerts ────────────────────────────────────────────────────────
     discord_webhook_url: Optional[str] = Field(

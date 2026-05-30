@@ -10,7 +10,8 @@ from datetime import datetime, timezone
 
 from api import router
 from config import configure_tracing, settings
-from services.container import alert_service, logger
+from infrastructure.container import alert_service
+from infrastructure.logging import logger
 from utils.correlation import set_correlation_id, get_correlation_id
 from utils.exceptions import RAGException, Severity
 
@@ -32,12 +33,7 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:4321",
-        "http://localhost:3000",
-        "http://127.0.0.1:4321",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

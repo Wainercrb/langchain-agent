@@ -15,7 +15,8 @@ from models import (
     HealthResponse,
     MetricsResponse,
 )
-from services.container import alert_service, logger
+from infrastructure.container import alert_service
+from infrastructure.logging import logger
 from utils.exceptions import Severity
 
 router = APIRouter(prefix="/v1", tags=["chat"])

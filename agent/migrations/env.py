@@ -14,7 +14,10 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-from services.container import logger, db_direct_url
+from config import settings
+from infrastructure.logging import logger
+
+db_direct_url = settings.supabase_direct_url
 
 if not db_direct_url:
     logger.error("DB DIRECT URL is not set")

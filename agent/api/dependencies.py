@@ -1,73 +1,22 @@
 """Service dependencies for the RAG API.
 
-All pluggable singletons live in services/container.py.
-This file assembles the agent from container components.
-
-Strategy Pattern: the logic of which agent is used and which tools are active
-lives HERE (in a function with local imports) to avoid circular imports
-with rag.* which also import services.container.logger.
+All pluggable singletons (including the agent) live in services/container.py.
+This file provides FastAPI Depends() wrappers only.
 """
 
-from services.container import llm, vector_store, embeddings, logger, feedback_service
-
-# ── Agent Assembly (local imports avoid circular deps) ───────────────
-
-
-def _build_agent():
-    """Build the configured Agent strategy.
-
-    Local imports prevent circular dependencies since rag.* modules
-    import services.container.logger.
-    """
-    from rag.retrieval.retriever import Retriever
-    from rag.core.chain import RAGChain
-    from services.agent import ToolCallingAgent, RAGChainAgent
-    from services.tools import (
-        create_search_documents_tool,
-        web_search_tool,
-    )
-    from config import settings
-
-    retriever = Retriever(vector_store=vector_store, embeddings=embeddings)
-
-    if settings.use_tool_agent:
-        # Tool-calling agent — container decides which tools are active.
-        # To add/remove tools, edit this list. No changes in agent code needed.
-        _search_artifact_store = []
-        tools = [
-            create_search_documents_tool(
-                retriever=retriever,
-                artifact_store=_search_artifact_store,
-                default_latest_only=True,
-            ),
-            web_search_tool,
-        ]
-        return ToolCallingAgent(
-            llm=llm.chat_model,
-            tools=tools,
-            artifact_store=_search_artifact_store,
-            default_top_k=5,
-        )
-    else:
-        # Legacy RAG chain (always retrieves documents)
-        chain = RAGChain(retriever=retriever, llm=llm)
-        return RAGChainAgent(chain=chain)
-
-
-# Singleton agent instance (lazy assembly avoids circular imports at import time)
-_agent_instance = None
+from infrastructure.container import (
+    agent,
+    embeddings,
+    feedback_service,
+    llm,
+    vector_store,
+)
+from infrastructure.logging import logger
 
 
 def get_agent():
-    """Return the pre-wired Agent singleton.
-
-    The dependency layer decides the strategy (tool-calling vs legacy)
-    based on USE_TOOL_AGENT setting. The route is agnostic.
-    """
-    global _agent_instance
-    if _agent_instance is None:
-        _agent_instance = _build_agent()
-    return _agent_instance
+    """Return the pre-wired Agent singleton from the composition root."""
+    return agent
 
 
 def get_feedback_service():
