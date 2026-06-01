@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timezone
 
 from api import router
+from api.middleware.rate_limit import RateLimitMiddleware
 from config import configure_tracing, settings
 from infrastructure.container import alert_service
 from infrastructure.logging import logger
@@ -18,13 +19,13 @@ from utils.exceptions import RAGException, Severity
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan: configure tracing on startup, clean up on shutdown."""
+    """Application lifespan: configure tracing on startup."""
     configure_tracing()
     yield
 
 
 app = FastAPI(
-    title="LangChain Agent RAG API",
+    title="LangChain Agent RAGAPI",
     version="1.0.0",
     docs_url="/docs",
     lifespan=lifespan,
@@ -38,6 +39,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add rate limiting middleware (applies to /v1/chat and /v1/rag only)
+app.add_middleware(RateLimitMiddleware)
 
 
 @app.middleware("http")

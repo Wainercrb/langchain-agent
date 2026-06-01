@@ -4,8 +4,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 
-from .dependencies import check_health, get_agent, get_feedback_service
-from .metrics import get_metrics
+from api.dependencies import check_health, get_agent, get_feedback_service
+from api.metrics import get_metrics
 from config import settings
 from models import (
     ChatRequest,
@@ -100,6 +100,7 @@ async def chat(
             error=e,
             metadata={"path": "/v1/chat", "query": request.query[:50]},
         )
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
@@ -118,6 +119,7 @@ async def chat(
             error=e,
             metadata={"path": "/v1/chat", "query": request.query[:50]},
         )
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={

@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
     openrouter_model: str = Field(default="openai/gpt-4o", alias="OPENROUTER_MODEL")
     openrouter_temperature: float = Field(default=0.7, alias="OPENROUTER_TEMPERATURE")
-    openrouter_max_tokens: int = Field(default=2000, alias="OPENROUTER_MAX_TOKENS")
+    openrouter_max_tokens: int = Field(default=1000, alias="OPENROUTER_MAX_TOKENS")
 
     # ── Supabase / pgvector ──────────────────────────────────────────
     supabase_url: str = Field(..., alias="SUPABASE_URL")
@@ -89,6 +89,12 @@ class Settings(BaseSettings):
         default=False,
         alias="USE_TOOL_AGENT",
         description="Use the intelligent tool-calling agent instead of the hardcoded RAGChain",
+    )
+
+    # ── Rate Limiting ─────────────────────────────────────────────────
+    rate_limit_enabled: bool = Field(default=True, alias="RATE_LIMIT_ENABLED")
+    rate_limit_requests_per_minute: int = Field(
+        default=100, alias="RATE_LIMIT_REQUESTS_PER_MINUTE"
     )
 
     # ── LangSmith / Tracing ────────────────────────────────────────────

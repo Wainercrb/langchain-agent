@@ -56,6 +56,21 @@ class RateLimiter:
         # Record this request
         self.request_timestamps.append(current_time)
 
+    def is_allowed(self) -> bool:
+        """Non-blocking check. Returns True if request should proceed, False if limited."""
+        current_time = time.time()
+
+        while (
+            self.request_timestamps and self.request_timestamps[0] < current_time - 60
+        ):
+            self.request_timestamps.popleft()
+
+        if len(self.request_timestamps) >= self.requests_per_minute:
+            return False
+
+        self.request_timestamps.append(current_time)
+        return True
+
     def get_request_count_this_minute(self) -> int:
         """Get current request count in the last minute."""
         current_time = time.time()
@@ -64,3 +79,20 @@ class RateLimiter:
         ):
             self.request_timestamps.popleft()
         return len(self.request_timestamps)
+
+    def get_reset_timestamp(self) -> float:
+        """Get the timestamp when the current window resets."""
+        if not self.request_timestamps:
+            return time.time() + 60
+        oldest = self.request_timestamps[0]
+        return oldest + 60
+
+    def get_remaining(self) -> int:
+        """Get remaining requests in current window."""
+        current_time = time.time()
+        while (
+            self.request_timestamps and self.request_timestamps[0] < current_time - 60
+        ):
+            self.request_timestamps.popleft()
+        remaining = self.requests_per_minute - len(self.request_timestamps)
+        return max(0, remaining)

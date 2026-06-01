@@ -1,0 +1,247 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="System Dashboard">
+  <div class="dashboard">
+    <h1>System Health Dashboard</h1>
+
+    <div class="status-grid" id="status-grid">
+      <div class="status-card" id="db-status">
+        <span class="indicator" id="db-indicator">yellow</span>
+        <span class="label">Database</span>
+        <span class="detail" id="db-detail">Checking...</span>
+      </div>
+      <div class="status-card" id="llm-status">
+        <span class="indicator" id="llm-indicator">yellow</span>
+        <span class="label">LLM</span>
+        <span class="detail" id="llm-detail">Checking...</span>
+      </div>
+      <div class="status-card" id="embedding-status">
+        <span class="indicator" id="embedding-indicator">yellow</span>
+        <span class="label">Embedding</span>
+        <span class="detail" id="embedding-detail">Checking...</span>
+      </div>
+    </div>
+
+    <div class="metrics-grid" id="metrics-grid">
+      <div class="metric-card">
+        <span class="metric-value" id="request-count">-</span>
+        <span class="metric-label">Total Requests</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-value" id="error-rate">-</span>
+        <span class="metric-label">Error Rate</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-value" id="avg-latency">-</span>
+        <span class="metric-label">Avg Latency</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-value" id="token-usage">-</span>
+        <span class="metric-label">Token Usage</span>
+      </div>
+    </div>
+
+    <div class="connection-error" id="connection-error" style="display: none;">
+      <p>Unable to connect to backend</p>
+      <button id="retry-btn" onclick="fetchMetrics()">Retry</button>
+    </div>
+
+    <p class="last-updated" id="last-updated">Last updated: --</p>
+  </div>
+</Layout>
+
+<script>
+  const API_BASE = import.meta.env.PUBLIC_API_URL || 'http://localhost:8000';
+  let consecutiveErrors = 0;
+  const MAX_ERRORS_BEFORE_SHOW = 3;
+
+  async function fetchHealth() {
+    try {
+      const res = await fetch(`${API_BASE}/v1/health`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      consecutiveErrors = 0;
+
+      updateIndicator('db-indicator', 'db-detail', data.db_connected);
+      updateIndicator('llm-indicator', 'llm-detail', data.llm_connected);
+      updateIndicator('embedding-indicator', 'embedding-detail', data.embedding_connected);
+
+      document.getElementById('connection-error').style.display = 'none';
+      document.getElementById('status-grid').style.display = 'grid';
+      document.getElementById('metrics-grid').style.display = 'grid';
+    } catch (err) {
+      consecutiveErrors++;
+      if (consecutiveErrors >= MAX_ERRORS_BEFORE_SHOW) {
+        document.getElementById('connection-error').style.display = 'block';
+        document.getElementById('status-grid').style.display = 'none';
+        document.getElementById('metrics-grid').style.display = 'none';
+      }
+    }
+  }
+
+  async function fetchMetrics() {
+    try {
+      const res = await fetch(`${API_BASE}/v1/metrics`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      consecutiveErrors = 0;
+
+      document.getElementById('request-count').textContent = data.request_count.toLocaleString();
+
+      const errorRate = data.request_count > 0
+        ? ((data.error_count / data.request_count) * 100).toFixed(1) + '%'
+        : '0%';
+      document.getElementById('error-rate').textContent = errorRate;
+      document.getElementById('avg-latency').textContent = data.avg_latency_ms.toFixed(0) + 'ms';
+      document.getElementById('token-usage').textContent = 'N/A';
+
+      document.getElementById('connection-error').style.display = 'none';
+      document.getElementById('status-grid').style.display = 'grid';
+      document.getElementById('metrics-grid').style.display = 'grid';
+    } catch (err) {
+      consecutiveErrors++;
+      if (consecutiveErrors >= MAX_ERRORS_BEFORE_SHOW) {
+        document.getElementById('connection-error').style.display = 'block';
+        document.getElementById('status-grid').style.display = 'none';
+        document.getElementById('metrics-grid').style.display = 'none';
+      }
+    }
+
+    document.getElementById('last-updated').textContent =
+      'Last updated: ' + new Date().toLocaleTimeString();
+  }
+
+  function updateIndicator(indicatorId, detailId, isConnected) {
+    const indicator = document.getElementById(indicatorId);
+    const detail = document.getElementById(detailId);
+    if (isConnected) {
+      indicator.className = 'indicator green';
+      detail.textContent = 'Connected';
+    } else {
+      indicator.className = 'indicator red';
+      detail.textContent = 'Disconnected';
+    }
+  }
+
+  // Initial fetch
+  fetchHealth();
+  fetchMetrics();
+
+  // Poll every 30 seconds
+  setInterval(fetchHealth, 30000);
+  setInterval(fetchMetrics, 30000);
+</script>
+
+<style>
+  .dashboard {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+    font-family: system-ui, sans-serif;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+    color: #1a1a2e;
+  }
+
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .status-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .indicator.green { background: #22c55e; }
+  .indicator.yellow { background: #eab308; }
+  .indicator.red { background: #ef4444; }
+
+  .label {
+    font-weight: 600;
+    color: #334155;
+  }
+
+  .detail {
+    font-size: 0.875rem;
+    color: #64748b;
+  }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .metric-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 1.25rem;
+    text-align: center;
+  }
+
+  .metric-value {
+    display: block;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1e293b;
+  }
+
+  .metric-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .connection-error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    text-align: center;
+    color: #991b1b;
+  }
+
+  .connection-error button {
+    margin-top: 0.75rem;
+    padding: 0.5rem 1.5rem;
+    background: #dc2626;
+    color: #fff;
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .connection-error button:hover {
+    background: #b91c1c;
+  }
+
+  .last-updated {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    text-align: right;
+  }
+</style>
