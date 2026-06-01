@@ -6,12 +6,14 @@ Tools are INJECTED via constructor — the container decides which tools are act
 
 import time
 import uuid
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import BaseTool
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langsmith import traceable
+from langsmith.run_trees import _context as run_tree_context
 
 from models import ChatResponse, SourceDocument
 from infrastructure.agent.base import Agent
@@ -27,7 +29,7 @@ RULES:
 
 TOOL SELECTION GUIDE:
 - User says "find the ...", "search for ...", "look up ...", "find in the ...", "find in the api documentation", "find in the requirement documents", "find in the UIQCG documents", "what does the document say about ...", "where in the docs is ..." → Use: search_documents
-- Question asks about news, weather, sports, stocks, celebrities, current events → Use: web_search
+- Question asks about news, weather, sports, celebrities, current events → Use: web_search
 - Greeting, general questions, or anything not matching above → Answer directly, no tools
 
 EXAMPLES:
@@ -45,6 +47,37 @@ Only say "I don't have that information" if the retrieved documents are complete
 """
 
 
+class _TokenCallback(BaseCallbackHandler):
+    """Captures LLM token usage from callback events."""
+
+    def __init__(self) -> None:
+        self.input_tokens: int = 0
+        self.output_tokens: int = 0
+
+    def on_llm_end(self, serialized: dict, response: Any, **kwargs: Any) -> None:
+        """Extract token counts from the LLM response."""
+        usage = getattr(response, "usage_metadata", None) or getattr(response, "usage", None)
+        if not usage:
+            return
+
+        if isinstance(usage, dict):
+            self.input_tokens += usage.get("input_tokens", usage.get("prompt_tokens", 0))
+            self.output_tokens += usage.get("output_tokens", usage.get("completion_tokens", 0))
+        elif hasattr(usage, "input_tokens"):
+            self.input_tokens += usage.input_tokens or 0
+            self.output_tokens += usage.output_tokens or 0
+
+    def as_dict(self) -> Optional[Dict[str, int]]:
+        """Return token counts as a dict, or None if no tokens were captured."""
+        if self.input_tokens == 0 and self.output_tokens == 0:
+            return None
+        return {
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
+            "total_tokens": self.input_tokens + self.output_tokens,
+        }
+
+
 class ToolCallingAgent(Agent):
     """LangChain tool-calling agent.
 
@@ -54,12 +87,12 @@ class ToolCallingAgent(Agent):
 
     def __init__(
         self,
-        llm,
+        llm: Any,
         tools: List[BaseTool],
         artifact_store: Optional[list] = None,
         default_top_k: int = 5,
         default_latest_only: bool = True,
-    ):
+    ) -> None:
         self._llm = llm
         self._tools = tools
         self._artifact_store = artifact_store
@@ -107,7 +140,18 @@ class ToolCallingAgent(Agent):
         include_sources: bool = True,
         latest_only: bool = True,
     ) -> ChatResponse:
-        """Process query using tool-calling agent."""
+        """Process query using tool-calling agent.
+
+        Args:
+            query: User's natural language question.
+            top_k: Number of documents to retrieve (passed to search tool).
+            temperature: LLM creativity (0.0-1.0).
+            include_sources: Whether to include source documents in response.
+            latest_only: Whether to search only latest document versions.
+
+        Returns:
+            ChatResponse with answer, sources, and metadata.
+        """
         start_time = time.time()
         try:
             logger.info(
@@ -115,22 +159,25 @@ class ToolCallingAgent(Agent):
                 f"tools={[t.name for t in self._tools]}"
             )
 
+            token_cb = _TokenCallback()
             executor = self._build_executor(temperature=temperature)
-            result = executor.invoke({"input": query})
-            response_text = result.get("output", "")
+
+            llm_latency_ms, response_text = self._execute(
+                executor, query, token_cb
+            )
 
             execution_time_ms = (time.time() - start_time) * 1000
 
-            # Extract sources from tool side-effects
-            # Tool implementations that produce retrievable docs attach them
-            # to a shared artifact store on the tool instance (via closure).
             sources_list = self._extract_sources(include_sources)
 
-            run_id = str(uuid.uuid4())
+            run_id, langsmith_tags = self._capture_tracing_metadata(
+                top_k, temperature
+            )
 
             logger.info(
                 f"ToolCallingAgent complete: query={query[:50]}..., "
-                f"time={execution_time_ms:.0f}ms, sources={len(sources_list or [])}"
+                f"time={execution_time_ms:.0f}ms, llm_time={llm_latency_ms:.0f}ms, "
+                f"sources={len(sources_list or [])}"
             )
 
             return ChatResponse(
@@ -140,6 +187,9 @@ class ToolCallingAgent(Agent):
                 execution_time_ms=execution_time_ms,
                 model=getattr(self._llm, "model", "unknown"),
                 run_id=run_id,
+                usage_metadata=token_cb.as_dict(),
+                llm_latency_ms=llm_latency_ms,
+                langsmith_tags=langsmith_tags,
             )
 
         except Exception as e:
@@ -149,7 +199,45 @@ class ToolCallingAgent(Agent):
             )
             raise
 
-    def _extract_sources(self, include_sources: bool) -> Optional[List[SourceDocument]]:
+    def _execute(
+        self, executor: AgentExecutor, query: str, token_cb: _TokenCallback
+    ) -> tuple[float, str]:
+        """Execute the agent and measure LLM latency.
+
+        Returns:
+            Tuple of (llm_latency_ms, response_text).
+        """
+        llm_start = time.time()
+        result = executor.invoke({"input": query}, config={"callbacks": [token_cb]})
+        llm_latency_ms = (time.time() - llm_start) * 1000
+        return llm_latency_ms, result.get("output", "")
+
+    def _capture_tracing_metadata(
+        self, top_k: int, temperature: float
+    ) -> tuple[str, Optional[List[str]]]:
+        """Extract LangSmith run ID and apply dynamic tags.
+
+        Returns:
+            Tuple of (run_id, langsmith_tags).
+        """
+        current_run = run_tree_context.get_current_run_tree()
+        run_id = str(current_run.id) if current_run else str(uuid.uuid4())
+
+        if not current_run:
+            return run_id, None
+
+        langsmith_tags = [
+            f"model:{getattr(self._llm, 'model', 'unknown')}",
+            "agent:tool-calling",
+            f"top_k:{top_k}",
+            f"temperature:{temperature}",
+        ]
+        current_run.add_tags(langsmith_tags)
+        return run_id, langsmith_tags
+
+    def _extract_sources(
+        self, include_sources: bool
+    ) -> Optional[List[SourceDocument]]:
         """Extract sources from the shared artifact store.
 
         The search_documents tool populates this list during invocation.
@@ -158,7 +246,7 @@ class ToolCallingAgent(Agent):
             return None
 
         all_sources = list(self._artifact_store)
-        self._artifact_store.clear()  # Reset for next request
+        self._artifact_store.clear()
 
         if not all_sources:
             return None

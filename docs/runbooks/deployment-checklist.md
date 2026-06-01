@@ -54,10 +54,10 @@ Complete all items before proceeding with deployment.
 - [ ] Health endpoint returns 200: `curl http://localhost:8000/v1/health`
 - [ ] Metrics endpoint responds: `curl http://localhost:8000/v1/metrics`
 - [ ] Chat endpoint works: `curl -X POST http://localhost:8000/v1/chat -H "Content-Type: application/json" -d '{"query": "test"}'`
-- [ ] Audit endpoint responds: `curl http://localhost:8000/v1/audit`
 - [ ] Dashboard loads: `http://localhost:4321/dashboard`
 - [ ] Discord connectivity verified (check logs for any webhook errors)
 - [ ] Rate limiting active: send rapid requests to `/v1/chat`, verify 429 after threshold
+- [ ] LangSmith audit trail: verify traces appear at configured LangSmith project dashboard
 
 ---
 

@@ -3,81 +3,109 @@ import Layout from '../layouts/Layout.astro';
 ---
 
 <Layout title="System Dashboard">
-  <div class="dashboard">
-    <h1>System Health Dashboard</h1>
+  <main class="mx-auto max-w-3xl px-4 py-8 font-['Inter',system-ui,sans-serif]">
+    <header class="mb-6 flex items-baseline justify-between">
+      <h1 class="text-2xl font-bold text-[var(--color-text)]">System Health</h1>
+      <time id="last-updated" class="text-xs text-[var(--color-text-muted)]">--</time>
+    </header>
 
-    <div class="status-grid" id="status-grid">
-      <div class="status-card" id="db-status">
-        <span class="indicator" id="db-indicator">yellow</span>
-        <span class="label">Database</span>
-        <span class="detail" id="db-detail">Checking...</span>
-      </div>
-      <div class="status-card" id="llm-status">
-        <span class="indicator" id="llm-indicator">yellow</span>
-        <span class="label">LLM</span>
-        <span class="detail" id="llm-detail">Checking...</span>
-      </div>
-      <div class="status-card" id="embedding-status">
-        <span class="indicator" id="embedding-indicator">yellow</span>
-        <span class="label">Embedding</span>
-        <span class="detail" id="embedding-detail">Checking...</span>
-      </div>
-    </div>
+    <section id="status-grid" class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3" aria-label="Service status">
+      <article class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm transition-shadow hover:shadow-md">
+        <div class="mb-1 flex items-center gap-2">
+          <span id="db-indicator" class="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-yellow-500" aria-hidden="true"></span>
+          <span class="text-sm font-semibold text-[var(--color-text)]">Database</span>
+        </div>
+        <span id="db-detail" class="block pl-[calc(0.625rem+0.5rem)] text-xs text-[var(--color-text-muted)]">Checking...</span>
+      </article>
+      <article class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm transition-shadow hover:shadow-md">
+        <div class="mb-1 flex items-center gap-2">
+          <span id="llm-indicator" class="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-yellow-500" aria-hidden="true"></span>
+          <span class="text-sm font-semibold text-[var(--color-text)]">LLM</span>
+        </div>
+        <span id="llm-detail" class="block pl-[calc(0.625rem+0.5rem)] text-xs text-[var(--color-text-muted)]">Checking...</span>
+      </article>
+      <article class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm transition-shadow hover:shadow-md">
+        <div class="mb-1 flex items-center gap-2">
+          <span id="embedding-indicator" class="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-yellow-500" aria-hidden="true"></span>
+          <span class="text-sm font-semibold text-[var(--color-text)]">Embedding</span>
+        </div>
+        <span id="embedding-detail" class="block pl-[calc(0.625rem+0.5rem)] text-xs text-[var(--color-text-muted)]">Checking...</span>
+      </article>
+    </section>
 
-    <div class="metrics-grid" id="metrics-grid">
-      <div class="metric-card">
-        <span class="metric-value" id="request-count">-</span>
-        <span class="metric-label">Total Requests</span>
+    <section id="metrics-grid" class="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4" aria-label="Operational metrics">
+      <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-center shadow-sm transition-shadow hover:shadow-md">
+        <span id="request-count" class="block text-2xl font-bold text-[var(--color-text)]">-</span>
+        <span class="mt-1 block text-[0.65rem] uppercase tracking-wider text-[var(--color-text-muted)]">Total Requests</span>
       </div>
-      <div class="metric-card">
-        <span class="metric-value" id="error-rate">-</span>
-        <span class="metric-label">Error Rate</span>
+      <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-center shadow-sm transition-shadow hover:shadow-md">
+        <span id="error-rate" class="block text-2xl font-bold text-[var(--color-text)]">-</span>
+        <span class="mt-1 block text-[0.65rem] uppercase tracking-wider text-[var(--color-text-muted)]">Error Rate</span>
       </div>
-      <div class="metric-card">
-        <span class="metric-value" id="avg-latency">-</span>
-        <span class="metric-label">Avg Latency</span>
+      <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-center shadow-sm transition-shadow hover:shadow-md">
+        <span id="avg-latency" class="block text-2xl font-bold text-[var(--color-text)]">-</span>
+        <span class="mt-1 block text-[0.65rem] uppercase tracking-wider text-[var(--color-text-muted)]">Avg Latency</span>
       </div>
-      <div class="metric-card">
-        <span class="metric-value" id="token-usage">-</span>
-        <span class="metric-label">Token Usage</span>
+      <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-center shadow-sm transition-shadow hover:shadow-md">
+        <span id="token-usage" class="block text-2xl font-bold text-[var(--color-text)]">-</span>
+        <span class="mt-1 block text-[0.65rem] uppercase tracking-wider text-[var(--color-text-muted)]">Token Usage</span>
       </div>
-    </div>
+    </section>
 
-    <div class="connection-error" id="connection-error" style="display: none;">
+    <div id="connection-error" class="hidden rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/5 p-6 text-center text-[var(--color-error)]">
       <p>Unable to connect to backend</p>
-      <button id="retry-btn" onclick="fetchMetrics()">Retry</button>
+      <button id="retry-btn" type="button" class="mt-3 rounded-md bg-[var(--color-error)] px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--color-error)]/90">Retry</button>
     </div>
-
-    <p class="last-updated" id="last-updated">Last updated: --</p>
-  </div>
+  </main>
 </Layout>
 
 <script>
   const API_BASE = import.meta.env.PUBLIC_API_URL || 'http://localhost:8000';
-  let consecutiveErrors = 0;
+  const POLL_INTERVAL_MS = 30_000;
   const MAX_ERRORS_BEFORE_SHOW = 3;
+
+  let consecutiveErrors = 0;
+
+  function toggleErrorState(show: boolean) {
+    const errorEl = document.getElementById('connection-error');
+    const statusEl = document.getElementById('status-grid');
+    const metricsEl = document.getElementById('metrics-grid');
+
+    if (show) {
+      errorEl?.classList.remove('hidden');
+      statusEl?.classList.add('hidden');
+      metricsEl?.classList.add('hidden');
+    } else {
+      errorEl?.classList.add('hidden');
+      statusEl?.classList.remove('hidden');
+      metricsEl?.classList.remove('hidden');
+    }
+  }
+
+  function handleFetchError() {
+    consecutiveErrors++;
+    if (consecutiveErrors >= MAX_ERRORS_BEFORE_SHOW) {
+      toggleErrorState(true);
+    }
+  }
+
+  function resetErrorState() {
+    consecutiveErrors = 0;
+    toggleErrorState(false);
+  }
 
   async function fetchHealth() {
     try {
       const res = await fetch(`${API_BASE}/v1/health`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      consecutiveErrors = 0;
+      resetErrorState();
 
       updateIndicator('db-indicator', 'db-detail', data.db_connected);
       updateIndicator('llm-indicator', 'llm-detail', data.llm_connected);
       updateIndicator('embedding-indicator', 'embedding-detail', data.embedding_connected);
-
-      document.getElementById('connection-error').style.display = 'none';
-      document.getElementById('status-grid').style.display = 'grid';
-      document.getElementById('metrics-grid').style.display = 'grid';
-    } catch (err) {
-      consecutiveErrors++;
-      if (consecutiveErrors >= MAX_ERRORS_BEFORE_SHOW) {
-        document.getElementById('connection-error').style.display = 'block';
-        document.getElementById('status-grid').style.display = 'none';
-        document.getElementById('metrics-grid').style.display = 'none';
-      }
+    } catch {
+      handleFetchError();
     }
   }
 
@@ -86,162 +114,45 @@ import Layout from '../layouts/Layout.astro';
       const res = await fetch(`${API_BASE}/v1/metrics`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      consecutiveErrors = 0;
+      resetErrorState();
 
-      document.getElementById('request-count').textContent = data.request_count.toLocaleString();
+      document.getElementById('request-count')!.textContent = data.request_count.toLocaleString();
 
       const errorRate = data.request_count > 0
-        ? ((data.error_count / data.request_count) * 100).toFixed(1) + '%'
+        ? `${((data.error_count / data.request_count) * 100).toFixed(1)}%`
         : '0%';
-      document.getElementById('error-rate').textContent = errorRate;
-      document.getElementById('avg-latency').textContent = data.avg_latency_ms.toFixed(0) + 'ms';
-      document.getElementById('token-usage').textContent = 'N/A';
+      document.getElementById('error-rate')!.textContent = errorRate;
+      document.getElementById('avg-latency')!.textContent = `${Math.round(data.avg_latency_ms)}ms`;
 
-      document.getElementById('connection-error').style.display = 'none';
-      document.getElementById('status-grid').style.display = 'grid';
-      document.getElementById('metrics-grid').style.display = 'grid';
-    } catch (err) {
-      consecutiveErrors++;
-      if (consecutiveErrors >= MAX_ERRORS_BEFORE_SHOW) {
-        document.getElementById('connection-error').style.display = 'block';
-        document.getElementById('status-grid').style.display = 'none';
-        document.getElementById('metrics-grid').style.display = 'none';
-      }
+      const hasTokens = typeof data.total_input_tokens === 'number'
+        && typeof data.total_output_tokens === 'number';
+      document.getElementById('token-usage')!.textContent = hasTokens
+        ? `In: ${data.total_input_tokens.toLocaleString()} / Out: ${data.total_output_tokens.toLocaleString()}`
+        : 'N/A';
+    } catch {
+      handleFetchError();
     }
 
-    document.getElementById('last-updated').textContent =
-      'Last updated: ' + new Date().toLocaleTimeString();
+    document.getElementById('last-updated')!.textContent = new Date().toLocaleTimeString();
   }
 
-  function updateIndicator(indicatorId, detailId, isConnected) {
-    const indicator = document.getElementById(indicatorId);
+  function updateIndicator(dotId: string, detailId: string, isConnected: boolean) {
+    const dot = document.getElementById(dotId);
     const detail = document.getElementById(detailId);
-    if (isConnected) {
-      indicator.className = 'indicator green';
-      detail.textContent = 'Connected';
-    } else {
-      indicator.className = 'indicator red';
-      detail.textContent = 'Disconnected';
-    }
+    if (!dot || !detail) return;
+
+    dot.className = `h-2.5 w-2.5 flex-shrink-0 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`;
+    detail.textContent = isConnected ? 'Connected' : 'Disconnected';
   }
 
-  // Initial fetch
+  document.getElementById('retry-btn')!.addEventListener('click', () => {
+    fetchHealth();
+    fetchMetrics();
+  });
+
   fetchHealth();
   fetchMetrics();
 
-  // Poll every 30 seconds
-  setInterval(fetchHealth, 30000);
-  setInterval(fetchMetrics, 30000);
+  setInterval(fetchHealth, POLL_INTERVAL_MS);
+  setInterval(fetchMetrics, POLL_INTERVAL_MS);
 </script>
-
-<style>
-  .dashboard {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 2rem 1rem;
-    font-family: system-ui, sans-serif;
-  }
-
-  h1 {
-    font-size: 1.5rem;
-    margin-bottom: 1.5rem;
-    color: #1a1a2e;
-  }
-
-  .status-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-bottom: 2rem;
-  }
-
-  .status-card {
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 0.5rem;
-    padding: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .indicator {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    display: inline-block;
-  }
-
-  .indicator.green { background: #22c55e; }
-  .indicator.yellow { background: #eab308; }
-  .indicator.red { background: #ef4444; }
-
-  .label {
-    font-weight: 600;
-    color: #334155;
-  }
-
-  .detail {
-    font-size: 0.875rem;
-    color: #64748b;
-  }
-
-  .metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
-
-  .metric-card {
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 0.5rem;
-    padding: 1.25rem;
-    text-align: center;
-  }
-
-  .metric-value {
-    display: block;
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: #1e293b;
-  }
-
-  .metric-label {
-    font-size: 0.75rem;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .connection-error {
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    border-radius: 0.5rem;
-    padding: 1.5rem;
-    text-align: center;
-    color: #991b1b;
-  }
-
-  .connection-error button {
-    margin-top: 0.75rem;
-    padding: 0.5rem 1.5rem;
-    background: #dc2626;
-    color: #fff;
-    border: none;
-    border-radius: 0.375rem;
-    cursor: pointer;
-    font-weight: 500;
-  }
-
-  .connection-error button:hover {
-    background: #b91c1c;
-  }
-
-  .last-updated {
-    font-size: 0.75rem;
-    color: #94a3b8;
-    text-align: right;
-  }
-</style>

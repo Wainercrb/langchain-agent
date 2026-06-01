@@ -1,7 +1,7 @@
 """Response models for API and RAG operations."""
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -37,9 +37,28 @@ class MetricsResponse(BaseModel):
         ge=0,
         description="Average request latency in milliseconds",
     )
+    total_input_tokens: int = Field(
+        default=0,
+        ge=0,
+        description="Total input (prompt) tokens since startup",
+    )
+    total_output_tokens: int = Field(
+        default=0,
+        ge=0,
+        description="Total output (completion) tokens since startup",
+    )
+    avg_tokens_per_request: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Average total tokens per request (input + output)",
+    )
     langsmith_dashboard_url: Optional[str] = Field(
         default=None,
         description="Link to LangSmith project dashboard (null if tracing disabled)",
+    )
+    langsmith_audit_url: Optional[str] = Field(
+        default=None,
+        description="Link to LangSmith audit/project URL (null if tracing disabled)",
     )
 
 
@@ -82,6 +101,19 @@ class ChatResponse(BaseModel):
         default=None,
         description="LangSmith run ID for feedback correlation (null when tracing disabled)",
     )
+    usage_metadata: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Token usage metadata from LLM provider (null when unavailable)",
+    )
+    llm_latency_ms: Optional[float] = Field(
+        default=None,
+        ge=0,
+        description="Time spent in the LLM call only (excludes retrieval, serialization). Approximates TTFT for non-streaming calls.",
+    )
+    langsmith_tags: Optional[List[str]] = Field(
+        default=None,
+        description="Tags applied to the LangSmith run for filtering (null when tracing disabled)",
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -101,6 +133,8 @@ class ChatResponse(BaseModel):
                 "execution_time_ms": 2340.5,
                 "model": "gemini-2.5-flash",
                 "run_id": "550e8400-e29b-41d4-a716-446655440000",
+                "llm_latency_ms": 1850.3,
+                "langsmith_tags": ["model:openai/gpt-4o", "agent:tool-calling", "top_k:5"],
             }
         }
     )

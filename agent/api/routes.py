@@ -1,5 +1,6 @@
 import time
 from datetime import datetime, timezone
+from typing import Any, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
@@ -20,6 +21,33 @@ from infrastructure.logging import logger
 from utils.exceptions import Severity
 
 router = APIRouter(prefix="/v1", tags=["chat"])
+
+
+def _extract_tokens(response: Any) -> Tuple[int, int]:
+    """Extract input/output token counts from a ChatResponse.
+
+    Returns (0, 0) if token metadata is unavailable rather than raising.
+    """
+    usage = getattr(response, "usage_metadata", None)
+    if not isinstance(usage, dict):
+        return 0, 0
+
+    return (
+        usage.get("input_tokens", usage.get("prompt_tokens", 0)),
+        usage.get("output_tokens", usage.get("completion_tokens", 0)),
+    )
+
+
+def _safe_get(response: Any, field: str, default: Any = None) -> Any:
+    """Safely extract an optional field from an agent response.
+
+    Handles MagicMock test doubles and missing attributes gracefully.
+    """
+    try:
+        value = getattr(response, field, default)
+        return value if isinstance(value, (dict, list, str, int, float, type(None))) else default
+    except Exception:
+        return default
 
 
 @router.post(
@@ -82,13 +110,19 @@ async def chat(
 
         get_metrics().record_request(execution_time_ms)
 
+        input_tokens, output_tokens = _extract_tokens(response)
+        get_metrics().record_tokens(input_tokens, output_tokens)
+
         return ChatResponse(
             response=response.response,
             query=request.query,
             sources=response.sources if request.include_sources else None,
             execution_time_ms=execution_time_ms,
             model=response.model,
-            run_id=response.run_id,
+            run_id=_safe_get(response, "run_id"),
+            usage_metadata=_safe_get(response, "usage_metadata"),
+            llm_latency_ms=_safe_get(response, "llm_latency_ms"),
+            langsmith_tags=_safe_get(response, "langsmith_tags"),
         )
 
     except ValueError as e:
@@ -205,7 +239,6 @@ async def metrics() -> MetricsResponse:
 
     langsmith_url = None
     if settings.enable_langsmith_tracing and settings.langsmith_api_key:
-        # LangSmith dashboard URL pattern for a project
         project = settings.langsmith_project or "langchain-agent"
         langsmith_url = f"https://smith.langchain.com/o/default/projects/p/{project}"
 
@@ -213,7 +246,11 @@ async def metrics() -> MetricsResponse:
         request_count=data["request_count"],
         error_count=data["error_count"],
         avg_latency_ms=data["avg_latency_ms"],
+        total_input_tokens=data["total_input_tokens"],
+        total_output_tokens=data["total_output_tokens"],
+        avg_tokens_per_request=data["avg_tokens_per_request"],
         langsmith_dashboard_url=langsmith_url,
+        langsmith_audit_url=langsmith_url,
     )
 
 

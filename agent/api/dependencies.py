@@ -25,7 +25,11 @@ def get_feedback_service():
 
 
 async def check_health() -> dict:
-    """Perform system health check including DB, LLM, and embedding services."""
+    """Perform system health check including DB, LLM, and embedding services.
+
+    Each service is pinged with a minimal payload to verify actual connectivity,
+    not just object existence.
+    """
     health = {
         "status": "ok",
         "db_connected": False,
@@ -40,15 +44,17 @@ async def check_health() -> dict:
     except Exception as e:
         logger.error(f"DB health check failed: {str(e)}")
 
-    # LLM check (lightweight — verify provider is initialized)
+    # LLM check — lightweight invoke to verify the API responds
     try:
-        health["llm_connected"] = llm is not None and hasattr(llm, "_llm")
+        response = llm.invoke([{"role": "user", "content": "ping"}])
+        health["llm_connected"] = bool(response and response.content)
     except Exception as e:
         logger.error(f"LLM health check failed: {str(e)}")
 
-    # Embedding check
+    # Embedding check — generate embedding for a short string
     try:
-        health["embedding_connected"] = embeddings is not None
+        vec = embeddings.embed_query("health")
+        health["embedding_connected"] = bool(vec and len(vec) > 0)
     except Exception as e:
         logger.error(f"Embedding health check failed: {str(e)}")
 
