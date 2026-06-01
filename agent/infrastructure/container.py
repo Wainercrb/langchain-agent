@@ -18,27 +18,42 @@ Examples:
 from config import settings
 
 # ── LLM ──────────────────────────────────────────────────────────────
-from infrastructure.llm import OpenRouterProvider
-
-# llm = GoogleProvider(
-#     model=settings.gemini_model,
-#     temperature=settings.gemini_temperature,
-#     api_key=settings.google_api_key,
-# )
-
-# llm = OpenAIProvider(
-#     model=settings.openai_model,
-#     temperature=settings.openai_temperature,
-#     api_key=settings.openai_api_key or None,
-# )
-
-llm = OpenRouterProvider(
-    model=settings.openrouter_model,
-    temperature=settings.openrouter_temperature,
-    max_tokens=settings.openrouter_max_tokens,
-    api_key=settings.openrouter_api_key,
-    timeout=settings.llm_timeout_seconds,
+from infrastructure.llm import (
+    OpenRouterProvider,
+    GoogleProvider,
+    OpenAIProvider,
+    ResilientLLMProvider,
 )
+
+_llm_providers = []
+
+if settings.openrouter_api_key:
+    _llm_providers.append(OpenRouterProvider(
+        model=settings.openrouter_model,
+        temperature=settings.openrouter_temperature,
+        max_tokens=settings.openrouter_max_tokens,
+        api_key=settings.openrouter_api_key,
+        timeout=settings.llm_timeout_seconds,
+    ))
+
+if settings.google_api_key:
+    _llm_providers.append(GoogleProvider(
+        model=settings.gemini_model,
+        temperature=settings.gemini_temperature,
+        max_tokens=settings.gemini_max_tokens,
+        api_key=settings.google_api_key,
+    ))
+
+if settings.openai_api_key:
+    _llm_providers.append(OpenAIProvider(
+        model=settings.openai_model,
+        temperature=settings.openai_temperature,
+        max_tokens=settings.openai_max_tokens,
+        api_key=settings.openai_api_key,
+    ))
+
+llm = ResilientLLMProvider(providers=_llm_providers)
+llm.resolve_chat_model()
 
 # ── Embeddings ───────────────────────────────────────────────────────
 from infrastructure.embeddings import GoogleEmbeddingsWrapper

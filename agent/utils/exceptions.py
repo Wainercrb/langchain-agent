@@ -131,3 +131,26 @@ class PermanentLLMError(LLMProviderError):
     @property
     def severity(self) -> Severity:
         return Severity.ERROR
+
+
+class AllProvidersExhaustedError(LLMProviderError):
+    """Raised when all LLM providers in the failover chain are exhausted."""
+
+    def __init__(
+        self,
+        message: str,
+        attempted_providers: list[str],
+        errors: list[Exception],
+    ):
+        self.attempted_providers = attempted_providers
+        self.errors = errors
+        super().__init__(
+            message,
+            provider="all",
+            error_code="ALL_PROVIDERS_EXHAUSTED",
+            is_transient=False,
+        )
+
+    @property
+    def severity(self) -> Severity:
+        return Severity.CRITICAL

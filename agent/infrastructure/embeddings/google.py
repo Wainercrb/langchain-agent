@@ -5,12 +5,11 @@ from typing import List
 from infrastructure.embeddings.base import Embeddings
 from utils import RateLimiter
 from utils.exceptions import EmbeddingError
-from utils.retry import retry_llm
 from infrastructure.logging import logger
 
 
 class GoogleEmbeddingsWrapper(Embeddings):
-    """Wrapper for Google Embeddings API with batching and retry."""
+    """Wrapper for Google Embeddings API with batching."""
 
     def __init__(self, api_key: str):
         try:
@@ -31,7 +30,6 @@ class GoogleEmbeddingsWrapper(Embeddings):
             logger.error(f"Failed to initialize embeddings: {str(e)}")
             raise
 
-    @retry_llm()
     def _embed_single(self, text: str) -> List[float]:
         self.rate_limiter.wait_if_needed()
         response = self.genai.embed_content(
@@ -61,7 +59,7 @@ class GoogleEmbeddingsWrapper(Embeddings):
             except Exception as e:
                 raise EmbeddingError(
                     message=f"Failed to embed batch: {str(e)}",
-                    error_code="EMBEDDING_MAX_RETRIES",
+                    error_code="EMBEDDING_FAILED",
                     details={"batch_size": len(batch)},
                 )
 

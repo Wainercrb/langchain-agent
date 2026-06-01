@@ -22,8 +22,15 @@ def configure_tracing() -> None:
     os.environ at import time. This function sets defaults so that
     tracing works even if the user hasn't added them to .env.
     Call early in the application lifecycle (before LangChain imports).
+
+    Supports legacy env vars: LANGSMITH_TRACING, LANGCHAIN_TRACING_V2.
     """
-    if settings.enable_langsmith_tracing:
+    enabled = settings.enable_langsmith_tracing
+    if not enabled:
+        legacy = os.getenv("LANGSMITH_TRACING", os.getenv("LANGCHAIN_TRACING_V2", "false"))
+        enabled = legacy.lower() in ("true", "1", "yes", "on")
+
+    if enabled:
         os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
         os.environ.setdefault(
             "LANGCHAIN_PROJECT",

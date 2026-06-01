@@ -1,11 +1,22 @@
-"""Configuration management using Pydantic Settings — centraliza todas las variables de entorno."""
+"""Configuration management using Pydantic Settings — centralizes all environment variables."""
 
-import os
 from pathlib import Path
 from typing import Annotated, Optional
 
-from pydantic import Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, NoDecode
+from pydantic import BeforeValidator, Field
+from pydantic_settings import BaseSettings
+
+
+def _parse_list(v: object) -> list[str]:
+    """Parse comma-separated string to list."""
+    if isinstance(v, str):
+        return [p.strip() for p in v.split(",") if p.strip()]
+    if isinstance(v, list):
+        return [str(p).strip() for p in v if str(p).strip()]
+    return v  # type: ignore[return-value]
+
+
+ListFromEnv = Annotated[list[str], BeforeValidator(_parse_list)]
 
 
 class Settings(BaseSettings):
@@ -15,11 +26,13 @@ class Settings(BaseSettings):
     google_api_key: str = Field(..., alias="GOOGLE_API_KEY")
     gemini_model: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL")
     gemini_temperature: float = Field(default=0.7, alias="GEMINI_TEMPERATURE")
+    gemini_max_tokens: int = Field(default=1000, alias="GEMINI_MAX_TOKENS")
 
     # ── OpenAI ───────────────────────────────────────────────────────
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL")
     openai_temperature: float = Field(default=0.7, alias="OPENAI_TEMPERATURE")
+    openai_max_tokens: int = Field(default=1000, alias="OPENAI_MAX_TOKENS")
 
     # ── OpenRouter ───────────────────────────────────────────────────
     openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
@@ -49,13 +62,13 @@ class Settings(BaseSettings):
     chunk_overlap: int = Field(default=200, alias="CHUNK_OVERLAP")
     embedding_retries: int = Field(default=3, alias="EMBEDDING_RETRIES")
 
-    # ── Logging (Strategy Pattern) ───────────────────────────────────
+    # ── Logging ──────────────────────────────────────────────────────
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     logger_backend: str = Field(default="console", alias="LOGGER_BACKEND")
     log_file: Optional[str] = Field(default=None, alias="LOG_FILE")
 
     # ── CORS ──────────────────────────────────────────────────────────
-    cors_origins: Annotated[list[str], NoDecode] = Field(
+    cors_origins: ListFromEnv = Field(
         default=[
             "http://localhost:4321",
             "http://localhost:3000",
@@ -63,14 +76,8 @@ class Settings(BaseSettings):
             "http://127.0.0.1:3000",
         ],
         alias="CORS_ORIGINS",
+        description="Comma-separated string or list of allowed CORS origins",
     )
-
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def _parse_cors_origins(cls, v: object) -> list[str]:
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v  # type: ignore[return-value]
 
     # ── Alerts ────────────────────────────────────────────────────────
     discord_webhook_url: Optional[str] = Field(
@@ -80,9 +87,8 @@ class Settings(BaseSettings):
         default=5, alias="ALERT_RATE_LIMIT_PER_MINUTE"
     )
 
-    # ── LLM Resilience ────────────────────────────────────────────────
+    # ── LLM ──────────────────────────────────────────────────────────
     llm_timeout_seconds: int = Field(default=60, alias="LLM_TIMEOUT_SECONDS")
-    llm_max_retries: int = Field(default=3, alias="LLM_MAX_RETRIES")
 
     # ── Agent / Tool Calling ────────────────────────────────────────────
     use_tool_agent: bool = Field(
@@ -103,21 +109,6 @@ class Settings(BaseSettings):
     enable_langsmith_tracing: bool = Field(
         default=False, alias="ENABLE_LANGSMITH_TRACING"
     )
-
-    @model_validator(mode="after")
-    def _backward_compat_langsmith(self) -> "Settings":
-        """Support legacy env var names for LangSmith tracing.
-
-        If ENABLE_LANGSMITH_TRACING is not set, fall back to LANGSMITH_TRACING
-        or LANGCHAIN_TRACING_V2 so existing .env files keep working.
-        """
-        if not self.enable_langsmith_tracing:
-            legacy = os.getenv(
-                "LANGSMITH_TRACING", os.getenv("LANGCHAIN_TRACING_V2", "false")
-            )
-            if legacy.lower() in ("true", "1", "yes", "on"):
-                self.enable_langsmith_tracing = True
-        return self
 
     model_config = {
         "env_file": ".env",

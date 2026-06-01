@@ -29,6 +29,9 @@ async def check_health() -> dict:
 
     Each service is pinged with a minimal payload to verify actual connectivity,
     not just object existence.
+
+    For LLM failover chain, reports which providers are up/down and requires
+    at least one provider to be healthy for overall healthy status.
     """
     health = {
         "status": "ok",
