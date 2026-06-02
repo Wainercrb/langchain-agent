@@ -132,6 +132,7 @@ class ToolCallingAgent(Agent):
             verbose=False,
             max_iterations=10,
             early_stopping_method="force",
+            return_intermediate_steps=True,
         )
 
     @traceable(name="ToolCallingAgent.invoke", run_type="chain")
@@ -264,16 +265,23 @@ class ToolCallingAgent(Agent):
         tools_used: List[str] = []
 
         for i, step in enumerate(intermediate_steps):
-            if hasattr(step, "tool") and hasattr(step, "tool_input"):
+            tool_name = None
+            tool_input = {}
+            output_summary = None
+
+            # Format 1: tuple/list of (AgentAction, output)
+            if isinstance(step, (list, tuple)) and len(step) >= 2:
+                action = step[0]
+                tool_name = getattr(action, "tool", None) or str(action)
+                tool_input = getattr(action, "tool_input", {})
+                output_summary = str(step[1])[:200]
+            # Format 2: object with .tool attribute
+            elif hasattr(step, "tool"):
                 tool_name = step.tool
-                tool_input = step.tool_input if hasattr(step, "tool_input") else {}
-                output_summary = str(step.observation)[:200] if hasattr(step, "observation") else None
-            elif isinstance(step, (list, tuple)) and len(step) >= 2:
-                tool_call = step[0]
-                tool_name = getattr(tool_call, "tool", str(tool_call))
-                tool_input = getattr(tool_call, "tool_input", {})
-                output_summary = str(step[1])[:200] if len(step) > 1 else None
-            else:
+                tool_input = getattr(step, "tool_input", {})
+                output_summary = str(getattr(step, "observation", ""))[:200]
+
+            if not tool_name:
                 continue
 
             tools_used.append(tool_name)
@@ -285,6 +293,11 @@ class ToolCallingAgent(Agent):
             ))
 
         chain_length = len(tools_used)
+
+        logger.debug(
+            f"Decision extraction: found {chain_length} tools in intermediate_steps, "
+            f"tools={tools_used}, result_keys={list(executor_result.keys())}"
+        )
 
         if chain_length == 0:
             decision_quality = DecisionQuality.POOR
