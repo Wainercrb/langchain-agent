@@ -1,0 +1,94 @@
+"""Simple in-memory request/error/latency counters.
+
+LangSmith handles the heavy observability; this is a lightweight health-check
+friendly endpoint with basic counters. Restart loss is acceptable per spec —
+these are for operational awareness, not billing or auditing.
+"""
+
+import threading
+from typing import Any
+
+
+class SimpleMetrics:
+    """Thread-safe in-memory request/error/latency counters."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._request_count = 0
+        self._error_count = 0
+        self._total_latency_ms = 0.0
+        self._total_input_tokens = 0
+        self._total_output_tokens = 0
+        self._decision_tracker: Any = None
+
+    def set_decision_tracker(self, tracker: Any) -> None:
+        """Set the DecisionTracker reference for metrics aggregation.
+
+        Args:
+            tracker: DecisionTracker instance to query for decision aggregates.
+        """
+        self._decision_tracker = tracker
+
+    def record_request(self, latency_ms: float) -> None:
+        """Record a completed request with its latency."""
+        with self._lock:
+            self._request_count += 1
+            self._total_latency_ms += latency_ms
+
+    def record_error(self) -> None:
+        """Record an error occurrence."""
+        with self._lock:
+            self._error_count += 1
+
+    def record_tokens(self, input_tokens: int, output_tokens: int) -> None:
+        """Record token usage for a completed request.
+
+        Silently ignores negative values — they indicate a provider metadata
+        bug and should not corrupt the counters.
+        """
+        if input_tokens < 0 or output_tokens < 0:
+            return
+        with self._lock:
+            self._total_input_tokens += input_tokens
+            self._total_output_tokens += output_tokens
+
+    def snapshot(self) -> dict:
+        """Return a point-in-time snapshot of all counters."""
+        with self._lock:
+            avg_latency = (
+                round(self._total_latency_ms / self._request_count, 2)
+                if self._request_count > 0
+                else 0.0
+            )
+            total_tokens = self._total_input_tokens + self._total_output_tokens
+            avg_tokens = (
+                round(total_tokens / self._request_count, 2)
+                if self._request_count > 0
+                else 0.0
+            )
+            result = {
+                "request_count": self._request_count,
+                "error_count": self._error_count,
+                "avg_latency_ms": avg_latency,
+                "total_input_tokens": self._total_input_tokens,
+                "total_output_tokens": self._total_output_tokens,
+                "avg_tokens_per_request": avg_tokens,
+            }
+
+            if self._decision_tracker:
+                result["ai_decisions"] = {
+                    "total_decisions": self._decision_tracker.size,
+                    "decisions_evicted": self._decision_tracker.eviction_count,
+                    "store_size": self._decision_tracker.size,
+                }
+
+            return result
+
+
+# Singleton instance used by the /metrics endpoint
+_metrics = SimpleMetrics()
+
+
+def get_metrics() -> SimpleMetrics:
+    """Return the global SimpleMetrics singleton."""
+    return _metrics

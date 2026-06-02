@@ -1,0 +1,51 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --color-bg: #f9f9ff;
+  --color-surface: #f9f9ff;
+  --color-surface-elevated: #e7eeff;
+  --color-border: #c7c4d7;
+  --color-border-focus: #4648d4;
+  --color-text: #111c2d;
+  --color-text-secondary: #464554;
+  --color-text-muted: #767586;
+  --color-primary: #4648d4;
+  --color-primary-hover: #6063ee;
+  --color-primary-subtle: rgba(70, 72, 212, 0.1);
+  --color-success: #10b981;
+  --color-error: #ba1a1a;
+  --color-ai-bubble: #e0e3e5;
+  --color-surface-container-low: #f0f3ff;
+  --space-1: 0.5rem;
+  --space-2: 1rem;
+  --space-3: 1.5rem;
+  --space-4: 2rem;
+  --space-6: 3rem;
+  --chat-gap: 1.25rem;
+  --container-margin: 1.25rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px 0 rgba(17, 28, 45, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(17, 28, 45, 0.1), 0 2px 4px -2px rgba(17, 28, 45, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(17, 28, 45, 0.1), 0 8px 10px -6px rgba(17, 28, 45, 0.1);
+  --transition-fast: 150ms ease;
+}
+
+html, body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: 'Inter', system-ui, sans-serif;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Keyframe referenced by Tailwind animate-[...] in JS */
+@keyframes message-fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

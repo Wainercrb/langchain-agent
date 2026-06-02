@@ -1,0 +1,432 @@
+---
+// ChatIsland — Client-side interactive chat component (Tailwind CSS only)
+---
+
+<div class="flex flex-col h-full" role="log" aria-live="polite" aria-label="Chat messages">
+    <div class="flex flex-col gap-5 flex-1" id="messages-container">
+      <!-- Empty state -->
+      <div class="flex items-center justify-center flex-1 text-center" id="empty-state">
+        <div class="text-[var(--color-text-secondary)]">
+          <p class="text-base font-medium mb-2 text-[var(--color-text)]">Start a conversation...</p>
+          <p class="text-xs text-[var(--color-text-muted)]">Ask anything about the documents</p>
+        </div>
+      </div>
+    </div>
+</div>
+
+<script>
+  import { chatWithAgent, submitFeedback, validateSettings, checkHealth } from '../utils/api';
+  import type { ChatResponse } from '../utils/api';
+
+  // ============================================
+  // Types
+  // ============================================
+
+  interface ChatMessage {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: Date;
+    sources?: Array<{ filename: string; similarity_score: number; content?: string }>;
+    executionTime?: number;
+    model?: string;
+    runId?: string | null;
+  }
+
+  interface ChatState {
+    messages: ChatMessage[];
+    isLoading: boolean;
+    settings: { topK: number; temperature: number; includeSources: boolean };
+  }
+
+  // ============================================
+  // State
+  // ============================================
+
+  let state: ChatState = {
+    messages: [],
+    isLoading: false,
+    settings: loadSettings(),
+  };
+
+  let resizeTimeout: number | undefined;
+  let healthCheckInterval: number | undefined;
+
+  // ============================================
+  // Health Check
+  // ============================================
+
+  async function updateHealthStatus() {
+    const dot = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    try {
+      const isHealthy = await checkHealth();
+      if (isHealthy) {
+        if (dot) dot.style.backgroundColor = 'var(--color-success)';
+        if (text) text.textContent = 'System Online';
+      } else {
+        if (dot) dot.style.backgroundColor = 'var(--color-error)';
+        if (text) text.textContent = 'System Offline';
+      }
+    } catch {
+      if (dot) dot.style.backgroundColor = 'var(--color-error)';
+      if (text) text.textContent = 'System Offline';
+    }
+  }
+
+  // ============================================
+  // Settings
+  // ============================================
+
+  function loadSettings() {
+    try {
+      const raw = {
+        topK: localStorage.getItem('topK'),
+        temperature: localStorage.getItem('temperature'),
+        includeSources: localStorage.getItem('includeSources'),
+      };
+      return validateSettings({
+        topK: raw.topK ? parseInt(raw.topK, 10) : undefined,
+        temperature: raw.temperature ? parseFloat(raw.temperature) : undefined,
+        includeSources: raw.includeSources ? raw.includeSources === 'true' : undefined,
+      });
+    } catch {
+      return { topK: 5, temperature: 0.7, includeSources: true };
+    }
+  }
+
+  function saveSettings() {
+    localStorage.setItem('topK', String(state.settings.topK));
+    localStorage.setItem('temperature', String(state.settings.temperature));
+    localStorage.setItem('includeSources', String(state.settings.includeSources));
+  }
+
+  // ============================================
+  // SVG Icons
+  // ============================================
+
+  const icons = {
+    bolt: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
+    copy: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`,
+    thumbUp: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>`,
+    thumbDown: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"/></svg>`,
+    description: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>`,
+  };
+
+  // ============================================
+  // Render Message (Tailwind utility classes)
+  // ============================================
+
+  function renderMessage(message: ChatMessage): HTMLElement {
+    const wrapper = document.createElement('div');
+    if (message.role === 'user') {
+      wrapper.className = 'flex flex-col w-full gap-2 items-end animate-[message-fade-in_0.4s_ease-out_forwards]';
+    } else {
+      wrapper.className = 'flex flex-col w-full gap-2 items-start animate-[message-fade-in_0.4s_ease-out_forwards]';
+    }
+
+    if (message.role === 'assistant') {
+      // AI message label
+      const label = document.createElement('div');
+      label.className = 'flex items-center gap-2 mb-2 ml-1';
+      label.innerHTML = `<span class="w-6 h-6 rounded-full bg-[var(--color-ai-bubble)] flex items-center justify-center text-[#626567]" aria-hidden="true">${icons.bolt}</span><span class="text-[11px] font-semibold tracking-widest text-[var(--color-text-secondary)]">FW Agent</span>`;
+
+      // AI bubble
+      const bubble = document.createElement('div');
+      bubble.className = 'max-w-[85%] p-4 break-words bg-[var(--color-ai-bubble)] rounded-[0.75rem_0.75rem_0.75rem_0.25rem] border border-[rgba(199,196,215,0.3)] shadow-[var(--shadow-sm)]';
+
+      const content = document.createElement('p');
+      content.className = 'm-0 text-base leading-[1.625]';
+      content.textContent = message.content;
+
+      // Action buttons
+      const actions = document.createElement('div');
+      actions.className = 'flex justify-end gap-2 mt-6';
+
+      // Copy
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'flex items-center justify-center w-8 h-8 p-0 bg-transparent border-none rounded-full text-[var(--color-text-secondary)] cursor-pointer transition-all duration-150 hover:text-[var(--color-primary)] hover:bg-[rgba(17,28,45,0.05)] active:scale-90 focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2';
+      copyBtn.setAttribute('aria-label', 'Copy message');
+      copyBtn.type = 'button';
+      copyBtn.innerHTML = icons.copy;
+      copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(message.content).then(() => {
+          copyBtn.style.color = 'var(--color-success)';
+          setTimeout(() => { copyBtn.style.color = ''; }, 2000);
+        });
+      });
+      actions.appendChild(copyBtn);
+
+      if (message.runId) {
+        // Thumb up
+        const likeBtn = document.createElement('button');
+        likeBtn.className = 'flex items-center justify-center w-8 h-8 p-0 bg-transparent border-none rounded-full text-[var(--color-text-secondary)] cursor-pointer transition-all duration-150 hover:text-[var(--color-primary)] hover:bg-[rgba(17,28,45,0.05)] active:scale-90 focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2';
+        likeBtn.setAttribute('aria-label', 'Like response');
+        likeBtn.type = 'button';
+        likeBtn.innerHTML = icons.thumbUp;
+      likeBtn.addEventListener('click', () => handleFeedback(message.runId!, 'like', likeBtn));
+      actions.appendChild(likeBtn);
+
+      // Thumb down
+      const dislikeBtn = document.createElement('button');
+      dislikeBtn.className = 'flex items-center justify-center w-8 h-8 p-0 bg-transparent border-none rounded-full text-[var(--color-text-secondary)] cursor-pointer transition-all duration-150 hover:text-[var(--color-primary)] hover:bg-[rgba(17,28,45,0.05)] active:scale-90 focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2';
+      dislikeBtn.setAttribute('aria-label', 'Dislike response');
+      dislikeBtn.type = 'button';
+      dislikeBtn.innerHTML = icons.thumbDown;
+      dislikeBtn.addEventListener('click', () => handleFeedback(message.runId!, 'dislike', dislikeBtn));
+        actions.appendChild(dislikeBtn);
+      }
+
+      // Assemble bubble: content → actions → files (bottom)
+      bubble.appendChild(content);
+      bubble.appendChild(actions);
+
+      // Attached Files (bottom of bubble, after actions)
+      if (message.sources && message.sources.length > 0 && state.settings.includeSources) {
+        const filesSection = document.createElement('div');
+        filesSection.className = 'mt-6 pt-6 border-t border-[rgba(199,196,215,0.3)]';
+
+        const filesHeader = document.createElement('div');
+        filesHeader.className = 'text-[10px] font-semibold tracking-widest uppercase text-[var(--color-text-secondary)] mb-2';
+        filesHeader.textContent = 'Attached Files';
+        filesSection.appendChild(filesHeader);
+
+        message.sources.forEach(src => {
+          const fileItem = document.createElement('div');
+          fileItem.className = 'flex items-center gap-2 px-3 py-1.5 bg-[var(--color-surface-container-low)] border border-[rgba(199,196,215,0.3)] rounded-full mb-2 cursor-pointer transition-colors duration-150 hover:bg-[var(--color-surface-elevated)]';
+
+          const fileIcon = document.createElement('span');
+          fileIcon.className = 'flex items-center text-[var(--color-primary)] shrink-0';
+          fileIcon.innerHTML = icons.description;
+          fileItem.appendChild(fileIcon);
+
+          const fileInfo = document.createElement('div');
+          fileInfo.className = 'flex flex-col';
+
+          const fileName = document.createElement('span');
+          fileName.className = 'text-xs font-medium text-[var(--color-text)]';
+          fileName.textContent = src.filename || 'Document';
+          fileInfo.appendChild(fileName);
+
+          const fileMeta = document.createElement('span');
+          fileMeta.className = 'text-[9px] text-[var(--color-text-secondary)] leading-none';
+          fileMeta.textContent = `Score: ${(src.similarity_score * 100).toFixed(1)}%`;
+          fileInfo.appendChild(fileMeta);
+
+          fileItem.appendChild(fileInfo);
+          filesSection.appendChild(fileItem);
+        });
+
+        bubble.appendChild(filesSection);
+      }
+
+      wrapper.appendChild(label);
+      wrapper.appendChild(bubble);
+    } else {
+      // User message
+      const bubble = document.createElement('div');
+      bubble.className = 'max-w-[85%] p-4 break-words bg-[var(--color-primary)] text-white rounded-[0.75rem_0.75rem_0.25rem_0.75rem] border border-[rgba(70,72,212,0.2)] shadow-[var(--shadow-md)]';
+
+      const content = document.createElement('p');
+      content.className = 'm-0 text-base leading-[1.625] text-white';
+      content.textContent = message.content;
+      bubble.appendChild(content);
+
+      wrapper.appendChild(bubble);
+    }
+
+    return wrapper;
+  }
+
+  function addMessageToDOM(message: ChatMessage) {
+    state.messages.push(message);
+    const container = document.getElementById('messages-container');
+    const emptyState = document.getElementById('empty-state');
+    if (emptyState) emptyState.remove();
+    if (container) {
+      container.appendChild(renderMessage(message));
+      container.scrollTop = container.scrollHeight;
+    }
+  }
+
+  function showLoading(): HTMLElement {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'flex flex-col w-full gap-2 items-start animate-[message-fade-in_0.4s_ease-out_forwards]';
+    wrapper.innerHTML = `
+      <div class="flex items-center gap-2 mb-2 ml-1">
+        <span class="w-6 h-6 rounded-full bg-[var(--color-ai-bubble)] flex items-center justify-center text-[#626567]" aria-hidden="true">${icons.bolt}</span>
+        <span class="text-[11px] font-semibold tracking-widest text-[var(--color-text-secondary)]">FW Agent</span>
+      </div>
+      <div class="max-w-[85%] p-4 break-words bg-[var(--color-ai-bubble)] rounded-[0.75rem_0.75rem_0.75rem_0.25rem] border border-[rgba(199,196,215,0.3)] shadow-[var(--shadow-sm)]">
+        <p class="m-0 text-base leading-[1.625]">Thinking...</p>
+      </div>
+    `;
+    const container = document.getElementById('messages-container');
+    if (container) {
+      container.appendChild(wrapper);
+      container.scrollTop = container.scrollHeight;
+    }
+    return wrapper;
+  }
+
+  function removeLoading(el: HTMLElement) {
+    el.remove();
+  }
+
+  // ============================================
+  // Event Handlers
+  // ============================================
+
+  async function handleFeedback(runId: string, type: 'like' | 'dislike', btn: HTMLButtonElement) {
+    try {
+      btn.disabled = true;
+      await submitFeedback(runId, type);
+      // Visual feedback: change color to primary to indicate recorded
+      btn.style.color = 'var(--color-primary)';
+      btn.style.background = 'rgba(70, 72, 212, 0.1)';
+      showToast(`${type === 'like' ? 'Liked' : 'Disliked'} — Feedback recorded`);
+    } catch (error) {
+      console.error('Feedback error:', error);
+      showToast('Failed to record feedback', 'error');
+      btn.disabled = false;
+    }
+  }
+
+  function showToast(message: string, variant: 'success' | 'error' = 'success') {
+    const toast = document.createElement('div');
+    const bgColor = variant === 'success' ? 'rgba(16, 185, 129, 0.9)' : 'rgba(186, 26, 26, 0.9)';
+    toast.className = 'fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg text-white text-sm font-medium shadow-lg animate-[message-fade-in_0.3s_ease-out_forwards] z-50';
+    toast.style.backgroundColor = bgColor;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transition = 'opacity 0.3s ease';
+      setTimeout(() => toast.remove(), 300);
+    }, 2000);
+  }
+
+  async function handleSend() {
+    const input = document.getElementById('chat-input') as HTMLTextAreaElement;
+    const sendBtn = document.getElementById('send-btn') as HTMLButtonElement;
+    const query = input.value.trim();
+
+    if (!query || state.isLoading) return;
+
+    state.isLoading = true;
+    input.disabled = true;
+    sendBtn.disabled = true;
+
+    addMessageToDOM({
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: query,
+      timestamp: new Date(),
+    });
+
+    input.value = '';
+    input.style.height = 'auto';
+
+    const loadingEl = showLoading();
+
+    try {
+      const response: ChatResponse = await chatWithAgent(query, state.settings);
+      removeLoading(loadingEl);
+
+      addMessageToDOM({
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: response.response,
+        timestamp: new Date(),
+        sources: response.sources?.map(s => ({
+          filename: s.filename || 'Document',
+          similarity_score: s.similarity_score,
+          content: (s as any).content_preview || '',
+        })),
+        executionTime: response.execution_time_ms,
+        model: response.model,
+        runId: response.run_id,
+      });
+    } catch (error) {
+      removeLoading(loadingEl);
+      addMessageToDOM({
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date(),
+      });
+    } finally {
+      state.isLoading = false;
+      input.disabled = false;
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  // ============================================
+  // Init
+  // ============================================
+
+  function init() {
+    document.getElementById('send-btn')?.addEventListener('click', handleSend);
+
+    document.getElementById('chat-input')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    });
+
+    // Settings
+    const resultsInput = document.getElementById('results-badge') as HTMLInputElement;
+    const creativityInput = document.getElementById('creativity-badge') as HTMLInputElement;
+    const includeSourcesInput = document.getElementById('include-sources') as HTMLInputElement;
+
+    // Initialize values from state
+    if (resultsInput) resultsInput.value = String(state.settings.topK);
+    if (creativityInput) creativityInput.value = String(state.settings.temperature);
+    if (includeSourcesInput) includeSourcesInput.checked = state.settings.includeSources;
+
+    resultsInput?.addEventListener('change', (e) => {
+      const val = parseInt((e.target as HTMLInputElement).value, 10);
+      if (!isNaN(val) && val >= 1 && val <= 20) {
+        state.settings.topK = val;
+        saveSettings();
+      }
+    });
+
+    creativityInput?.addEventListener('change', (e) => {
+      const val = parseFloat((e.target as HTMLInputElement).value);
+      if (!isNaN(val) && val >= 0 && val <= 1) {
+        state.settings.temperature = val;
+        saveSettings();
+      }
+    });
+
+    includeSourcesInput?.addEventListener('change', (e) => {
+      state.settings.includeSources = (e.target as HTMLInputElement).checked;
+      saveSettings();
+    });
+
+    // Auto-expand textarea (debounced)
+    document.getElementById('chat-input')?.addEventListener('input', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = window.setTimeout(() => {
+        const textarea = document.getElementById('chat-input') as HTMLTextAreaElement;
+        textarea.style.height = 'auto';
+        textarea.style.height = `${Math.min(textarea.scrollHeight, 96)}px`;
+      }, 100);
+    });
+
+    // Health check every 60 seconds
+    updateHealthStatus(); // Run immediately on load
+    healthCheckInterval = window.setInterval(updateHealthStatus, 60000);
+  }
+
+  window.addEventListener('beforeunload', () => {
+    if (resizeTimeout) clearTimeout(resizeTimeout);
+    if (healthCheckInterval) clearInterval(healthCheckInterval);
+  });
+
+  init();
+</script>
