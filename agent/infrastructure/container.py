@@ -121,3 +121,17 @@ else:
 # Wire decision tracker into metrics
 from api.metrics import get_metrics
 get_metrics().set_decision_tracker(decision_tracker)
+
+# ── Monitoring ───────────────────────────────────────────────────────
+from infrastructure.monitoring import HealthVerifier, MonitoringScheduler
+
+_health_verifier = HealthVerifier(
+    vector_store=vector_store,
+    embeddings=embeddings,
+)
+
+_monitoring_scheduler = MonitoringScheduler(
+    health_verifier=_health_verifier,
+    alert_service=alert_service,
+    settings_obj=settings,
+)

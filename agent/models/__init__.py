@@ -3,6 +3,7 @@
 from .chat import ChatRequest
 from .document import SourceDocument
 from .feedback import FeedbackRequest, FeedbackResponse
+from .monitoring import HealthCheckResult, MonitoringStatusResponse
 from .responses import ChatResponse, ErrorResponse, HealthResponse, MetricsResponse
 from .retrieval import RetrievedDocument
 
@@ -12,8 +13,10 @@ __all__ = [
     "ErrorResponse",
     "FeedbackRequest",
     "FeedbackResponse",
+    "HealthCheckResult",
     "HealthResponse",
     "MetricsResponse",
+    "MonitoringStatusResponse",
     "RetrievedDocument",
     "SourceDocument",
 ]

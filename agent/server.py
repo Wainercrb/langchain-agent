@@ -11,17 +11,25 @@ from datetime import datetime, timezone
 from api import router
 from api.middleware.rate_limit import RateLimitMiddleware
 from config import configure_tracing, settings
-from infrastructure.container import alert_service
+from infrastructure.container import alert_service, _monitoring_scheduler
 from infrastructure.logging import logger
 from utils.correlation import set_correlation_id, get_correlation_id
-from utils.exceptions import RAGException, Severity
+from utils.exceptions import Severity
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan: configure tracing on startup."""
+    """Application lifespan: configure tracing and start monitoring scheduler."""
     configure_tracing()
-    yield
+    if settings.monitoring_enabled:
+        await _monitoring_scheduler.start()
+        logger.info("Monitoring scheduler enabled and started")
+    try:
+        yield
+    finally:
+        if settings.monitoring_enabled:
+            await _monitoring_scheduler.stop()
+            logger.info("Monitoring scheduler stopped")
 
 
 app = FastAPI(

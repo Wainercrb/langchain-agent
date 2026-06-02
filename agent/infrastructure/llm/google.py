@@ -28,6 +28,7 @@ class GoogleProvider(LLMProvider):
             temperature=temperature,
             max_output_tokens=max_tokens,
             google_api_key=api_key,
+            timeout=timeout,
             **kwargs,
         )
         logger.info(f"Google Gemini provider initialized: model={self.model}")

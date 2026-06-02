@@ -1,0 +1,148 @@
+"""Health verifier — individual check methods for automated monitoring.
+
+All checks execute WITHOUT LLM invocation. Each returns (ok: bool, detail: str).
+"""
+
+import os
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional, Tuple
+
+from config import settings
+from infrastructure.logging import logger
+
+
+class HealthVerifier:
+    """Performs individual health checks without LLM invocation."""
+
+    def __init__(
+        self,
+        vector_store=None,
+        embeddings=None,
+    ) -> None:
+        self._vector_store = vector_store
+        self._embeddings = embeddings
+
+    async def check_db(self) -> Tuple[bool, str]:
+        """Verify database connectivity via vector store health check."""
+        try:
+            result = await self._vector_store.health_check()
+            if result:
+                return True, "Database connection healthy"
+            return False, "Database health check returned false"
+        except Exception as e:
+            return False, f"Database connection failed: {str(e)}"
+
+    async def check_langsmith(self) -> Tuple[bool, str]:
+        """Verify LangSmith API is reachable using list_projects()."""
+        if not settings.enable_langsmith_tracing or not settings.langsmith_api_key:
+            return True, "LangSmith tracing not configured, skipping"
+        try:
+            from langsmith import Client as LangSmithClient
+            client = LangSmithClient()
+            list(client.list_projects(limit=1))
+            return True, "LangSmith API reachable"
+        except Exception as e:
+            return False, f"LangSmith API unreachable: {str(e)}"
+
+    async def check_embeddings(self) -> Tuple[bool, str]:
+        """Verify embeddings provider is reachable."""
+        try:
+            vec = self._embeddings.embed_query("health")
+            if vec and len(vec) > 0:
+                return True, "Embeddings provider reachable"
+            return False, "Embeddings returned empty vector"
+        except Exception as e:
+            return False, f"Embeddings provider unreachable: {str(e)}"
+
+    async def check_tracing_completeness(self) -> Tuple[bool, str]:
+        """Compare LangSmith trace count against in-memory request count.
+
+        Uses langsmith.Client.list_runs() to count recent traces and compares
+        against SimpleMetrics.request_count over a configurable time window.
+        """
+        if not settings.enable_langsmith_tracing or not settings.langsmith_api_key:
+            return True, "LangSmith tracing not configured, skipping"
+        try:
+            from langsmith import Client as LangSmithClient
+            from api.metrics import get_metrics
+
+            client = LangSmithClient()
+            now = datetime.now(timezone.utc)
+            window = settings.monitoring_tracing_window_seconds
+
+            runs = list(
+                client.list_runs(
+                    project_name=settings.langsmith_project or "langchain-agent",
+                    start_time=now.timestamp() - window,
+                    limit=1000,
+                )
+            )
+            trace_count = len(runs)
+            metrics = get_metrics()
+            snapshot = metrics.snapshot()
+            request_count = snapshot.get("request_count", 0)
+
+            if request_count == 0:
+                return True, "No requests made yet, tracing completeness N/A"
+
+            if trace_count == 0 and request_count > 0:
+                return False, (
+                    f"Tracing gap: {request_count} requests but 0 traces "
+                    f"in last {window}s window"
+                )
+
+            mismatch = abs(request_count - trace_count)
+            if mismatch > max(1, request_count * 0.1):
+                return False, (
+                    f"Trace mismatch: {request_count} requests vs {trace_count} "
+                    f"traces ({mismatch} difference)"
+                )
+
+            return True, f"Tracing complete: {trace_count} traces for {request_count} requests"
+        except Exception as e:
+            return False, f"Tracing completeness check failed: {str(e)}"
+
+    async def check_memory_usage(self) -> Tuple[bool, str]:
+        """Check process memory usage against threshold.
+
+        Uses psutil if available, otherwise skips gracefully.
+        """
+        try:
+            import psutil
+            process = psutil.Process(os.getpid())
+            memory_mb = process.memory_info().rss / (1024 * 1024)
+            threshold = settings.monitoring_memory_threshold_mb
+
+            if memory_mb > threshold:
+                return False, (
+                    f"Memory usage {memory_mb:.1f}MB exceeds threshold {threshold}MB"
+                )
+            return True, f"Memory usage {memory_mb:.1f}MB (threshold: {threshold}MB)"
+        except ImportError:
+            return True, "psutil not available, memory check skipped"
+        except Exception as e:
+            return False, f"Memory check failed: {str(e)}"
+
+    async def check_log_rotation(self) -> Tuple[bool, str]:
+        """Check log file age if LOGGER_BACKEND=file and LOG_FILE is set."""
+        if settings.logger_backend != "file" or not settings.log_file:
+            return True, "Log backend is not file, log rotation check skipped"
+        try:
+            log_path = Path(settings.log_file)
+            if not log_path.exists():
+                return False, f"Log file not found: {settings.log_file}"
+
+            stat = log_path.stat()
+            mtime = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
+            age_hours = (datetime.now(timezone.utc) - mtime).total_seconds() / 3600
+            max_age = settings.monitoring_log_max_age_hours
+
+            if age_hours > max_age:
+                return False, (
+                    f"Log file is stale: {age_hours:.1f}h old "
+                    f"(max: {max_age}h)"
+                )
+            return True, f"Log file age {age_hours:.1f}h (max: {max_age}h)"
+        except Exception as e:
+            return False, f"Log rotation check failed: {str(e)}"

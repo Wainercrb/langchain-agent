@@ -110,6 +110,13 @@ class Settings(BaseSettings):
         default=False, alias="ENABLE_LANGSMITH_TRACING"
     )
 
+    # ── Monitoring ────────────────────────────────────────────────────
+    monitoring_enabled: bool = Field(default=False, alias="MONITORING_ENABLED")
+    monitoring_interval_seconds: int = Field(default=300, alias="MONITORING_INTERVAL_SECONDS")
+    monitoring_memory_threshold_mb: int = Field(default=512, alias="MONITORING_MEMORY_THRESHOLD_MB")
+    monitoring_log_max_age_hours: int = Field(default=24, alias="MONITORING_LOG_MAX_AGE_HOURS")
+    monitoring_tracing_window_seconds: int = Field(default=300, alias="MONITORING_TRACING_WINDOW_SECONDS")
+
     model_config = {
         "env_file": ".env",
         "case_sensitive": False,
