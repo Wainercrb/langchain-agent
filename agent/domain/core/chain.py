@@ -13,6 +13,7 @@ from langsmith import traceable
 from langsmith.run_trees import _context as run_tree_context
 
 from models import ChatResponse, SourceDocument
+from models.decision import DecisionLogEntry, DecisionQuality
 from utils.formatting import format_documents_as_context
 
 from ..retrieval.retriever import Retriever
@@ -33,9 +34,10 @@ class RAGChain:
     context, and passes them to the injected LLM.
     """
 
-    def __init__(self, retriever: Retriever, llm: Any) -> None:
+    def __init__(self, retriever: Retriever, llm: Any, decision_tracker: Optional[Any] = None) -> None:
         self._retriever = retriever
         self._llm = llm
+        self._decision_tracker = decision_tracker
         logger.info("RAGChain initialized")
 
     @traceable(name="RAGChain.invoke", run_type="chain")
@@ -86,13 +88,25 @@ class RAGChain:
 
             execution_time_ms = (time.time() - start_time) * 1000
 
+            run_id = self._get_run_id()
+
+            decision_metadata = self._extract_decision_metadata(
+                run_id, query, execution_time_ms, top_k, temperature, len(retrieved)
+            )
+
             run_id, langsmith_tags = self._capture_tracing_metadata(
-                top_k, temperature
+                top_k, temperature, decision_metadata, run_id
             )
 
             sources_list = self._format_sources(
                 retrieved, include_sources
             )
+
+            if self._decision_tracker and decision_metadata:
+                try:
+                    self._decision_tracker.record(decision_metadata)
+                except Exception as e:
+                    logger.warning(f"Failed to record decision: {str(e)}")
 
             logger.info(
                 f"RAGChain.invoke complete: query={query[:50]}..., "
@@ -110,6 +124,11 @@ class RAGChain:
                 usage_metadata=usage_metadata,
                 llm_latency_ms=llm_latency_ms,
                 langsmith_tags=langsmith_tags,
+                agent_type=decision_metadata.agent_type if decision_metadata else "rag_chain",
+                tools_used=decision_metadata.tools_used if decision_metadata else [],
+                chain_length=decision_metadata.chain_length if decision_metadata else 0,
+                decision_quality=decision_metadata.decision_quality.value if decision_metadata else DecisionQuality.SUBOPTIMAL.value,
+                reasoning_summary=decision_metadata.reasoning_summary if decision_metadata else None,
             )
 
         except Exception as e:
@@ -164,16 +183,76 @@ class RAGChain:
 
         return response_text, usage_metadata, llm_latency_ms
 
+    def _extract_decision_metadata(
+        self,
+        run_id: str,
+        query: str,
+        execution_time_ms: float,
+        top_k: int,
+        temperature: float,
+        documents_retrieved: int,
+    ) -> DecisionLogEntry:
+        """Extract decision metadata for RAGChain invocation.
+
+        RAGChain always retrieves documents, so tool selection is implicit.
+
+        Args:
+            run_id: LangSmith run ID for this invocation.
+            query: Original user query.
+            execution_time_ms: Total execution time.
+            top_k: Number of documents retrieved.
+            temperature: LLM temperature setting.
+            documents_retrieved: Actual number of documents retrieved.
+
+        Returns:
+            DecisionLogEntry with routing metadata.
+        """
+        from datetime import timezone
+
+        from infrastructure.decision_tracker import DecisionTracker
+
+        return DecisionLogEntry(
+            run_id=run_id,
+            agent_type="rag_chain",
+            query_preview=query[:200],
+            query_hash=DecisionTracker.compute_query_hash(query),
+            tools_used=[],
+            chain_length=0,
+            chain_tools=[],
+            decision_quality=DecisionQuality.OPTIMAL if documents_retrieved > 0 else DecisionQuality.SUBOPTIMAL,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            model_used=self._llm.model,
+            top_k=top_k,
+            temperature=temperature,
+            latency_ms=execution_time_ms,
+            reasoning_summary=f"RAG retrieval: {documents_retrieved} docs with top_k={top_k}",
+        )
+
+    def _get_run_id(self) -> str:
+        """Extract or generate a run ID for this invocation.
+
+        Returns:
+            LangSmith run ID or UUID fallback.
+        """
+        current_run = run_tree_context.get_current_run_tree()
+        return str(current_run.id) if current_run else str(uuid.uuid4())
+
     def _capture_tracing_metadata(
-        self, top_k: int, temperature: float
+        self, top_k: int, temperature: float, decision_metadata: Optional[Any] = None, pre_run_id: Optional[str] = None
     ) -> tuple[str, Optional[List[str]]]:
         """Extract LangSmith run ID and apply dynamic tags.
+
+        Args:
+            top_k: Number of documents retrieved.
+            temperature: LLM temperature setting.
+            decision_metadata: Optional DecisionLogEntry for decision tags.
+            pre_run_id: Optional pre-computed run_id to use.
 
         Returns:
             Tuple of (run_id, langsmith_tags).
         """
         current_run = run_tree_context.get_current_run_tree()
-        run_id = str(current_run.id) if current_run else str(uuid.uuid4())
+        run_id = pre_run_id or (str(current_run.id) if current_run else str(uuid.uuid4()))
 
         if not current_run:
             return run_id, None
@@ -184,6 +263,16 @@ class RAGChain:
             f"top_k:{top_k}",
             f"temperature:{temperature}",
         ]
+
+        if decision_metadata:
+            try:
+                langsmith_tags.append(f"decision_quality:{decision_metadata.decision_quality.value}")
+                langsmith_tags.append(f"chain_length:{decision_metadata.chain_length}")
+                if decision_metadata.tools_used:
+                    langsmith_tags.append(f"tools_used:{','.join(decision_metadata.tools_used)}")
+            except Exception:
+                pass
+
         current_run.add_tags(langsmith_tags)
         return run_id, langsmith_tags
 

@@ -60,6 +60,10 @@ class MetricsResponse(BaseModel):
         default=None,
         description="Link to LangSmith audit/project URL (null if tracing disabled)",
     )
+    ai_decisions: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="AI decision summary statistics (total_decisions, by_agent_type, by_quality, etc.)",
+    )
 
 
 class ChatResponse(BaseModel):
@@ -114,6 +118,26 @@ class ChatResponse(BaseModel):
         default=None,
         description="Tags applied to the LangSmith run for filtering (null when tracing disabled)",
     )
+    agent_type: str = Field(
+        default="tool_calling",
+        description="Agent strategy used: 'tool_calling' or 'rag_chain'",
+    )
+    tools_used: List[str] = Field(
+        default_factory=list,
+        description="List of tool names used in execution order",
+    )
+    chain_length: int = Field(
+        default=0,
+        description="Number of sequential tool calls made",
+    )
+    decision_quality: str = Field(
+        default="suboptimal",
+        description="Quality classification: optimal, suboptimal, or poor",
+    )
+    reasoning_summary: Optional[str] = Field(
+        default=None,
+        description="Summary of the AI's reasoning for tool selection",
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -151,6 +175,7 @@ class HealthResponse(BaseModel):
         timestamp: Health check timestamp
         version: API version (default: "1.0.0")
         db_connected: Whether database is reachable
+        langsmith_connected: Whether LangSmith tracing API is reachable
     """
 
     status: str = Field(
@@ -170,9 +195,9 @@ class HealthResponse(BaseModel):
         ...,
         description="Database connectivity status",
     )
-    llm_connected: bool = Field(
+    langsmith_connected: bool = Field(
         default=False,
-        description="LLM provider availability",
+        description="LangSmith tracing API availability",
     )
     embedding_connected: bool = Field(
         default=False,
@@ -186,6 +211,7 @@ class HealthResponse(BaseModel):
                 "timestamp": "2025-01-15T12:00:00",
                 "version": "1.0.0",
                 "db_connected": True,
+                "langsmith_connected": True,
             }
         }
     )

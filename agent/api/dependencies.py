@@ -4,8 +4,10 @@ All pluggable singletons (including the agent) live in services/container.py.
 This file provides FastAPI Depends() wrappers only.
 """
 
+from config import settings
 from infrastructure.container import (
     agent,
+    decision_tracker,
     embeddings,
     feedback_service,
     llm,
@@ -24,19 +26,24 @@ def get_feedback_service():
     return feedback_service
 
 
+def get_decision_tracker():
+    """Return the DecisionTracker singleton from container."""
+    return decision_tracker
+
+
 async def check_health() -> dict:
-    """Perform system health check including DB, LLM, and embedding services.
+    """Perform system health check including DB, LangSmith, and embedding services.
 
     Each service is pinged with a minimal payload to verify actual connectivity,
     not just object existence.
 
-    For LLM failover chain, reports which providers are up/down and requires
-    at least one provider to be healthy for overall healthy status.
+    For LangSmith, uses list_projects() — a lightweight API call that verifies
+    the tracing API is reachable without invoking an LLM (saves tokens/cost).
     """
     health = {
         "status": "ok",
         "db_connected": False,
-        "llm_connected": False,
+        "langsmith_connected": False,
         "embedding_connected": False,
     }
 
@@ -47,12 +54,16 @@ async def check_health() -> dict:
     except Exception as e:
         logger.error(f"DB health check failed: {str(e)}")
 
-    # LLM check — lightweight invoke to verify the API responds
-    try:
-        response = llm.invoke([{"role": "user", "content": "ping"}])
-        health["llm_connected"] = bool(response and response.content)
-    except Exception as e:
-        logger.error(f"LLM health check failed: {str(e)}")
+    # LangSmith check — lightweight API call, no LLM invocation needed
+    if settings.enable_langsmith_tracing and settings.langsmith_api_key:
+        try:
+            from langsmith import Client as LangSmithClient
+            client = LangSmithClient()
+            # list_projects() is a lightweight API call that verifies connectivity
+            list(client.list_projects(limit=1))
+            health["langsmith_connected"] = True
+        except Exception as e:
+            logger.error(f"LangSmith health check failed: {str(e)}")
 
     # Embedding check — generate embedding for a short string
     try:

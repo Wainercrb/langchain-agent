@@ -16,6 +16,7 @@ from langsmith import traceable
 from langsmith.run_trees import _context as run_tree_context
 
 from models import ChatResponse, SourceDocument
+from models.decision import DecisionLogEntry, DecisionQuality, ToolCallRecord
 from infrastructure.agent.base import Agent
 from infrastructure.logging import logger
 
@@ -92,12 +93,14 @@ class ToolCallingAgent(Agent):
         artifact_store: Optional[list] = None,
         default_top_k: int = 5,
         default_latest_only: bool = True,
+        decision_tracker: Optional[Any] = None,
     ) -> None:
         self._llm = llm
         self._tools = tools
         self._artifact_store = artifact_store
         self._default_top_k = default_top_k
         self._default_latest_only = default_latest_only
+        self._decision_tracker = decision_tracker
         logger.info(f"ToolCallingAgent initialized with {len(tools)} tools")
 
     def _build_prompt(self) -> ChatPromptTemplate:
@@ -162,7 +165,7 @@ class ToolCallingAgent(Agent):
             token_cb = _TokenCallback()
             executor = self._build_executor(temperature=temperature)
 
-            llm_latency_ms, response_text = self._execute(
+            llm_latency_ms, response_text, executor_result = self._execute(
                 executor, query, token_cb
             )
 
@@ -170,9 +173,21 @@ class ToolCallingAgent(Agent):
 
             sources_list = self._extract_sources(include_sources)
 
-            run_id, langsmith_tags = self._capture_tracing_metadata(
-                top_k, temperature
+            run_id = self._get_run_id()
+
+            decision_metadata = self._extract_decision_metadata(
+                run_id, query, executor_result, execution_time_ms, top_k, temperature
             )
+
+            run_id, langsmith_tags = self._capture_tracing_metadata(
+                top_k, temperature, decision_metadata, run_id
+            )
+
+            if self._decision_tracker and decision_metadata:
+                try:
+                    self._decision_tracker.record(decision_metadata)
+                except Exception as e:
+                    logger.warning(f"Failed to record decision: {str(e)}")
 
             logger.info(
                 f"ToolCallingAgent complete: query={query[:50]}..., "
@@ -190,6 +205,11 @@ class ToolCallingAgent(Agent):
                 usage_metadata=token_cb.as_dict(),
                 llm_latency_ms=llm_latency_ms,
                 langsmith_tags=langsmith_tags,
+                agent_type=decision_metadata.agent_type if decision_metadata else "tool_calling",
+                tools_used=decision_metadata.tools_used if decision_metadata else [],
+                chain_length=decision_metadata.chain_length if decision_metadata else 0,
+                decision_quality=decision_metadata.decision_quality.value if decision_metadata else DecisionQuality.SUBOPTIMAL.value,
+                reasoning_summary=decision_metadata.reasoning_summary if decision_metadata else None,
             )
 
         except Exception as e:
@@ -201,27 +221,123 @@ class ToolCallingAgent(Agent):
 
     def _execute(
         self, executor: AgentExecutor, query: str, token_cb: _TokenCallback
-    ) -> tuple[float, str]:
+    ) -> tuple[float, str, Any]:
         """Execute the agent and measure LLM latency.
 
         Returns:
-            Tuple of (llm_latency_ms, response_text).
+            Tuple of (llm_latency_ms, response_text, executor_result).
         """
         llm_start = time.time()
         result = executor.invoke({"input": query}, config={"callbacks": [token_cb]})
         llm_latency_ms = (time.time() - llm_start) * 1000
-        return llm_latency_ms, result.get("output", "")
+        return llm_latency_ms, result.get("output", ""), result
+
+    def _extract_decision_metadata(
+        self,
+        run_id: str,
+        query: str,
+        executor_result: Any,
+        execution_time_ms: float,
+        top_k: int,
+        temperature: float,
+    ) -> Optional[DecisionLogEntry]:
+        """Extract decision metadata from AgentExecutor result.
+
+        Args:
+            run_id: LangSmith run ID for this invocation.
+            query: Original user query.
+            executor_result: Full result dict from AgentExecutor.invoke().
+            execution_time_ms: Total execution time.
+            top_k: Number of documents retrieved.
+            temperature: LLM temperature setting.
+
+        Returns:
+            DecisionLogEntry with tool selection and quality metadata.
+        """
+        from datetime import datetime, timezone
+
+        from infrastructure.decision_tracker import DecisionTracker
+
+        intermediate_steps = executor_result.get("intermediate_steps", [])
+
+        chain_tools: List[ToolCallRecord] = []
+        tools_used: List[str] = []
+
+        for i, step in enumerate(intermediate_steps):
+            if hasattr(step, "tool") and hasattr(step, "tool_input"):
+                tool_name = step.tool
+                tool_input = step.tool_input if hasattr(step, "tool_input") else {}
+                output_summary = str(step.observation)[:200] if hasattr(step, "observation") else None
+            elif isinstance(step, (list, tuple)) and len(step) >= 2:
+                tool_call = step[0]
+                tool_name = getattr(tool_call, "tool", str(tool_call))
+                tool_input = getattr(tool_call, "tool_input", {})
+                output_summary = str(step[1])[:200] if len(step) > 1 else None
+            else:
+                continue
+
+            tools_used.append(tool_name)
+            chain_tools.append(ToolCallRecord(
+                tool_name=tool_name,
+                tool_input=tool_input if isinstance(tool_input, dict) else {},
+                output_summary=output_summary,
+                order=i,
+            ))
+
+        chain_length = len(tools_used)
+
+        if chain_length == 0:
+            decision_quality = DecisionQuality.POOR
+            reasoning_summary = "No tool selected — direct answer or failed selection"
+        elif chain_length == 1:
+            decision_quality = DecisionQuality.OPTIMAL
+            reasoning_summary = f"Single tool call: {tools_used[0]}"
+        else:
+            decision_quality = DecisionQuality.SUBOPTIMAL
+            reasoning_summary = f"Chained {chain_length} tools: {', '.join(tools_used)}"
+
+        return DecisionLogEntry(
+            run_id=run_id,
+            agent_type="tool_calling",
+            query_preview=query[:200],
+            query_hash=DecisionTracker.compute_query_hash(query),
+            tools_used=tools_used,
+            chain_length=chain_length,
+            chain_tools=chain_tools,
+            decision_quality=decision_quality,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            model_used=getattr(self._llm, "model", "unknown"),
+            top_k=top_k,
+            temperature=temperature,
+            latency_ms=execution_time_ms,
+            reasoning_summary=reasoning_summary,
+        )
+
+    def _get_run_id(self) -> str:
+        """Extract or generate a run ID for this invocation.
+
+        Returns:
+            LangSmith run ID or UUID fallback.
+        """
+        current_run = run_tree_context.get_current_run_tree()
+        return str(current_run.id) if current_run else str(uuid.uuid4())
 
     def _capture_tracing_metadata(
-        self, top_k: int, temperature: float
+        self, top_k: int, temperature: float, decision_metadata: Optional[Any] = None, pre_run_id: Optional[str] = None
     ) -> tuple[str, Optional[List[str]]]:
         """Extract LangSmith run ID and apply dynamic tags.
+
+        Args:
+            top_k: Number of documents retrieved.
+            temperature: LLM temperature setting.
+            decision_metadata: Optional DecisionLogEntry for decision tags.
+            pre_run_id: Optional pre-computed run_id to use.
 
         Returns:
             Tuple of (run_id, langsmith_tags).
         """
         current_run = run_tree_context.get_current_run_tree()
-        run_id = str(current_run.id) if current_run else str(uuid.uuid4())
+        run_id = pre_run_id or (str(current_run.id) if current_run else str(uuid.uuid4()))
 
         if not current_run:
             return run_id, None
@@ -232,6 +348,16 @@ class ToolCallingAgent(Agent):
             f"top_k:{top_k}",
             f"temperature:{temperature}",
         ]
+
+        if decision_metadata:
+            try:
+                langsmith_tags.append(f"decision_quality:{decision_metadata.decision_quality.value}")
+                langsmith_tags.append(f"chain_length:{decision_metadata.chain_length}")
+                if decision_metadata.tools_used:
+                    langsmith_tags.append(f"tools_used:{','.join(decision_metadata.tools_used)}")
+            except Exception:
+                pass
+
         current_run.add_tags(langsmith_tags)
         return run_id, langsmith_tags
 

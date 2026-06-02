@@ -23,7 +23,7 @@ class TestHealthEndpoint:
         data = response.json()
         assert "status" in data
         assert "db_connected" in data
-        assert "llm_connected" in data
+        assert "langsmith_connected" in data
         assert "embedding_connected" in data
 
     def test_health_check_returns_json(self, client):

@@ -6,6 +6,7 @@ these are for operational awareness, not billing or auditing.
 """
 
 import threading
+from typing import Any
 
 
 class SimpleMetrics:
@@ -18,6 +19,15 @@ class SimpleMetrics:
         self._total_latency_ms = 0.0
         self._total_input_tokens = 0
         self._total_output_tokens = 0
+        self._decision_tracker: Any = None
+
+    def set_decision_tracker(self, tracker: Any) -> None:
+        """Set the DecisionTracker reference for metrics aggregation.
+
+        Args:
+            tracker: DecisionTracker instance to query for decision aggregates.
+        """
+        self._decision_tracker = tracker
 
     def record_request(self, latency_ms: float) -> None:
         """Record a completed request with its latency."""
@@ -56,7 +66,7 @@ class SimpleMetrics:
                 if self._request_count > 0
                 else 0.0
             )
-            return {
+            result = {
                 "request_count": self._request_count,
                 "error_count": self._error_count,
                 "avg_latency_ms": avg_latency,
@@ -64,6 +74,15 @@ class SimpleMetrics:
                 "total_output_tokens": self._total_output_tokens,
                 "avg_tokens_per_request": avg_tokens,
             }
+
+            if self._decision_tracker:
+                result["ai_decisions"] = {
+                    "total_decisions": self._decision_tracker.size,
+                    "decisions_evicted": self._decision_tracker.eviction_count,
+                    "store_size": self._decision_tracker.size,
+                }
+
+            return result
 
 
 # Singleton instance used by the /metrics endpoint

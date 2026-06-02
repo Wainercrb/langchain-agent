@@ -1,11 +1,11 @@
 import time
 from datetime import datetime, timezone
-from typing import Any, Tuple
+from typing import Any, Optional, Tuple
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 
-from api.dependencies import check_health, get_agent, get_feedback_service
+from api.dependencies import check_health, get_agent, get_decision_tracker, get_feedback_service
 from api.metrics import get_metrics
 from config import settings
 from models import (
@@ -16,6 +16,7 @@ from models import (
     HealthResponse,
     MetricsResponse,
 )
+from models.decision import DecisionLogEntry, DecisionMetricsResponse
 from infrastructure.container import alert_service
 from infrastructure.logging import logger
 from utils.exceptions import Severity
@@ -251,6 +252,7 @@ async def metrics() -> MetricsResponse:
         avg_tokens_per_request=data["avg_tokens_per_request"],
         langsmith_dashboard_url=langsmith_url,
         langsmith_audit_url=langsmith_url,
+        ai_decisions=data.get("ai_decisions"),
     )
 
 
@@ -269,7 +271,8 @@ async def health() -> HealthResponse:
     This endpoint performs a lightweight health check including:
     - Service availability
     - Database connectivity (Supabase/pgvector)
-    - Overall system status
+    - LangSmith tracing API connectivity (lightweight, no LLM invocation)
+    - Embedding service connectivity
 
     Returns:
         HealthResponse containing:
@@ -277,6 +280,8 @@ async def health() -> HealthResponse:
             - timestamp: Check timestamp
             - version: API version
             - db_connected: Database connectivity status
+            - langsmith_connected: LangSmith tracing API availability
+            - embedding_connected: Embedding service availability
 
     Raises:
         Returns degraded status rather than raising, to allow clients to assess
@@ -289,6 +294,80 @@ async def health() -> HealthResponse:
         status=health_info["status"],
         timestamp=datetime.now(timezone.utc),
         db_connected=health_info.get("db_connected", False),
-        llm_connected=health_info.get("llm_connected", False),
+        langsmith_connected=health_info.get("langsmith_connected", False),
         embedding_connected=health_info.get("embedding_connected", False),
     )
+
+
+@router.get(
+    "/decisions",
+    response_model=DecisionMetricsResponse,
+    status_code=200,
+)
+async def list_decisions(
+    from_date: Optional[str] = Query(None, alias="from", description="ISO 8601 start date filter"),
+    to_date: Optional[str] = Query(None, alias="to", description="ISO 8601 end date filter"),
+    tool: Optional[str] = Query(None, description="Filter by tool name"),
+    quality: Optional[str] = Query(None, description="Filter by decision quality"),
+    page: int = Query(1, ge=1, description="Page number"),
+    per_page: int = Query(20, ge=1, le=100, description="Results per page"),
+    tracker=Depends(get_decision_tracker),
+) -> DecisionMetricsResponse:
+    """Query AI decision records with optional filters and pagination.
+
+    Args:
+        from_date: ISO 8601 start date (inclusive).
+        to_date: ISO 8601 end date (inclusive).
+        tool: Filter by tool name.
+        quality: Filter by decision_quality (optimal, suboptimal, poor).
+        page: Page number (1-indexed).
+        per_page: Results per page (max 100).
+        tracker: Injected DecisionTracker.
+
+    Returns:
+        DecisionMetricsResponse with filtered decisions and aggregates.
+    """
+    return tracker.query(
+        from_date=from_date,
+        to_date=to_date,
+        tool=tool,
+        quality=quality,
+        page=page,
+        per_page=per_page,
+    )
+
+
+@router.get(
+    "/decisions/{run_id}",
+    status_code=200,
+    responses={
+        404: {"model": ErrorResponse, "description": "Decision not found"},
+    },
+)
+async def get_decision(
+    run_id: str,
+    tracker=Depends(get_decision_tracker),
+) -> DecisionLogEntry:
+    """Retrieve a single decision record by run_id.
+
+    Args:
+        run_id: LangSmith run ID to look up.
+        tracker: Injected DecisionTracker.
+
+    Returns:
+        Full DecisionLogEntry with tool chain and metadata.
+
+    Raises:
+        HTTPException (404): If no decision record exists for the run_id.
+    """
+    entry = tracker.get_by_run_id(run_id)
+    if entry is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error": "decision_not_found",
+                "message": f"No decision record found for run_id: {run_id}",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+    return entry

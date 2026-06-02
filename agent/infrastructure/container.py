@@ -84,6 +84,11 @@ alert_service = DiscordAlertProvider(
     rate_limit_per_minute=settings.alert_rate_limit_per_minute,
 )
 
+# ── Decision Tracker ─────────────────────────────────────────────────
+from infrastructure.decision_tracker import DecisionTracker
+
+decision_tracker = DecisionTracker(maxlen=10000)
+
 # ── Agent ─────────────────────────────────────────────────────────────
 from domain.retrieval.retriever import Retriever
 from domain.core.chain import RAGChain
@@ -107,7 +112,12 @@ if settings.use_tool_agent:
         tools=_tools,
         artifact_store=_search_artifact_store,
         default_top_k=5,
+        decision_tracker=decision_tracker,
     )
 else:
-    _chain = RAGChain(retriever=_retriever, llm=llm)
+    _chain = RAGChain(retriever=_retriever, llm=llm, decision_tracker=decision_tracker)
     agent = RAGChainAgent(chain=_chain)
+
+# Wire decision tracker into metrics
+from api.metrics import get_metrics
+get_metrics().set_decision_tracker(decision_tracker)
