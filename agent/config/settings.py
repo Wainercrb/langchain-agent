@@ -83,6 +83,9 @@ class Settings(BaseSettings):
     discord_webhook_url: Optional[str] = Field(
         default=None, alias="DISCORD_WEBHOOK_URL"
     )
+    slack_webhook_url: Optional[str] = Field(
+        default=None, alias="SLACK_WEBHOOK_URL"
+    )
     alert_rate_limit_per_minute: int = Field(
         default=5, alias="ALERT_RATE_LIMIT_PER_MINUTE"
     )

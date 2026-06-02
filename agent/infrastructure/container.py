@@ -76,13 +76,37 @@ from infrastructure.feedback import LangSmithFeedbackProvider
 feedback_service = LangSmithFeedbackProvider()
 
 # ── Alerts ────────────────────────────────────────────────────────────
-from infrastructure.alerts import DiscordAlertProvider
-
-# Future: swap DiscordAlertProvider for SlackAlertProvider or TeamsAlertProvider
-alert_service = DiscordAlertProvider(
-    webhook_url=settings.discord_webhook_url,
-    rate_limit_per_minute=settings.alert_rate_limit_per_minute,
+from infrastructure.alerts import (
+    DiscordAlertProvider,
+    SlackAlertProvider,
+    MultiAlertProvider,
 )
+
+_providers = []
+
+if settings.discord_webhook_url:
+    _providers.append(DiscordAlertProvider(
+        webhook_url=settings.discord_webhook_url,
+        rate_limit_per_minute=settings.alert_rate_limit_per_minute,
+    ))
+
+if settings.slack_webhook_url:
+    _providers.append(SlackAlertProvider(
+        webhook_url=settings.slack_webhook_url,
+        rate_limit_per_minute=settings.alert_rate_limit_per_minute,
+    ))
+
+# Fall back to Discord-only if Slack is not configured (backward compatible)
+if len(_providers) > 1:
+    alert_service = MultiAlertProvider(_providers)
+elif len(_providers) == 1:
+    alert_service = _providers[0]
+else:
+    # No webhooks configured — use a no-op provider that logs warnings
+    alert_service = DiscordAlertProvider(
+        webhook_url=None,
+        rate_limit_per_minute=settings.alert_rate_limit_per_minute,
+    )
 
 # ── Decision Tracker ─────────────────────────────────────────────────
 from infrastructure.decision_tracker import DecisionTracker
