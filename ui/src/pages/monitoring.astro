@@ -2,10 +2,10 @@
 import Layout from '../layouts/Layout.astro';
 ---
 
-<Layout title="System Monitoring">
+<Layout title="Health Checks">
   <main class="mx-auto w-full max-w-1/2 px-4 py-8">
     <header class="mb-6 flex items-baseline justify-between">
-      <h1 class="text-2xl font-bold text-[var(--color-text)]">System Monitoring</h1>
+      <h1 class="text-2xl font-bold text-[var(--color-text)]">Health Checks</h1>
       <time id="last-updated" class="text-xs text-[var(--color-text-muted)]">--</time>
     </header>
 
@@ -42,8 +42,8 @@ import Layout from '../layouts/Layout.astro';
 </Layout>
 
 <script>
-  import { fetchMonitoringStatus } from '../utils/api';
-  import type { MonitoringStatus } from '../utils/api';
+  import { fetchHealthStatus } from '../utils/api';
+  import type { HealthStatus } from '../utils/api';
 
   const API_BASE = import.meta.env.PUBLIC_API_URL || 'http://localhost:8000';
   const POLL_INTERVAL_MS = 30_000;
@@ -60,7 +60,7 @@ import Layout from '../layouts/Layout.astro';
     statusContent?.classList.add('hidden');
 
     try {
-      const data = await fetchMonitoringStatus();
+      const data = await fetchHealthStatus();
 
       loadingEl?.classList.add('hidden');
 

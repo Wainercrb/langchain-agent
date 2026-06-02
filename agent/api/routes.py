@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 
 from api.dependencies import check_health, get_agent, get_decision_tracker, get_feedback_service
-from api.metrics import get_metrics
+from api.metrics import build_metrics_snapshot, get_llm_usage_metrics, get_request_metrics
 from config import settings
 from models import (
     ChatRequest,
@@ -19,7 +19,7 @@ from models import (
     MonitoringStatusResponse,
     CircuitStatusResponse,
 )
-from models.decision import DecisionLogEntry, DecisionMetricsResponse
+from models.observability.decisions import DecisionLogEntry, DecisionMetricsResponse
 from infrastructure.logging import logger
 from utils.exceptions import Severity, AllProvidersExhaustedError
 
@@ -113,10 +113,10 @@ async def chat(
             f"sources={len(response.sources or [])}"
         )
 
-        get_metrics().record_request(execution_time_ms)
+        get_request_metrics().record_request(execution_time_ms)
 
         input_tokens, output_tokens = _extract_tokens(response)
-        get_metrics().record_tokens(input_tokens, output_tokens)
+        get_llm_usage_metrics().record_tokens(input_tokens, output_tokens)
 
         return ChatResponse(
             response=response.response,
@@ -137,7 +137,7 @@ async def chat(
 
     except ValueError as e:
         logger.error(f"Chat validation error: {str(e)}")
-        get_metrics().record_error()
+        get_request_metrics().record_error()
         await alert_service.send_alert(
             severity=Severity.WARNING,
             message=f"Chat validation error: {str(e)[:100]}",
@@ -156,7 +156,7 @@ async def chat(
 
     except AllProvidersExhaustedError as e:
         logger.error(f"All LLM providers exhausted: {str(e)}")
-        get_metrics().record_error()
+        get_request_metrics().record_error()
         await alert_service.send_alert(
             severity=Severity.CRITICAL,
             message="All LLM providers exhausted — service degraded",
@@ -182,7 +182,7 @@ async def chat(
 
     except Exception as e:
         logger.error(f"Chat error: {str(e)}", exc_info=True)
-        get_metrics().record_error()
+        get_request_metrics().record_error()
         await alert_service.send_alert(
             severity=Severity.ERROR,
             message=f"Chat processing failed: {str(e)[:200]}",
@@ -281,7 +281,9 @@ async def feedback(
     response_model=MetricsResponse,
     status_code=200,
 )
-async def metrics() -> MetricsResponse:
+async def metrics(
+    tracker=Depends(get_decision_tracker),
+) -> MetricsResponse:
     """
     Return lightweight operational counters since process startup.
 
@@ -289,11 +291,16 @@ async def metrics() -> MetricsResponse:
     this endpoint provides simple request/error/latency counters
     that are health-check friendly.
 
+    Args:
+        tracker: Injected DecisionTracker — used to attach AI decision
+            aggregates (total_decisions, decisions_evicted, store_size)
+            to the snapshot.
+
     Returns:
         MetricsResponse with request_count, error_count, avg_latency_ms,
         and langsmith_dashboard_url (if tracing is configured).
     """
-    data = get_metrics().snapshot()
+    data = build_metrics_snapshot(decision_tracker=tracker)
 
     langsmith_url = None
     if settings.enable_langsmith_tracing and settings.langsmith_api_key:
@@ -351,6 +358,7 @@ async def health() -> HealthResponse:
         status=health_info["status"],
         timestamp=datetime.now(timezone.utc),
         db_connected=health_info.get("db_connected", False),
+        llm_connected=health_info.get("llm_connected", False),
         langsmith_connected=health_info.get("langsmith_connected", False),
         embedding_connected=health_info.get("embedding_connected", False),
     )

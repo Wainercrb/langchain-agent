@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
 from server import app
-from api.metrics import SimpleMetrics, get_metrics
+from api.metrics.llm_usage import LLMUsageMetrics
 from api.dependencies import get_agent
 
 
@@ -16,17 +16,17 @@ def client():
 
 
 @pytest.fixture
-def fresh_metrics():
-    """Provide a fresh SimpleMetrics instance for each test."""
-    fresh = SimpleMetrics()
-    with patch("api.routes.get_metrics", return_value=fresh):
+def fresh_llm_usage():
+    """Provide a fresh LLMUsageMetrics instance for each test."""
+    fresh = LLMUsageMetrics()
+    with patch("api.routes.get_llm_usage_metrics", return_value=fresh):
         yield fresh
 
 
 class TestChatTokenRecording:
     """Tests for token extraction and recording in chat endpoint."""
 
-    def test_chat_records_tokens_on_success(self, client, fresh_metrics):
+    def test_chat_records_tokens_on_success(self, client, fresh_llm_usage):
         """Should record token usage when chat succeeds with usage_metadata."""
         mock_response = MagicMock()
         mock_response.response = "Test answer"
@@ -47,13 +47,13 @@ class TestChatTokenRecording:
             response = client.post("/v1/chat", json={"query": "Test query"})
             assert response.status_code == 200
 
-            snapshot = fresh_metrics.snapshot()
+            snapshot = fresh_llm_usage.snapshot()
             assert snapshot["total_input_tokens"] == 150
             assert snapshot["total_output_tokens"] == 75
         finally:
             app.dependency_overrides.clear()
 
-    def test_chat_handles_missing_token_data(self, client, fresh_metrics):
+    def test_chat_handles_missing_token_data(self, client, fresh_llm_usage):
         """Should not error when agent response has no usage_metadata."""
         mock_response = MagicMock()
         mock_response.response = "Test answer"
@@ -71,13 +71,13 @@ class TestChatTokenRecording:
             response = client.post("/v1/chat", json={"query": "Test query"})
             assert response.status_code == 200
 
-            snapshot = fresh_metrics.snapshot()
+            snapshot = fresh_llm_usage.snapshot()
             assert snapshot["total_input_tokens"] == 0
             assert snapshot["total_output_tokens"] == 0
         finally:
             app.dependency_overrides.clear()
 
-    def test_chat_handles_usage_metadata_exception(self, client, fresh_metrics):
+    def test_chat_handles_usage_metadata_exception(self, client, fresh_llm_usage):
         """Should not error when accessing usage_metadata raises exception."""
         mock_response = MagicMock()
         mock_response.response = "Test answer"
@@ -97,7 +97,7 @@ class TestChatTokenRecording:
             response = client.post("/v1/chat", json={"query": "Test query"})
             assert response.status_code == 200
 
-            snapshot = fresh_metrics.snapshot()
+            snapshot = fresh_llm_usage.snapshot()
             assert snapshot["total_input_tokens"] == 0
             assert snapshot["total_output_tokens"] == 0
         finally:
@@ -109,14 +109,19 @@ class TestMetricsEndpointTokenFields:
 
     @pytest.fixture(autouse=True)
     def reset_metrics(self):
-        """Reset global metrics singleton before each test in this class."""
-        from api.metrics import _metrics
-        with _metrics._lock:
-            _metrics._request_count = 0
-            _metrics._error_count = 0
-            _metrics._total_latency_ms = 0.0
-            _metrics._total_input_tokens = 0
-            _metrics._total_output_tokens = 0
+        """Reset global metric singletons before each test in this class."""
+        from api.metrics.llm_usage import _llm_usage_metrics
+        from api.metrics.request import _request_metrics
+
+        with _llm_usage_metrics._lock:
+            _llm_usage_metrics._total_input_tokens = 0
+            _llm_usage_metrics._total_output_tokens = 0
+            _llm_usage_metrics._record_count = 0
+
+        with _request_metrics._lock:
+            _request_metrics._request_count = 0
+            _request_metrics._error_count = 0
+            _request_metrics._total_latency_ms = 0.0
 
     def test_metrics_returns_token_fields(self, client):
         """GET /v1/metrics should include token fields in response."""

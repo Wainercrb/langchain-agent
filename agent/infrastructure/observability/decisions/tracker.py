@@ -12,13 +12,12 @@ import os
 import threading
 import time
 from collections import deque
-from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from config import settings
 
-from models.decision import DecisionLogEntry, DecisionMetricsResponse
+from models.observability.decisions import DecisionLogEntry, DecisionMetricsResponse
 
 
 class DecisionTracker:
@@ -75,8 +74,6 @@ class DecisionTracker:
         with self._lock:
             if entry.run_id in self._index:
                 # Update existing entry (feedback correlation)
-                old_entry = self._index[entry.run_id]
-                # Replace in deque: rebuild since deque doesn't support random access mutation
                 self._store = deque(
                     (entry if e.run_id == entry.run_id else e for e in self._store),
                     maxlen=self._maxlen,

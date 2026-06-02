@@ -6,7 +6,7 @@ All checks execute WITHOUT LLM invocation. Each returns (ok: bool, detail: str).
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Tuple
 
 from config import settings
 from infrastructure.logging import logger
@@ -59,13 +59,13 @@ class HealthVerifier:
         """Compare LangSmith trace count against in-memory request count.
 
         Uses langsmith.Client.list_runs() to count recent traces and compares
-        against SimpleMetrics.request_count over a configurable time window.
+        against RequestMetrics.request_count over a configurable time window.
         """
         if not settings.enable_langsmith_tracing or not settings.langsmith_api_key:
             return True, "LangSmith tracing not configured, skipping"
         try:
             from langsmith import Client as LangSmithClient
-            from api.metrics import get_metrics
+            from api.metrics.request import get_request_metrics
 
             client = LangSmithClient()
             now = datetime.now(timezone.utc)
@@ -79,8 +79,7 @@ class HealthVerifier:
                 )
             )
             trace_count = len(runs)
-            metrics = get_metrics()
-            snapshot = metrics.snapshot()
+            snapshot = get_request_metrics().snapshot()
             request_count = snapshot.get("request_count", 0)
 
             if request_count == 0:
@@ -164,7 +163,7 @@ class HealthVerifier:
             return True, "No decision tracker available, drift check skipped"
 
         try:
-            from models.decision import DecisionQuality
+            from models.observability.decisions import DecisionQuality
 
             # Analyze the last 50 decisions for drift
             window_size = 50

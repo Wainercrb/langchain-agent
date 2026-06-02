@@ -11,8 +11,8 @@ from typing import Dict, Optional
 
 from config import settings
 from infrastructure.logging import logger
-from infrastructure.monitoring.health_verifier import HealthVerifier
-from models.monitoring import HealthCheckResult
+from infrastructure.observability.health.checks import HealthVerifier
+from models.observability.health import HealthCheckResult
 from utils.exceptions import Severity
 
 

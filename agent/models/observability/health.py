@@ -1,7 +1,7 @@
-"""Pydantic models for monitoring status responses."""
+"""Pydantic models for health monitoring responses."""
 
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -23,9 +23,3 @@ class MonitoringStatusResponse(BaseModel):
     interval_seconds: int
     checks: list[HealthCheckResult]
     overall_status: str  # "ok" | "degraded" | "error"
-
-
-class CircuitStatusResponse(BaseModel):
-    """Response model for GET /v1/llm/circuits."""
-
-    circuits: Dict[str, str]  # provider_name -> circuit state

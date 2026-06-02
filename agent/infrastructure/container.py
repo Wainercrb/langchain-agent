@@ -113,7 +113,7 @@ else:
     )
 
 # ── Decision Tracker ─────────────────────────────────────────────────
-from infrastructure.decision_tracker import DecisionTracker
+from infrastructure.observability.decisions import DecisionTracker
 
 decision_tracker = DecisionTracker(maxlen=10000)
 
@@ -146,12 +146,10 @@ else:
     _chain = RAGChain(retriever=_retriever, llm=llm, decision_tracker=decision_tracker)
     agent = RAGChainAgent(chain=_chain)
 
-# Wire decision tracker into metrics
-from api.metrics import get_metrics
-get_metrics().set_decision_tracker(decision_tracker)
-
 # ── Monitoring ───────────────────────────────────────────────────────
-from infrastructure.monitoring import HealthVerifier, MonitoringScheduler
+# DecisionTracker is passed directly to the /v1/metrics route via
+# build_metrics_snapshot; no global wiring needed.
+from infrastructure.observability.health import HealthVerifier, MonitoringScheduler
 
 _health_verifier = HealthVerifier(
     vector_store=vector_store,

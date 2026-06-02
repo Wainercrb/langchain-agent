@@ -240,7 +240,7 @@ export function validateSettings(settings: unknown): ChatSettings {
 }
 
 // ============================================
-// Decision & Monitoring Types
+// Decision & Health Types
 // ============================================
 
 export interface DecisionRecord {
@@ -251,14 +251,14 @@ export interface DecisionRecord {
   status: string;
 }
 
-export interface MonitoringStatus {
+export interface HealthStatus {
   status: 'healthy' | 'degraded' | 'unhealthy';
   details: Record<string, unknown>;
   timestamp: string;
 }
 
 // ============================================
-// Decision & Monitoring API
+// Decision & Health API
 // ============================================
 
 export async function fetchDecisions(): Promise<DecisionRecord[]> {
@@ -267,7 +267,7 @@ export async function fetchDecisions(): Promise<DecisionRecord[]> {
   return response.json();
 }
 
-export async function fetchMonitoringStatus(): Promise<MonitoringStatus> {
+export async function fetchHealthStatus(): Promise<HealthStatus> {
   const response = await fetchWithTimeout(`${API_BASE_URL}/v1/monitoring/status`);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();

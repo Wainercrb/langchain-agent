@@ -16,7 +16,7 @@ from langsmith import traceable
 from langsmith.run_trees import _context as run_tree_context
 
 from models import ChatResponse, SourceDocument
-from models.decision import DecisionLogEntry, DecisionQuality, ToolCallRecord
+from models.observability.decisions import DecisionLogEntry, DecisionQuality, ToolCallRecord
 from infrastructure.agent.base import Agent
 from infrastructure.logging import logger
 
@@ -263,7 +263,7 @@ class ToolCallingAgent(Agent):
         """
         from datetime import datetime, timezone
 
-        from infrastructure.decision_tracker import DecisionTracker
+        from infrastructure.observability.decisions import DecisionTracker
 
         intermediate_steps = executor_result.get("intermediate_steps", [])
 

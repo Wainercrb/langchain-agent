@@ -3,7 +3,8 @@
 from .chat import ChatRequest
 from .document import SourceDocument
 from .feedback import FeedbackRequest, FeedbackResponse
-from .monitoring import CircuitStatusResponse, HealthCheckResult, MonitoringStatusResponse
+from .observability.circuits import CircuitStatusResponse
+from .observability.health import HealthCheckResult, MonitoringStatusResponse
 from .responses import ChatResponse, ErrorResponse, HealthResponse, MetricsResponse
 from .retrieval import RetrievedDocument
 
