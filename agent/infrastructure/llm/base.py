@@ -4,6 +4,8 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
+from langsmith.run_trees import _context as run_tree_context
+
 from utils.exceptions import TransientLLMError, PermanentLLMError, AllProvidersExhaustedError
 
 logger = logging.getLogger(__name__)
@@ -201,6 +203,18 @@ class ResilientLLMProvider(LLMProvider):
         response.metadata["failover"] = len(attempted) > 0
         if attempted:
             response.metadata["failed_providers"] = attempted
+
+        # Tag LangSmith trace with actual provider for dashboard filtering
+        try:
+            current_run = run_tree_context.get_current_run_tree()
+            if current_run:
+                current_run.add_tags([f"provider:{provider_name}"])
+                current_run.add_metadata({
+                    "actual_provider": provider_name,
+                    "failed_providers": attempted if attempted else [],
+                })
+        except Exception:
+            pass
 
         if attempted:
             logger.info(
