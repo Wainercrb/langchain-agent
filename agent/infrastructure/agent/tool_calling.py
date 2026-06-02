@@ -355,6 +355,29 @@ class ToolCallingAgent(Agent):
                 langsmith_tags.append(f"chain_length:{decision_metadata.chain_length}")
                 if decision_metadata.tools_used:
                     langsmith_tags.append(f"tools_used:{','.join(decision_metadata.tools_used)}")
+
+                # Standard LangSmith metadata for structured querying
+                current_run.add_metadata({
+                    "agent_type": decision_metadata.agent_type,
+                    "decision_quality": decision_metadata.decision_quality.value,
+                    "chain_length": decision_metadata.chain_length,
+                    "tools_used": decision_metadata.tools_used,
+                    "reasoning_summary": decision_metadata.reasoning_summary,
+                    "query_preview": decision_metadata.query_preview,
+                    "latency_ms": decision_metadata.latency_ms,
+                })
+
+                if decision_metadata.chain_tools:
+                    current_run.add_metadata({
+                        "chain_tools": [
+                            {
+                                "tool": t.tool_name,
+                                "order": t.order,
+                                "output_summary": t.output_summary,
+                            }
+                            for t in decision_metadata.chain_tools
+                        ],
+                    })
             except Exception:
                 pass
 
