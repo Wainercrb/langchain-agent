@@ -100,6 +100,10 @@ class DecisionLogEntry(BaseModel):
         default=None,
         description="Summary of the AI's reasoning for tool selection",
     )
+    tool_selection_rationale: Optional[str] = Field(
+        default=None,
+        description="Raw LLM reasoning text explaining WHY tools were selected",
+    )
     user_feedback: Optional[dict] = Field(
         default=None,
         description="User feedback linked to this run (like/dislike)",

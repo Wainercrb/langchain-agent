@@ -1,4 +1,5 @@
 import time
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional, Tuple
 
@@ -16,11 +17,11 @@ from models import (
     HealthResponse,
     MetricsResponse,
     MonitoringStatusResponse,
+    CircuitStatusResponse,
 )
 from models.decision import DecisionLogEntry, DecisionMetricsResponse
-from infrastructure.container import alert_service, _monitoring_scheduler
 from infrastructure.logging import logger
-from utils.exceptions import Severity
+from utils.exceptions import Severity, AllProvidersExhaustedError
 
 router = APIRouter(prefix="/v1", tags=["chat"])
 
@@ -92,6 +93,8 @@ async def chat(
         HTTPException (400): Validation error in request parameters
         HTTPException (500): Internal server error during processing
     """
+    from infrastructure.container import alert_service
+
     start_time = time.time()
     try:
         logger.info(f"Chat request: query={request.query[:50]}...")
@@ -125,6 +128,11 @@ async def chat(
             usage_metadata=_safe_get(response, "usage_metadata"),
             llm_latency_ms=_safe_get(response, "llm_latency_ms"),
             langsmith_tags=_safe_get(response, "langsmith_tags"),
+            agent_type=_safe_get(response, "agent_type", "tool_calling"),
+            tools_used=_safe_get(response, "tools_used", []),
+            chain_length=_safe_get(response, "chain_length", 0),
+            decision_quality=_safe_get(response, "decision_quality", "suboptimal"),
+            reasoning_summary=_safe_get(response, "reasoning_summary"),
         )
 
     except ValueError as e:
@@ -144,6 +152,32 @@ async def chat(
                 "message": "Invalid request parameters",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             },
+        )
+
+    except AllProvidersExhaustedError as e:
+        logger.error(f"All LLM providers exhausted: {str(e)}")
+        get_metrics().record_error()
+        await alert_service.send_alert(
+            severity=Severity.CRITICAL,
+            message="All LLM providers exhausted — service degraded",
+            error=e,
+            metadata={"path": "/v1/chat", "query": request.query[:50]},
+        )
+
+        execution_time_ms = (time.time() - start_time) * 1000
+        return ChatResponse(
+            response=(
+                "I'm temporarily unable to process your request because all AI providers "
+                "are unavailable. Please try again in a few minutes."
+            ),
+            query=request.query,
+            sources=None,
+            execution_time_ms=execution_time_ms,
+            model="unavailable",
+            run_id=str(uuid.uuid4()),
+            usage_metadata=None,
+            llm_latency_ms=0,
+            langsmith_tags=["degraded:true", "reason:all_providers_exhausted"],
         )
 
     except Exception as e:
@@ -184,6 +218,9 @@ async def feedback(
     unreachable, the feedback is logged server-side and a 202 Accepted is
     returned instead of failing the request.
 
+    Feedback is also correlated with the in-memory DecisionTracker so that
+    decision quality analysis can incorporate explicit user signals.
+
     Args:
         request: FeedbackRequest containing:
             - run_id: LangSmith run ID for feedback correlation
@@ -196,6 +233,25 @@ async def feedback(
     Raises:
         HTTPException (422): Validation error in request parameters
     """
+    from infrastructure.container import decision_tracker
+
+    # Correlate feedback with DecisionTracker
+    feedback_payload = {
+        "type": request.feedback_type,
+        "comment": request.comment,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    existing = decision_tracker.get_by_run_id(request.run_id)
+    if existing:
+        updated = DecisionLogEntry(
+            **{**existing.model_dump(), "user_feedback": feedback_payload},
+        )
+        decision_tracker.record(updated)
+        logger.info(
+            f"Feedback correlated with decision: run_id={request.run_id}, "
+            f"type={request.feedback_type}"
+        )
+
     try:
         result = service.record_feedback(
             run_id=request.run_id,
@@ -390,6 +446,8 @@ async def monitoring_status() -> MonitoringStatusResponse:
             - checks: List of individual check results
             - overall_status: "ok", "degraded", or "error"
     """
+    from infrastructure.container import _monitoring_scheduler
+
     results = _monitoring_scheduler.last_results
     checks = list(results.values())
 
@@ -399,4 +457,22 @@ async def monitoring_status() -> MonitoringStatusResponse:
         interval_seconds=settings.monitoring_interval_seconds,
         checks=checks,
         overall_status=_monitoring_scheduler.overall_status,
+    )
+
+
+@router.get(
+    "/llm/circuits",
+    response_model=CircuitStatusResponse,
+    status_code=200,
+)
+async def circuit_status() -> CircuitStatusResponse:
+    """Return current circuit breaker status for all LLM providers.
+
+    Returns:
+        CircuitStatusResponse with provider name -> circuit state mapping.
+    """
+    from infrastructure.container import llm
+
+    return CircuitStatusResponse(
+        circuits=llm.circuit_status() if hasattr(llm, "circuit_status") else {},
     )

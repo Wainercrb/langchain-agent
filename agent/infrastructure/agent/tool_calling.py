@@ -55,9 +55,15 @@ class _TokenCallback(BaseCallbackHandler):
         self.input_tokens: int = 0
         self.output_tokens: int = 0
 
-    def on_llm_end(self, serialized: dict, response: Any, **kwargs: Any) -> None:
+    def on_llm_end(self, response: Any, **kwargs: Any) -> None:
         """Extract token counts from the LLM response."""
+        # LangChain passes an LLMResult object; usage may be in .usage or .llm_output
         usage = getattr(response, "usage_metadata", None) or getattr(response, "usage", None)
+        if not usage:
+            # Try llm_output for older LangChain versions
+            llm_output = getattr(response, "llm_output", None) or {}
+            usage = llm_output.get("token_usage", {}) if isinstance(llm_output, dict) else None
+
         if not usage:
             return
 
@@ -263,11 +269,13 @@ class ToolCallingAgent(Agent):
 
         chain_tools: List[ToolCallRecord] = []
         tools_used: List[str] = []
+        tool_selection_rationale: List[str] = []
 
         for i, step in enumerate(intermediate_steps):
             tool_name = None
             tool_input = {}
             output_summary = None
+            rationale = None
 
             # Format 1: tuple/list of (AgentAction, output)
             if isinstance(step, (list, tuple)) and len(step) >= 2:
@@ -275,16 +283,20 @@ class ToolCallingAgent(Agent):
                 tool_name = getattr(action, "tool", None) or str(action)
                 tool_input = getattr(action, "tool_input", {})
                 output_summary = str(step[1])[:200]
+                rationale = getattr(action, "log", None)
             # Format 2: object with .tool attribute
             elif hasattr(step, "tool"):
                 tool_name = step.tool
                 tool_input = getattr(step, "tool_input", {})
                 output_summary = str(getattr(step, "observation", ""))[:200]
+                rationale = getattr(step, "log", None)
 
             if not tool_name:
                 continue
 
             tools_used.append(tool_name)
+            if rationale:
+                tool_selection_rationale.append(rationale.strip())
             chain_tools.append(ToolCallRecord(
                 tool_name=tool_name,
                 tool_input=tool_input if isinstance(tool_input, dict) else {},
@@ -302,12 +314,15 @@ class ToolCallingAgent(Agent):
         if chain_length == 0:
             decision_quality = DecisionQuality.POOR
             reasoning_summary = "No tool selected — direct answer or failed selection"
+            rationale_text = None
         elif chain_length == 1:
             decision_quality = DecisionQuality.OPTIMAL
             reasoning_summary = f"Single tool call: {tools_used[0]}"
+            rationale_text = tool_selection_rationale[0] if tool_selection_rationale else None
         else:
             decision_quality = DecisionQuality.SUBOPTIMAL
             reasoning_summary = f"Chained {chain_length} tools: {', '.join(tools_used)}"
+            rationale_text = "\n---\n".join(tool_selection_rationale) if tool_selection_rationale else None
 
         return DecisionLogEntry(
             run_id=run_id,
@@ -324,6 +339,7 @@ class ToolCallingAgent(Agent):
             temperature=temperature,
             latency_ms=execution_time_ms,
             reasoning_summary=reasoning_summary,
+            tool_selection_rationale=rationale_text,
         )
 
     def _get_run_id(self) -> str:
@@ -376,6 +392,7 @@ class ToolCallingAgent(Agent):
                     "chain_length": decision_metadata.chain_length,
                     "tools_used": decision_metadata.tools_used,
                     "reasoning_summary": decision_metadata.reasoning_summary,
+                    "tool_selection_rationale": getattr(decision_metadata, "tool_selection_rationale", None),
                     "query_preview": decision_metadata.query_preview,
                     "latency_ms": decision_metadata.latency_ms,
                 })

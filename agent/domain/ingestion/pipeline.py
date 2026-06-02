@@ -171,3 +171,96 @@ class DocumentIngestionPipeline:
 
     def _move_to_failed(self, file_path: Path) -> None:
         shutil.move(str(file_path), str(self.failed_dir / file_path.name))
+
+    def retry_failed_files(self, max_retries: int = 3) -> List[IngestionResult]:
+        """Re-process files in the failed/ directory with retry tracking.
+
+        Files that have exceeded max_retries are moved to failed/permanent/
+        and logged as unrecoverable.
+
+        Args:
+            max_retries: Maximum retry attempts before giving up.
+
+        Returns:
+            List of IngestionResult for each retry attempt.
+        """
+        permanent_dir = self.failed_dir / "permanent"
+        permanent_dir.mkdir(parents=True, exist_ok=True)
+
+        retry_meta_dir = self.failed_dir / ".retry_meta"
+        retry_meta_dir.mkdir(parents=True, exist_ok=True)
+
+        failed_files = [
+            f for f in self.failed_dir.iterdir()
+            if f.is_file() and not f.name.startswith(".")
+        ]
+
+        if not failed_files:
+            return []
+
+        results: List[IngestionResult] = []
+        logger.info(f"DLQ retry: {len(failed_files)} file(s) in failed/")
+
+        for file_path in failed_files:
+            meta_path = retry_meta_dir / f"{file_path.name}.json"
+            retry_count = 0
+
+            # Read retry count from metadata
+            if meta_path.exists():
+                import json
+                try:
+                    meta = json.loads(meta_path.read_text())
+                    retry_count = meta.get("retries", 0)
+                except Exception:
+                    retry_count = 0
+
+            if retry_count >= max_retries:
+                # Move to permanent failure
+                shutil.move(str(file_path), str(permanent_dir / file_path.name))
+                if meta_path.exists():
+                    meta_path.unlink()
+                logger.warning(
+                    f"DLQ: {file_path.name} exceeded {max_retries} retries, "
+                    f"moved to permanent/"
+                )
+                results.append(IngestionResult(
+                    filename=file_path.name,
+                    status=IngestionStatus.FAILED,
+                    error=f"Exceeded {max_retries} retries",
+                ))
+                continue
+
+            # Attempt retry
+            logger.info(
+                f"DLQ retry ({retry_count + 1}/{max_retries}): {file_path.name}"
+            )
+
+            # Temporarily move back to knowledge dir for processing
+            temp_path = self.failed_dir.parent / "raw_docs" / f".retry_{file_path.name}"
+            shutil.copy(str(file_path), str(temp_path))
+
+            result = self.ingest_file(temp_path)
+
+            # Update retry metadata if still failed
+            if result.status == IngestionStatus.FAILED:
+                import json
+                new_count = retry_count + 1
+                meta_path.write_text(json.dumps({
+                    "filename": file_path.name,
+                    "retries": new_count,
+                    "last_error": result.error or "Unknown",
+                    "last_attempt": time.time(),
+                }))
+                # Re-move to failed/ (ingest_file moves it there again)
+                logger.warning(
+                    f"DLQ retry failed for {file_path.name}: {result.error}"
+                )
+            else:
+                # Clean up metadata on success
+                if meta_path.exists():
+                    meta_path.unlink()
+                logger.info(f"DLQ retry succeeded for {file_path.name}")
+
+            results.append(result)
+
+        return results

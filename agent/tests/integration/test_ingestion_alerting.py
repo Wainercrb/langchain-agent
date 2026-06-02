@@ -10,6 +10,7 @@ import cronjob
 @pytest.fixture
 def mock_alert_service():
     """Mock alert service for testing."""
+    cronjob.reset_ingestion_alert_cooldown()
     with patch.object(cronjob, 'alert_service') as mock:
         mock.send_alert = AsyncMock()
         yield mock

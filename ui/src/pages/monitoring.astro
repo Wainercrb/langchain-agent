@@ -1,0 +1,137 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="System Monitoring">
+  <main class="mx-auto w-full max-w-1/2 px-4 py-8">
+    <header class="mb-6 flex items-baseline justify-between">
+      <h1 class="text-2xl font-bold text-[var(--color-text)]">System Monitoring</h1>
+      <time id="last-updated" class="text-xs text-[var(--color-text-muted)]">--</time>
+    </header>
+
+    <!-- Loading state -->
+    <div id="loading-state" class="flex items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-12">
+      <p class="text-sm text-[var(--color-text-muted)]">Loading system status...</p>
+    </div>
+
+    <!-- Error state -->
+    <div id="error-state" class="hidden rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/5 p-8 text-center">
+      <p class="text-sm font-medium text-[var(--color-error)]">Unable to retrieve system status</p>
+      <p id="error-message" class="mt-1 text-xs text-[var(--color-text-muted)]"></p>
+      <button id="retry-btn" type="button" class="mt-4 rounded-md bg-[var(--color-error)] px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--color-error)]/90">Retry</button>
+    </div>
+
+    <!-- Status content -->
+    <div id="status-content" class="hidden space-y-6">
+      <!-- Overall status card -->
+      <section id="overall-status" class="rounded-lg border p-6 shadow-sm transition-shadow hover:shadow-md" aria-label="Overall system health">
+        <div class="flex items-center gap-3">
+          <span id="status-indicator" class="h-4 w-4 rounded-full" aria-hidden="true"></span>
+          <span id="status-label" class="text-lg font-semibold text-[var(--color-text)]">--</span>
+        </div>
+        <p id="status-description" class="mt-2 text-sm text-[var(--color-text-secondary)]"></p>
+      </section>
+
+      <!-- Details section -->
+      <section aria-label="Status details">
+        <h2 class="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Details</h2>
+        <div id="details-list" class="space-y-3"></div>
+      </section>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  import { fetchMonitoringStatus } from '../utils/api';
+  import type { MonitoringStatus } from '../utils/api';
+
+  const API_BASE = import.meta.env.PUBLIC_API_URL || 'http://localhost:8000';
+  const POLL_INTERVAL_MS = 30_000;
+
+  async function loadStatus() {
+    const loadingEl = document.getElementById('loading-state');
+    const errorEl = document.getElementById('error-state');
+    const statusContent = document.getElementById('status-content');
+    const errorMsg = document.getElementById('error-message');
+    const timeEl = document.getElementById('last-updated');
+
+    loadingEl?.classList.remove('hidden');
+    errorEl?.classList.add('hidden');
+    statusContent?.classList.add('hidden');
+
+    try {
+      const data = await fetchMonitoringStatus();
+
+      loadingEl?.classList.add('hidden');
+
+      // Update overall status card
+      const indicator = document.getElementById('status-indicator');
+      const label = document.getElementById('status-label');
+      const description = document.getElementById('status-description');
+      const overallCard = document.getElementById('overall-status');
+
+      if (indicator && label) {
+        const colorMap: Record<string, string> = {
+          healthy: 'bg-green-500',
+          degraded: 'bg-yellow-500',
+          unhealthy: 'bg-red-500',
+        };
+        indicator.className = `h-4 w-4 rounded-full ${colorMap[data.status] || 'bg-gray-400'}`;
+
+        const labelMap: Record<string, string> = {
+          healthy: 'Healthy',
+          degraded: 'Degraded',
+          unhealthy: 'Unhealthy',
+        };
+        label.textContent = labelMap[data.status] || data.status;
+
+        const borderMap: Record<string, string> = {
+          healthy: 'border-green-200 bg-green-50',
+          degraded: 'border-yellow-200 bg-yellow-50',
+          unhealthy: 'border-red-200 bg-red-50',
+        };
+        overallCard?.classList.add(...(borderMap[data.status] || 'border-[var(--color-border)] bg-[var(--color-surface)]').split(' '));
+      }
+
+      // Render details
+      const detailsList = document.getElementById('details-list');
+      if (detailsList && data.details) {
+        detailsList.innerHTML = Object.entries(data.details).map(([key, value]) => {
+          const valStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+          return `
+            <div class="flex items-center justify-between rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
+              <span class="text-sm font-medium text-[var(--color-text)]">${escapeHtml(formatKey(key))}</span>
+              <span class="text-sm text-[var(--color-text-secondary)]">${escapeHtml(valStr)}</span>
+            </div>
+          `;
+        }).join('');
+      }
+
+      statusContent?.classList.remove('hidden');
+      if (timeEl) timeEl.textContent = new Date().toLocaleTimeString();
+    } catch (err) {
+      loadingEl?.classList.add('hidden');
+      errorEl?.classList.remove('hidden');
+      if (errorMsg) {
+        errorMsg.textContent = err instanceof Error ? err.message : 'An unexpected error occurred';
+      }
+    }
+  }
+
+  function formatKey(key: string): string {
+    return key
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  function escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  document.getElementById('retry-btn')?.addEventListener('click', loadStatus);
+
+  loadStatus();
+  setInterval(loadStatus, POLL_INTERVAL_MS);
+</script>

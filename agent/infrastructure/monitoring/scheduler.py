@@ -24,10 +24,12 @@ class MonitoringScheduler:
         health_verifier: HealthVerifier,
         alert_service,
         settings_obj=None,
+        decision_tracker=None,
     ) -> None:
         self._health_verifier = health_verifier
         self._alert_service = alert_service
         self._settings = settings_obj or settings
+        self._decision_tracker = decision_tracker
         self._task: Optional[asyncio.Task] = None
         self._last_results: Dict[str, HealthCheckResult] = {}
         self._last_check: Optional[datetime] = None
@@ -58,6 +60,7 @@ class MonitoringScheduler:
             ("tracing_completeness", self._health_verifier.check_tracing_completeness),
             ("memory_usage", self._health_verifier.check_memory_usage),
             ("log_rotation", self._health_verifier.check_log_rotation),
+            ("decision_drift", lambda: self._health_verifier.check_decision_drift(self._decision_tracker)),
         ]
 
         while True:

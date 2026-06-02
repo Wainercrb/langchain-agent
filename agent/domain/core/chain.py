@@ -226,6 +226,7 @@ class RAGChain:
             temperature=temperature,
             latency_ms=execution_time_ms,
             reasoning_summary=f"RAG retrieval: {documents_retrieved} docs with top_k={top_k}",
+            tool_selection_rationale=None,
         )
 
     def _get_run_id(self) -> str:
@@ -278,6 +279,7 @@ class RAGChain:
                     "chain_length": decision_metadata.chain_length,
                     "tools_used": decision_metadata.tools_used,
                     "reasoning_summary": decision_metadata.reasoning_summary,
+                    "tool_selection_rationale": getattr(decision_metadata, "tool_selection_rationale", None),
                     "query_preview": decision_metadata.query_preview,
                     "latency_ms": decision_metadata.latency_ms,
                     "documents_retrieved": decision_metadata.top_k,

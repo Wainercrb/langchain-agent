@@ -146,3 +146,60 @@ class HealthVerifier:
             return True, f"Log file age {age_hours:.1f}h (max: {max_age}h)"
         except Exception as e:
             return False, f"Log rotation check failed: {str(e)}"
+
+    async def check_decision_drift(self, decision_tracker=None) -> Tuple[bool, str]:
+        """Analyze recent decision quality trends and alert on degradation.
+
+        Compares the optimal decision ratio in the last N decisions against
+        a threshold. If the ratio drops below the threshold, it signals
+        potential model drift, prompt degradation, or tool availability issues.
+
+        Args:
+            decision_tracker: DecisionTracker instance to query.
+
+        Returns:
+            Tuple of (ok, detail).
+        """
+        if decision_tracker is None:
+            return True, "No decision tracker available, drift check skipped"
+
+        try:
+            from models.decision import DecisionQuality
+
+            # Analyze the last 50 decisions for drift
+            window_size = 50
+            quality_threshold = 0.5  # 50% optimal ratio minimum
+
+            all_decisions = list(decision_tracker._store)[-window_size:]
+            if len(all_decisions) < 10:
+                return True, (
+                    f"Insufficient data for drift analysis: "
+                    f"{len(all_decisions)} decisions (need >= 10)"
+                )
+
+            optimal_count = sum(
+                1 for d in all_decisions
+                if d.decision_quality == DecisionQuality.OPTIMAL
+            )
+            poor_count = sum(
+                1 for d in all_decisions
+                if d.decision_quality == DecisionQuality.POOR
+            )
+            optimal_ratio = optimal_count / len(all_decisions)
+            poor_ratio = poor_count / len(all_decisions)
+
+            if optimal_ratio < quality_threshold:
+                return False, (
+                    f"Decision quality degradation: "
+                    f"{optimal_ratio:.0%} optimal in last {len(all_decisions)} decisions "
+                    f"(threshold: {quality_threshold:.0%}), "
+                    f"{poor_ratio:.0%} poor"
+                )
+
+            return True, (
+                f"Decision quality stable: "
+                f"{optimal_ratio:.0%} optimal, {poor_ratio:.0%} poor "
+                f"(last {len(all_decisions)} decisions)"
+            )
+        except Exception as e:
+            return False, f"Decision drift check failed: {str(e)}"

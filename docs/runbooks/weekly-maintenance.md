@@ -32,6 +32,13 @@ Run this checklist during the scheduled weekly maintenance window.
 
 ## Database Health
 
+- [ ] Run automated backup script:
+  ```bash
+  cd agent && python scripts/backup.py --retention 7
+  ```
+  - Verify backup file created in `backups/`
+  - Check backup size is reasonable (not 0 bytes)
+  - Review backup logs for warnings
 - [ ] Check table sizes:
   ```sql
   SELECT relname, pg_size_pretty(pg_total_relation_size(relid))
