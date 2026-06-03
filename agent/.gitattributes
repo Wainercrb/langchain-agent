@@ -1,0 +1,8 @@
+# Ensure shell scripts are always checked out as LF on Windows.
+# Without this, Git on Windows with core.autocrlf=true can convert
+# *.sh files to CRLF, which breaks the #!/bin/bash shebang at runtime
+# in Linux containers.
+*.sh text eol=lf
+
+# Python files: keep CRLF/LF as-is (Python handles both)
+*.py text eol=lf

@@ -38,8 +38,10 @@ ENV PATH=/root/.local/bin:$PATH \
 # Copy application code
 COPY . .
 
-# Ensure start.sh is executable (git on Windows may not preserve the bit)
-RUN chmod +x start.sh
+# Strip CR from shell scripts (Git on Windows may re-introduce CRLF on
+# checkout, which would break the #!/bin/bash shebang at runtime) and
+# ensure start.sh is executable.
+RUN sed -i 's/\r$//' start.sh && chmod +x start.sh
 
 # Expose port
 EXPOSE 8000

@@ -15,7 +15,7 @@ set -e
 # before SIGKILL. If either child exits unexpectedly, we tear down the
 # other and exit, so the container is restarted by `restart: unless-stopped`.
 
-echo "[start.sh] Launching cronjob in background..."
+# echo "[start.sh] Launching cronjob in background..."
 python cronjob.py &
 CRON_PID=$!
 
