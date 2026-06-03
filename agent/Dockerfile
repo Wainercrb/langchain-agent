@@ -19,12 +19,9 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install runtime dependencies only
-# postgresql-client provides psql + pg_dump for backup and VACUUM jobs
-# scheduled by cronjob.py.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
-    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python packages from builder
@@ -38,11 +35,6 @@ ENV PATH=/root/.local/bin:$PATH \
 # Copy application code
 COPY . .
 
-# Strip CR from shell scripts (Git on Windows may re-introduce CRLF on
-# checkout, which would break the #!/bin/bash shebang at runtime) and
-# ensure start.sh is executable.
-RUN sed -i 's/\r$//' start.sh && chmod +x start.sh
-
 # Expose port
 EXPOSE 8000
 
@@ -50,6 +42,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/v1/health || exit 1
 
-# Launch both server.py and cronjob.py via start.sh (single container,
-# bash forwards SIGTERM to both children for graceful shutdown)
-CMD ["./start.sh"]
+# Run the application
+CMD ["python", "server.py"]

@@ -11,10 +11,6 @@ services:
       - "8000:8000"
     env_file:
       - ./agent/.env
-    volumes:
-      # Persist ingestion artifacts and backups across container restarts
-      - ./agent/knowledge:/app/knowledge
-      - ./agent/backups:/app/backups
     networks:
       - langchain-network
     restart: unless-stopped
