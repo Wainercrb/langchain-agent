@@ -56,7 +56,7 @@ from infrastructure.observability.decisions import DecisionTracker
 decision_tracker = DecisionTracker(maxlen=10000, supabase_client=supabase_client)
 
 # ── Agent ─────────────────────────────────────────────────────────────
-agent, _ = _create_agent(
+agent = _create_agent(
     llm_provider=llm,
     decision_tracker=decision_tracker,
     vector_store=vector_store,

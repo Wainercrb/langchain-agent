@@ -40,12 +40,13 @@ def _create_alert_providers():
 
 def _create_agent(llm_provider, decision_tracker, vector_store, embeddings):
     """Create the ToolCallingAgent with search and document tools."""
-    from infrastructure.tools import create_search_documents_tool, web_search_tool
     from domain.retrieval.retriever import Retriever
     from infrastructure.agent import ToolCallingAgent
 
     retriever = Retriever(vector_store=vector_store, embeddings=embeddings)
     search_artifact_store = []
+
+    from infrastructure.tools import create_search_documents_tool, web_search_tool
 
     agent_tools = [
         create_search_documents_tool(
@@ -62,4 +63,4 @@ def _create_agent(llm_provider, decision_tracker, vector_store, embeddings):
         artifact_store=search_artifact_store,
         default_top_k=5,
         decision_tracker=decision_tracker,
-    ), search_artifact_store
+    )
