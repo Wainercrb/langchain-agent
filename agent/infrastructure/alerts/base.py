@@ -140,29 +140,4 @@ class AlertProviderBase(ABC):
 AlertProvider = AlertProviderBase
 
 
-class NoOpAlertProvider(AlertProviderBase):
-    """No-op alert provider — used when no webhooks are configured."""
 
-    async def send_alert(
-        self,
-        severity: Severity,
-        message: str,
-        error: Optional[Exception] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> None:
-        """Discard the alert silently."""
-        pass
-
-    def _build_payload(
-        self,
-        severity: Severity,
-        message: str,
-        error: Optional[Exception],
-        metadata: Optional[Dict[str, Any]],
-    ) -> dict:
-        """Return empty payload."""
-        return {}
-
-    async def _send(self, payload: dict) -> None:
-        """No-op send."""
-        pass

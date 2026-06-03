@@ -224,12 +224,4 @@ class ParserFactory:
             error_code="UNSUPPORTED_FILE_TYPE",
         )
 
-    @classmethod
-    def register_parser(cls, parser: FileParser) -> None:
-        """Register custom parser (for extensibility).
 
-        Args:
-            parser: FileParser instance
-        """
-        cls._parsers.insert(0, parser)  # Insert at beginning for priority
-        logger.info(f"Registered custom parser: {parser.__class__.__name__}")

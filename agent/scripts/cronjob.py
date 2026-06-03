@@ -34,12 +34,6 @@ _last_ingestion_alert_time: float = 0
 _ingestion_alert_cooldown = 3600  # 1 hour between ingestion failure alerts
 
 
-def reset_ingestion_alert_cooldown() -> None:
-    """Reset the ingestion alert cooldown. Useful for testing."""
-    global _last_ingestion_alert_time
-    _last_ingestion_alert_time = 0
-
-
 def _alert_on_failures(results) -> None:
     """Send a simple Discord alert when ingestion failures are detected.
 

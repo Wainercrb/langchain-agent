@@ -367,10 +367,4 @@ class DecisionTracker:
             from infrastructure.logging import logger
             logger.warning(f"DecisionTracker: failed to save to {persist_path}: {e}")
 
-    def flush(self) -> None:
-        """Force immediate persistence of all pending records.
 
-        Call this on shutdown or before critical operations to ensure
-        no records are lost due to batching.
-        """
-        self._save()

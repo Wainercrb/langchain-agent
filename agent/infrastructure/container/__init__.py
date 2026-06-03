@@ -58,7 +58,6 @@ decision_tracker = DecisionTracker(maxlen=10000, supabase_client=supabase_client
 # ── Agent ─────────────────────────────────────────────────────────────
 agent, _ = _create_agent(
     llm_provider=llm,
-    tools=[],
     decision_tracker=decision_tracker,
     vector_store=vector_store,
     embeddings=embeddings,

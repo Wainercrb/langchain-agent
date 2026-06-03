@@ -99,12 +99,6 @@ class CloudWatchLogger(Logger):
         }
         self._py_logger.log(level_map.get(level, logging.INFO), msg, **log_kwargs)
 
-    def flush(self) -> None:
-        """Force flush pending logs to CloudWatch."""
-        for handler in self._py_logger.handlers:
-            if isinstance(handler, CloudWatchLogHandler):
-                handler.flush()
-
     def __repr__(self) -> str:
         return (
             f"CloudWatchLogger(group={self._log_group!r}, "

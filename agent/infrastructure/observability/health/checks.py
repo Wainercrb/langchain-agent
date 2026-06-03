@@ -64,7 +64,7 @@ class HealthVerifier:
             return True, "LangSmith tracing not configured, skipping"
         try:
             from langsmith import Client as LangSmithClient
-            from api.metrics.request import get_request_metrics
+            from api.metrics import get_request_metrics
 
             client = LangSmithClient()
             now = datetime.now(timezone.utc)
@@ -121,10 +121,6 @@ class HealthVerifier:
             return True, "psutil not available, memory check skipped"
         except Exception as e:
             return False, f"Memory check failed: {str(e)}"
-
-    async def check_log_rotation(self) -> Tuple[bool, str]:
-        """Always passes — log rotation is managed by CloudWatch retention policies."""
-        return True, "Log rotation managed by CloudWatch retention policies"
 
     async def check_decision_drift(self, decision_tracker=None) -> Tuple[bool, str]:
         """Analyze recent decision quality trends and alert on degradation.
