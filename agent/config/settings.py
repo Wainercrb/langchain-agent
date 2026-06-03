@@ -131,6 +131,16 @@ class Settings(BaseSettings):
     monitoring_log_max_age_hours: int = Field(default=24, alias="MONITORING_LOG_MAX_AGE_HOURS")
     monitoring_tracing_window_seconds: int = Field(default=300, alias="MONITORING_TRACING_WINDOW_SECONDS")
 
+    # ── Maintenance Schedule (automated runbook items) ───────────────
+    # These settings control the 3 automated runbook jobs scheduled by
+    # agent/cronjob.py: weekly backup, weekly VACUUM ANALYZE, daily log
+    # rotation. See docs/runbooks/weekly-maintenance.md for the full list.
+    maintenance_backup_enabled: bool = Field(default=True, alias="MAINTENANCE_BACKUP_ENABLED")
+    maintenance_vacuum_enabled: bool = Field(default=True, alias="MAINTENANCE_VACUUM_ENABLED")
+    maintenance_log_rotation_enabled: bool = Field(default=True, alias="MAINTENANCE_LOG_ROTATION_ENABLED")
+    maintenance_backup_retention: int = Field(default=7, alias="MAINTENANCE_BACKUP_RETENTION")
+    maintenance_log_max_age_hours: int = Field(default=168, alias="MAINTENANCE_LOG_MAX_AGE_HOURS")  # 7 days
+
     model_config = {
         "env_file": ".env",
         "case_sensitive": False,
