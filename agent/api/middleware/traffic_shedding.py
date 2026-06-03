@@ -33,13 +33,19 @@ class TrafficSheddingMiddleware:
         app,
         shed_on_status: list[str] | None = None,
         retry_after_seconds: int = 60,
+        enabled: bool = True,
     ) -> None:
         self.app = app
         self._shed_on_status = shed_on_status or ["error"]
         self._retry_after_seconds = retry_after_seconds
+        self._enabled = enabled
 
     async def __call__(self, scope, receive, send) -> None:
         if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        if not self._enabled:
             await self.app(scope, receive, send)
             return
 

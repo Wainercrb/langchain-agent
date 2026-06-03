@@ -37,12 +37,12 @@ def configure_middleware(app: FastAPI) -> None:
     app.add_middleware(RateLimitMiddleware)
 
     # Traffic shedding
-    if settings.traffic_shedding_enabled:
-        app.add_middleware(
-            TrafficSheddingMiddleware,
-            shed_on_status=["error"],
-            retry_after_seconds=settings.traffic_shedding_retry_after,
-        )
+    app.add_middleware(
+        TrafficSheddingMiddleware,
+        shed_on_status=["error"],
+        retry_after_seconds=settings.traffic_shedding_retry_after,
+        enabled=settings.traffic_shedding_enabled,
+    )
 
 
 def configure_correlation_middleware(app: FastAPI) -> None:

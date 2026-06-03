@@ -13,7 +13,7 @@ from api.response_builders import (
     build_chat_response,
     build_metrics_response,
 )
-from config import settings
+from config import settings, get_langsmith_dashboard_url
 from models import (
     ChatRequest,
     ChatResponse,
@@ -273,10 +273,7 @@ async def metrics(
     """
     data = build_metrics_snapshot(decision_tracker=tracker)
 
-    langsmith_url = None
-    if settings.enable_langsmith_tracing and settings.langsmith_api_key:
-        project = settings.langsmith_project or "langchain-agent"
-        langsmith_url = f"https://smith.langchain.com/o/default/projects/p/{project}"
+    langsmith_url = get_langsmith_dashboard_url()
 
     return build_metrics_response(data=data, langsmith_dashboard_url=langsmith_url)
 

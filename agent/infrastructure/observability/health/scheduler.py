@@ -36,11 +36,16 @@ class MonitoringScheduler:
 
     async def start(self) -> None:
         """Start the background monitoring task."""
+        if not self._settings.monitoring_enabled:
+            logger.debug("Monitoring disabled, skipping start")
+            return
         self._task = asyncio.create_task(self._run_loop())
         logger.info("Monitoring scheduler started")
 
     async def stop(self) -> None:
         """Cancel the background monitoring task."""
+        if not self._settings.monitoring_enabled:
+            return
         if self._task is not None:
             self._task.cancel()
             try:

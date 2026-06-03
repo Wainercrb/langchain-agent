@@ -38,4 +38,17 @@ def configure_tracing() -> None:
         )
 
 
-__all__ = ["Settings", "settings", "configure_tracing"]
+def is_langsmith_enabled() -> bool:
+    """Return True if LangSmith tracing is enabled and configured with an API key."""
+    return settings.enable_langsmith_tracing and bool(settings.langsmith_api_key)
+
+
+def get_langsmith_dashboard_url() -> str | None:
+    """Return the LangSmith dashboard URL or None if tracing is not configured."""
+    if not is_langsmith_enabled():
+        return None
+    project = settings.langsmith_project or "langchain-agent"
+    return f"https://smith.langchain.com/o/default/projects/p/{project}"
+
+
+__all__ = ["Settings", "settings", "configure_tracing", "is_langsmith_enabled", "get_langsmith_dashboard_url"]

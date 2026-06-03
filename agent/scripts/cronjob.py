@@ -233,6 +233,37 @@ def _run_vacuum_analyze() -> None:
         )
 
 
+def _schedule_maintenance_jobs(scheduler) -> None:
+    """Schedule maintenance jobs based on settings flags.
+
+    Args:
+        scheduler: APScheduler BlockingScheduler instance.
+    """
+    if settings.maintenance_backup_enabled:
+        scheduler.add_job(
+            _run_backup_cycle,
+            trigger=CronTrigger(day_of_week="sun", hour=2, minute=0),
+            id="weekly_backup",
+            name="Weekly database backup",
+            replace_existing=True,
+            max_instances=1,
+            misfire_grace_time=3600,  # 1h grace for weekly jobs
+        )
+        logger.info("Scheduled weekly backup: Sundays 02:00")
+
+    if settings.maintenance_vacuum_enabled:
+        scheduler.add_job(
+            _run_vacuum_analyze,
+            trigger=CronTrigger(day_of_week="sun", hour=4, minute=0),
+            id="weekly_vacuum_analyze",
+            name="Weekly VACUUM ANALYZE",
+            replace_existing=True,
+            max_instances=1,
+            misfire_grace_time=3600,
+        )
+        logger.info("Scheduled weekly VACUUM ANALYZE: Sundays 04:00")
+
+
 def main() -> None:
     settings.knowledge_dir.mkdir(parents=True, exist_ok=True)
     settings.processed_dir.mkdir(parents=True, exist_ok=True)
@@ -265,29 +296,7 @@ def main() -> None:
     )
 
     # ── Automated maintenance jobs (from docs/runbooks/weekly-maintenance.md) ──
-    if settings.maintenance_backup_enabled:
-        scheduler.add_job(
-            _run_backup_cycle,
-            trigger=CronTrigger(day_of_week="sun", hour=2, minute=0),
-            id="weekly_backup",
-            name="Weekly database backup",
-            replace_existing=True,
-            max_instances=1,
-            misfire_grace_time=3600,  # 1h grace for weekly jobs
-        )
-        logger.info("Scheduled weekly backup: Sundays 02:00")
-
-    if settings.maintenance_vacuum_enabled:
-        scheduler.add_job(
-            _run_vacuum_analyze,
-            trigger=CronTrigger(day_of_week="sun", hour=4, minute=0),
-            id="weekly_vacuum_analyze",
-            name="Weekly VACUUM ANALYZE",
-            replace_existing=True,
-            max_instances=1,
-            misfire_grace_time=3600,
-        )
-        logger.info("Scheduled weekly VACUUM ANALYZE: Sundays 04:00")
+    _schedule_maintenance_jobs(scheduler)
 
     # Graceful shutdown on SIGINT/SIGTERM
     def _shutdown(signum, frame):

@@ -4,7 +4,7 @@ All pluggable singletons (including the agent) live in services/container.py.
 This file provides FastAPI Depends() wrappers only.
 """
 
-from config import settings
+from config import settings, is_langsmith_enabled
 from infrastructure.container import (
     agent,
     decision_tracker,
@@ -66,7 +66,7 @@ async def check_health() -> dict:
     )
 
     # LangSmith check — lightweight API call, no LLM invocation needed
-    if settings.enable_langsmith_tracing and settings.langsmith_api_key:
+    if is_langsmith_enabled():
         try:
             from langsmith import Client as LangSmithClient
             client = LangSmithClient()
