@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends
 
-from api.response_builders import build_metrics_response
+from api.api_responses import build_metrics_response
 from config import get_langsmith_dashboard_url
 from infrastructure.container import decision_tracker
 from api.metrics_store import build_metrics_snapshot

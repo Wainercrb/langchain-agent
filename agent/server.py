@@ -4,7 +4,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from api import router
-from api.exception_handlers import global_exception_handler
+from api.global_exception import global_exception_handler
 from api.lifespan import lifespan
 from api.middleware_config import configure_correlation_middleware, configure_middleware
 from config import settings

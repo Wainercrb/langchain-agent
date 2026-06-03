@@ -4,7 +4,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from api.error_responses import not_found_response
+from api.api_errors import not_found_response
 from infrastructure.container import decision_tracker
 from models import ErrorResponse
 from models.observability.decisions import DecisionLogEntry, DecisionMetricsResponse

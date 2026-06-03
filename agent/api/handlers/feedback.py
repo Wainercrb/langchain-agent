@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 
-from api.error_responses import internal_error_response
+from api.api_errors import internal_error_response
 from infrastructure.container import decision_tracker, feedback_service
 from infrastructure.logging import logger
 from models import ErrorResponse, FeedbackRequest

@@ -3,7 +3,7 @@
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from api.error_responses import internal_error_response
+from api.api_errors import internal_error_response
 from config.constants import TRUNCATE_ALERT_MESSAGE
 from infrastructure.container import alert_service
 from infrastructure.logging import logger
