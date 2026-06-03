@@ -4,8 +4,8 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from api.dependencies import get_decision_tracker
 from api.error_responses import not_found_response
+from infrastructure.container import decision_tracker
 from models import ErrorResponse
 from models.observability.decisions import DecisionLogEntry, DecisionMetricsResponse
 
@@ -24,7 +24,7 @@ async def list_decisions(
     quality: Optional[str] = Query(None, description="Filter by decision quality"),
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(20, ge=1, le=100, description="Results per page"),
-    tracker=Depends(get_decision_tracker),
+    tracker=Depends(lambda: decision_tracker),
 ) -> DecisionMetricsResponse:
     """Query AI decision records with optional filters and pagination.
 
@@ -59,7 +59,7 @@ async def list_decisions(
 )
 async def get_decision(
     run_id: str,
-    tracker=Depends(get_decision_tracker),
+    tracker=Depends(lambda: decision_tracker),
 ) -> DecisionLogEntry:
     """Retrieve a single decision record by run_id.
 

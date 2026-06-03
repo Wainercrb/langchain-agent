@@ -2,9 +2,9 @@
 
 from fastapi import APIRouter, Depends
 
-from api.dependencies import get_decision_tracker
 from api.response_builders import build_metrics_response
 from config import get_langsmith_dashboard_url
+from infrastructure.container import decision_tracker
 from metrics import build_metrics_snapshot
 from models import MetricsResponse
 
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/v1", tags=["metrics"])
     status_code=200,
 )
 async def metrics_endpoint(
-    tracker=Depends(get_decision_tracker),
+    tracker=Depends(lambda: decision_tracker),
 ) -> MetricsResponse:
     """
     Return lightweight operational counters since process startup.

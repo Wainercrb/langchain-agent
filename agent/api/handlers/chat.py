@@ -6,9 +6,9 @@ from typing import Any, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from api.dependencies import get_agent
 from api.error_responses import internal_error_response, validation_error_response
 from api.response_builders import build_chat_response
+from infrastructure.container import agent
 from infrastructure.logging import logger
 from metrics import get_llm_usage_metrics, get_request_metrics
 from models import ChatRequest, ChatResponse, ErrorResponse
@@ -43,7 +43,7 @@ def _extract_tokens(response: Any) -> Tuple[int, int]:
 )
 async def chat(
     request: ChatRequest,
-    processor=Depends(get_agent),
+    processor=Depends(lambda: agent),
 ) -> ChatResponse:
     """
     Process a user query using the configured agent strategy.

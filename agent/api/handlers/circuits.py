@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from infrastructure.container import llm
 from models import CircuitStatusResponse
 
 router = APIRouter(prefix="/v1", tags=["llm"])
@@ -18,10 +19,6 @@ async def circuit_status() -> CircuitStatusResponse:
     Returns:
         CircuitStatusResponse with provider name -> circuit state mapping.
     """
-    from infrastructure.container import llm
-
-    from models.observability.circuits import CircuitStatusResponse
-
     return CircuitStatusResponse(
         circuits=llm.circuit_status() if hasattr(llm, "circuit_status") else {},
     )

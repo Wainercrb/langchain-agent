@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from config import settings
+from infrastructure.container import _monitoring_scheduler
 from models import MonitoringStatusResponse
 
 router = APIRouter(prefix="/v1", tags=["monitoring"])
@@ -24,10 +25,6 @@ async def monitoring_status() -> MonitoringStatusResponse:
             - checks: List of individual check results
             - overall_status: "ok", "degraded", or "error"
     """
-    from infrastructure.container import _monitoring_scheduler
-
-    from models.observability.health import MonitoringStatusResponse
-
     results = _monitoring_scheduler.last_results
     checks = list(results.values())
 

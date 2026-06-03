@@ -5,10 +5,10 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 
-from api.dependencies import get_feedback_service
 from api.error_responses import internal_error_response
+from infrastructure.container import decision_tracker, feedback_service
 from infrastructure.logging import logger
-from models import FeedbackRequest, ErrorResponse
+from models import ErrorResponse, FeedbackRequest
 from models.observability.decisions import DecisionLogEntry
 
 router = APIRouter(prefix="/v1", tags=["feedback"])
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/v1", tags=["feedback"])
 )
 async def feedback(
     request: FeedbackRequest,
-    service=Depends(get_feedback_service),
+    service=Depends(lambda: feedback_service),
 ) -> dict:
     """Record user feedback (like/dislike) correlated to a LangSmith run_id.
 
@@ -47,8 +47,6 @@ async def feedback(
     Raises:
         HTTPException (422): Validation error in request parameters
     """
-    from infrastructure.container import decision_tracker
-
     # Correlate feedback with DecisionTracker
     feedback_payload = {
         "type": request.feedback_type,
