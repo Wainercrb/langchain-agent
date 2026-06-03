@@ -23,7 +23,7 @@ from config.prompts import SYSTEM_PROMPT_TOOL_CALLING as SYSTEM_PROMPT
 from infrastructure.observability.tracing import build_source_documents, capture_tracing_tags, extract_run_id
 from models import ChatResponse, SourceDocument
 from models.observability.decisions import DecisionLogEntry, DecisionQuality, ToolCallRecord
-from infrastructure.agent.base import Agent
+from domain.agents.base import Agent
 from infrastructure.logging import logger
 
 

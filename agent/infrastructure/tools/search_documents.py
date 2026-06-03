@@ -10,7 +10,7 @@ from typing import Optional
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
-from utils.formatting import format_documents_as_context
+from domain.retrieval.formatting import format_documents_as_context
 from infrastructure.logging import logger
 
 # Phrases to strip from user queries before semantic search.

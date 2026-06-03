@@ -14,7 +14,7 @@ from config.constants import TRUNCATE_CONTENT_PREVIEW, TRUNCATE_QUERY_LOG, TRUNC
 from infrastructure.observability.tracing import build_source_documents, capture_tracing_tags, extract_run_id
 from models import ChatResponse
 from models.observability.decisions import DecisionLogEntry, DecisionQuality
-from utils.formatting import format_documents_as_context
+from ..retrieval.formatting import format_documents_as_context
 
 from ..retrieval.retriever import Retriever
 from infrastructure.logging import logger

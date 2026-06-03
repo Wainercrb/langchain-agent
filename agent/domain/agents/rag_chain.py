@@ -4,7 +4,7 @@ This is the "legacy" strategy: always retrieve documents, then call LLM.
 Kept for backward compatibility and as a baseline comparison.
 """
 
-from infrastructure.agent.base import Agent
+from domain.agents.base import Agent
 from domain.core.chain import RAGChain
 
 

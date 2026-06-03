@@ -78,9 +78,10 @@ def _create_alert_providers():
 
 def _create_agent(llm_provider, tools, decision_tracker, vector_store, embeddings):
     """Create the agent instance based on settings."""
+    from domain.agents import RAGChainAgent
     from domain.core.chain import RAGChain
     from domain.retrieval.retriever import Retriever
-    from infrastructure.agent import RAGChainAgent, ToolCallingAgent
+    from infrastructure.agent import ToolCallingAgent
 
     retriever = Retriever(vector_store=vector_store, embeddings=embeddings)
 
