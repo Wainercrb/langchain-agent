@@ -48,14 +48,6 @@ class GoogleProvider(LLMProvider):
 
     def invoke(self, messages: List[Dict[str, str]], **kwargs) -> LLMResponse:
         try:
-            response = self._llm.invoke(messages, **kwargs)
-            return LLMResponse(
-                content=(
-                    response.content if hasattr(response, "content") else str(response)
-                ),
-                model=self.model,
-                provider=self.name,
-                usage=getattr(response, "usage_metadata", None),
-            )
+            return self._invoke_provider(messages, **kwargs)
         except Exception as e:
-            raise self._classify_error(e, provider=self.name)
+            raise self.classify_error(e, provider=self.name)

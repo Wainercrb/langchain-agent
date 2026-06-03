@@ -93,100 +93,46 @@ class ResilientChatModel(Runnable):
         except Exception:
             pass
 
-    def _try_provider_sync(self, input: Any, config: Optional[dict], kwargs: dict) -> Any:
-        """Core loop: try providers in order with circuit breaker + failover (sync)."""
-        errors = []
+    def _try_provider(
+        self, invoke_fn: callable, input: Any, config: Optional[dict], kwargs: dict
+    ) -> Any:
+        """Core loop: try providers in order with circuit breaker + failover.
 
+        Args:
+            invoke_fn: Callable for model invocation (model.invoke or model.ainvoke).
+            input: Input to pass to the model.
+            config: Optional LangChain config.
+            kwargs: Additional keyword arguments.
+
+        Returns:
+            Model response from the first successful provider.
+
+        Raises:
+            AllProvidersExhaustedError: if all providers fail.
+        """
+        errors = []
         for provider in self._providers:
             cb = self._circuit_breakers[provider.name]
-
             if not cb.can_execute():
-                logger.info(
-                    f"ResilientChatModel: provider={provider.name} circuit OPEN, skipping"
-                )
+                logger.info(f"ResilientChatModel: provider={provider.name} circuit OPEN, skipping")
                 continue
-
             try:
                 raw_model = provider.chat_model
-                if self._tools:
-                    bound_model = raw_model.bind_tools(self._tools, **kwargs)
-                else:
-                    bound_model = raw_model
-
-                response = bound_model.invoke(input, config=config, **kwargs)
+                bound_model = raw_model.bind_tools(self._tools, **kwargs) if self._tools else raw_model
+                response = invoke_fn(bound_model, input, config=config, **kwargs)
                 response = self._normalize_content(response)
                 cb.record_success()
                 self._tag_trace(provider.name)
-
                 logger.info(f"ResilientChatModel: provider={provider.name}, success")
                 return response
-
             except Exception as e:
                 cb.record_failure()
                 classified = provider.classify_error(e, provider=provider.name)
-
                 if isinstance(classified, PermanentLLMError):
-                    logger.error(
-                        f"ResilientChatModel: provider={provider.name} permanent error: {e}"
-                    )
+                    logger.error(f"ResilientChatModel: provider={provider.name} permanent error: {e}")
                     raise
-
-                logger.warning(
-                    f"ResilientChatModel: provider={provider.name} transient error, "
-                    f"trying next ({cb})"
-                )
+                logger.warning(f"ResilientChatModel: provider={provider.name} transient error, trying next ({cb})")
                 errors.append(e)
-
-        raise AllProvidersExhaustedError(
-            message=f"All {len(errors)} LLM providers exhausted in ResilientChatModel",
-            attempted_providers=[p.name for p in self._providers],
-            errors=errors,
-        )
-
-    async def _try_provider_async(self, input: Any, config: Optional[dict], kwargs: dict) -> Any:
-        """Core loop: try providers in order with circuit breaker + failover (async)."""
-        errors = []
-
-        for provider in self._providers:
-            cb = self._circuit_breakers[provider.name]
-
-            if not cb.can_execute():
-                logger.info(
-                    f"ResilientChatModel: provider={provider.name} circuit OPEN, skipping"
-                )
-                continue
-
-            try:
-                raw_model = provider.chat_model
-                if self._tools:
-                    bound_model = raw_model.bind_tools(self._tools, **kwargs)
-                else:
-                    bound_model = raw_model
-
-                response = await bound_model.ainvoke(input, config=config, **kwargs)
-                response = self._normalize_content(response)
-                cb.record_success()
-                self._tag_trace(provider.name)
-
-                logger.info(f"ResilientChatModel: provider={provider.name}, success")
-                return response
-
-            except Exception as e:
-                cb.record_failure()
-                classified = provider.classify_error(e, provider=provider.name)
-
-                if isinstance(classified, PermanentLLMError):
-                    logger.error(
-                        f"ResilientChatModel: provider={provider.name} permanent error: {e}"
-                    )
-                    raise
-
-                logger.warning(
-                    f"ResilientChatModel: provider={provider.name} transient error, "
-                    f"trying next ({cb})"
-                )
-                errors.append(e)
-
         raise AllProvidersExhaustedError(
             message=f"All {len(errors)} LLM providers exhausted in ResilientChatModel",
             attempted_providers=[p.name for p in self._providers],
@@ -194,12 +140,12 @@ class ResilientChatModel(Runnable):
         )
 
     def invoke(self, input: Any, config: Optional[dict] = None, **kwargs) -> Any:
-        """Try providers in order, failover on transient error with backoff."""
-        return self._try_provider_sync(input, config, kwargs)
+        """Try providers in order, failover on transient error with backoff (sync)."""
+        return self._try_provider(lambda m, i, c, k: m.invoke(i, config=c, **k), input, config, kwargs)
 
     async def ainvoke(self, input: Any, config: Optional[dict] = None, **kwargs) -> Any:
         """Async version — try providers in order with failover."""
-        return await self._try_provider_async(input, config, kwargs)
+        return self._try_provider(lambda m, i, c, k: m.ainvoke(i, config=c, **k), input, config, kwargs)
 
     def __repr__(self) -> str:
         return (

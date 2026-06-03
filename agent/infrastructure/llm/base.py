@@ -52,6 +52,24 @@ class LLMProvider(ABC):
         """
         pass
 
+    def _invoke_provider(self, messages: List[Dict[str, str]], **kwargs) -> "LLMResponse":
+        """Template method: invoke chat model, wrap response in LLMResponse.
+
+        Args:
+            messages: List of dicts with 'role' and 'content'
+            **kwargs: Additional keyword arguments forwarded to the underlying LLM call
+
+        Returns:
+            LLMResponse with content and metadata
+        """
+        response = self.chat_model.invoke(messages, **kwargs)
+        return LLMResponse(
+            content=response.content if hasattr(response, "content") else str(response),
+            model=self.model,
+            provider=self.name,
+            usage=getattr(response, "usage_metadata", None),
+        )
+
     def classify_error(self, error: Exception, provider: str) -> Exception:
         """Classify an error as transient (retriable) or permanent.
 

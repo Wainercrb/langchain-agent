@@ -1,17 +1,72 @@
-"""File parser implementations using Strategy pattern."""
+"""File parser implementations using Strategy pattern.
+
+ParserFactory auto-discovers parser subclasses via __init_subclass__
+registration, making the system open for extension without modification (OCP).
+"""
 
 import re
 from abc import ABC, abstractmethod
-from html.parser import HTMLParser
+from html.parser import HTMLParser as StdlibHTMLParser
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 from infrastructure.logging import logger
 from utils.exceptions import IngestionError
 
 
+class ParserFactory:
+    """Factory for selecting appropriate file parser based on file type.
+
+    Uses registry pattern: parsers are auto-registered via FileParser's
+    __init_subclass__ hook. No manual list maintenance needed.
+    """
+
+    _registry: Dict[str, "FileParser"] = {}
+
+    @classmethod
+    def register(cls, parser: "FileParser") -> None:
+        """Register a parser for all file extensions it supports.
+
+        Args:
+            parser: FileParser instance to register.
+        """
+        for ext in [".txt", ".md", ".html", ".pdf", ".docx", ".csv"]:
+            if parser.supports(ext):
+                cls._registry[ext] = parser
+
+    @classmethod
+    def get_parser(cls, file_extension: str) -> "FileParser":
+        """Get parser for file extension.
+
+        Args:
+            file_extension: File extension (e.g., '.pdf')
+
+        Returns:
+            Appropriate FileParser instance
+
+        Raises:
+            IngestionError: If no parser found for extension
+        """
+        parser = cls._registry.get(file_extension.lower())
+        if parser is None:
+            raise IngestionError(
+                message=f"Unsupported file type: {file_extension}",
+                error_code="UNSUPPORTED_FILE_TYPE",
+            )
+        return parser
+
+
 class FileParser(ABC):
-    """Abstract base class for file parsers."""
+    """Abstract base class for file parsers.
+
+    Concrete subclasses are automatically registered with ParserFactory
+    via __init_subclass__. Subclasses define supports() and parse().
+    """
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # Auto-register concrete subclasses in the factory registry
+        ParserFactory.register(cls())
 
     @abstractmethod
     def supports(self, extension: str) -> bool:
@@ -52,10 +107,10 @@ class MarkdownParser(FileParser):
         return text
 
 
-class HTMLParser_(FileParser):
+class HTMLParser(FileParser):
     """Parser for HTML files."""
 
-    class _HTMLTextExtractor(HTMLParser):
+    class _HTMLTextExtractor(StdlibHTMLParser):
         """Extract text from HTML, ignoring scripts and styles."""
 
         def __init__(self):
@@ -188,40 +243,3 @@ class CSVParser(FileParser):
                 message=f"Failed to parse CSV file {file_path}: {str(e)}",
                 error_code="CSV_PARSE_ERROR",
             )
-
-
-class ParserFactory:
-    """Factory for selecting appropriate file parser based on file type."""
-
-    _parsers: List[FileParser] = [
-        TextParser(),
-        MarkdownParser(),
-        HTMLParser_(),
-        PDFParser(),
-        DocxParser(),
-        CSVParser(),
-    ]
-
-    @classmethod
-    def get_parser(cls, file_extension: str) -> FileParser:
-        """Get parser for file extension.
-
-        Args:
-            file_extension: File extension (e.g., '.pdf')
-
-        Returns:
-            Appropriate FileParser instance
-
-        Raises:
-            IngestionError: If no parser found for extension
-        """
-        for parser in cls._parsers:
-            if parser.supports(file_extension):
-                return parser
-
-        raise IngestionError(
-            message=f"Unsupported file type: {file_extension}",
-            error_code="UNSUPPORTED_FILE_TYPE",
-        )
-
-

@@ -5,7 +5,7 @@ Kept for backward compatibility and as a baseline comparison.
 """
 
 from domain.agents.base import Agent
-from domain.core.chain import RAGChain
+from domain.chains.chain import RAGChain
 
 
 class RAGChainAgent(Agent):

@@ -4,7 +4,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from infrastructure.vector_store.base import VectorStoreBase
+from infrastructure.vector_stores.base import VectorStore as VectorStoreBase
+
 from utils.exceptions import DocumentStoreError
 from infrastructure.logging import logger
 

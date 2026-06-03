@@ -23,7 +23,11 @@ from utils.correlation import set_correlation_id, get_correlation_id
 
 
 # ---------------------------------------------------------------------------
-# RateLimiter — reusable utility (used by middleware + embeddings)
+# RateLimiter — imported from infrastructure to break circular dependency
+# ---------------------------------------------------------------------------
+
+from infrastructure.rate_limiter import RateLimiter
+
 # ---------------------------------------------------------------------------
 
 class RateLimiter:

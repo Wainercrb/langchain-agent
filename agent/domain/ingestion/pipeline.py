@@ -10,8 +10,7 @@ from typing import Any, List, Protocol
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from infrastructure.logging import logger
-from infrastructure.parsers.parser import ParserFactory
+from domain.ports import Logger, ParserRegistry
 
 
 class IngestionStatus(str, Enum):
@@ -60,6 +59,8 @@ class DocumentIngestionPipeline:
         failed_dir: Path,
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
+        logger: Logger = None,
+        parser_registry: ParserRegistry = None,
     ):
         self.embeddings = embeddings
         self.vector_store = vector_store
@@ -67,18 +68,22 @@ class DocumentIngestionPipeline:
         self.failed_dir = failed_dir
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
+        self.logger = logger
+        self._parser_registry = parser_registry
 
     def ingest_file(self, file_path: Path) -> IngestionResult:
         """Process a single file through the ingestion pipeline."""
         start = time.time()
-        logger.info(f"Processing: {file_path.name}")
+        if self.logger:
+            self.logger.info(f"Processing: {file_path.name}")
 
         raw_bytes = file_path.read_bytes()
         content_hash = hashlib.sha256(raw_bytes).hexdigest()
 
         existing = self.vector_store.find_document_by_hash(content_hash)
         if existing is not None:
-            logger.info(f"Skipping (unchanged): {file_path.name}")
+            if self.logger:
+                self.logger.info(f"Skipping (unchanged): {file_path.name}")
             self._move_to_processed(file_path)
             return IngestionResult(
                 filename=file_path.name,
@@ -114,7 +119,8 @@ class DocumentIngestionPipeline:
         self._move_to_processed(file_path)
 
         elapsed = time.time() - start
-        logger.info(f"Done: {file_path.name} ({count} chunks, {elapsed:.1f}s)")
+        if self.logger:
+            self.logger.info(f"Done: {file_path.name} ({count} chunks, {elapsed:.1f}s)")
         return IngestionResult(
             filename=file_path.name,
             status=IngestionStatus.SUCCESS,
@@ -135,12 +141,13 @@ class DocumentIngestionPipeline:
         if not files:
             return []
 
-        logger.info(f"Found {len(files)} file(s) in {directory}")
+        if self.logger:
+            self.logger.info(f"Found {len(files)} file(s) in {directory}")
         return [self.ingest_file(f) for f in files]
 
     def _parse_file(self, file_path: Path) -> str:
         ext = file_path.suffix.lower()
-        parser = ParserFactory.get_parser(ext)
+        parser = self._parser_registry.get_parser(ext)
         return parser.parse(file_path)
 
     def _split_text(self, text: str) -> List[str]:
@@ -154,7 +161,8 @@ class DocumentIngestionPipeline:
     def _handle_failure(
         self, file_path: Path, error: str, start: float
     ) -> IngestionResult:
-        logger.error(f"Failed: {file_path.name} — {error}")
+        if self.logger:
+            self.logger.error(f"Failed: {file_path.name} — {error}")
         self._move_to_failed(file_path)
         self.vector_store.log_ingestion(
             file_path.name, "failure", error_message=error
@@ -199,7 +207,8 @@ class DocumentIngestionPipeline:
             return []
 
         results: List[IngestionResult] = []
-        logger.info(f"DLQ retry: {len(failed_files)} file(s) in failed/")
+        if self.logger:
+            self.logger.info(f"DLQ retry: {len(failed_files)} file(s) in failed/")
 
         for file_path in failed_files:
             meta_path = retry_meta_dir / f"{file_path.name}.json"
@@ -219,10 +228,11 @@ class DocumentIngestionPipeline:
                 shutil.move(str(file_path), str(permanent_dir / file_path.name))
                 if meta_path.exists():
                     meta_path.unlink()
-                logger.warning(
-                    f"DLQ: {file_path.name} exceeded {max_retries} retries, "
-                    f"moved to permanent/"
-                )
+                if self.logger:
+                    self.logger.warning(
+                        f"DLQ: {file_path.name} exceeded {max_retries} retries, "
+                        f"moved to permanent/"
+                    )
                 results.append(IngestionResult(
                     filename=file_path.name,
                     status=IngestionStatus.FAILED,
@@ -231,9 +241,10 @@ class DocumentIngestionPipeline:
                 continue
 
             # Attempt retry
-            logger.info(
-                f"DLQ retry ({retry_count + 1}/{max_retries}): {file_path.name}"
-            )
+            if self.logger:
+                self.logger.info(
+                    f"DLQ retry ({retry_count + 1}/{max_retries}): {file_path.name}"
+                )
 
             # Temporarily move back to knowledge dir for processing
             temp_path = self.failed_dir.parent / "raw_docs" / f".retry_{file_path.name}"
@@ -252,14 +263,16 @@ class DocumentIngestionPipeline:
                     "last_attempt": time.time(),
                 }))
                 # Re-move to failed/ (ingest_file moves it there again)
-                logger.warning(
-                    f"DLQ retry failed for {file_path.name}: {result.error}"
-                )
+                if self.logger:
+                    self.logger.warning(
+                        f"DLQ retry failed for {file_path.name}: {result.error}"
+                    )
             else:
                 # Clean up metadata on success
                 if meta_path.exists():
                     meta_path.unlink()
-                logger.info(f"DLQ retry succeeded for {file_path.name}")
+                if self.logger:
+                    self.logger.info(f"DLQ retry succeeded for {file_path.name}")
 
             results.append(result)
 

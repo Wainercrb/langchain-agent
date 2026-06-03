@@ -94,6 +94,36 @@ def capture_tracing_tags(
     return run_id, langsmith_tags
 
 
+class TracingOrchestratorImpl:
+    """Implementation of TracingOrchestrator Protocol.
+
+    Wraps the module-level functions so domain code can receive
+    a single object via dependency injection.
+    """
+
+    def extract_run_id(self) -> str:
+        return extract_run_id()
+
+    def capture_tracing_tags(
+        self,
+        model_name: str,
+        agent_type: str,
+        top_k: int,
+        temperature: float,
+        decision_metadata: Optional[Any] = None,
+        pre_run_id: Optional[str] = None,
+    ) -> tuple[str, Optional[List[str]]]:
+        return capture_tracing_tags(model_name, agent_type, top_k, temperature, decision_metadata, pre_run_id)
+
+    def build_source_documents(
+        self,
+        documents: list,
+        include_sources: bool,
+        content_preview_length: int = 200,
+    ) -> Optional[List[SourceDocument]]:
+        return build_source_documents(documents, include_sources, content_preview_length)
+
+
 def build_source_documents(
     documents: list,
     include_sources: bool,

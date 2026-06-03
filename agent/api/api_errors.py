@@ -3,8 +3,6 @@
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from fastapi.responses import JSONResponse
-
 
 def validation_error_response(message: str, details: Optional[Any] = None) -> dict:
     """Build a 400 validation error response body."""
