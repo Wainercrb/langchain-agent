@@ -5,16 +5,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from infrastructure.container import _monitoring_scheduler
+from infrastructure.logging import logger
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan: configure tracing and start monitoring scheduler."""
-    from config import configure_tracing
-
-    configure_tracing()
+    """Start monitoring scheduler on startup, stop on shutdown."""
+    logger.info("Application starting up")
     await _monitoring_scheduler.start()
     try:
         yield
     finally:
         await _monitoring_scheduler.stop()
+        logger.info("Application shutting down")
