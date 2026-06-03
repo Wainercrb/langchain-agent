@@ -66,9 +66,13 @@ class Settings(BaseSettings):
     # ── Logging ──────────────────────────────────────────────────────
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     logger_backend: str = Field(default="console", alias="LOGGER_BACKEND")
-    log_file: Optional[str] = Field(default=None, alias="LOG_FILE")
-    log_max_bytes: int = Field(default=10_485_760, alias="LOG_MAX_BYTES")  # 10 MB
-    log_backup_count: int = Field(default=5, alias="LOG_BACKUP_COUNT")
+
+    # ── AWS CloudWatch Logs ──────────────────────────────────────────
+    aws_access_key_id: Optional[str] = Field(default=None, alias="AWS_ACCESS_KEY_ID")
+    aws_secret_access_key: Optional[str] = Field(default=None, alias="AWS_SECRET_ACCESS_KEY")
+    aws_region: str = Field(default="us-east-1", alias="AWS_REGION")
+    cloudwatch_log_group: str = Field(default="langchain-agent", alias="CLOUDWATCH_LOG_GROUP")
+    cloudwatch_stream_name: str = Field(default="default", alias="CLOUDWATCH_STREAM_NAME")
 
     # ── CORS ──────────────────────────────────────────────────────────
     cors_origins: ListFromEnv = Field(
@@ -125,21 +129,19 @@ class Settings(BaseSettings):
     )
 
     # ── Monitoring ────────────────────────────────────────────────────
-    monitoring_enabled: bool = Field(default=False, alias="MONITORING_ENABLED")
+    monitoring_enabled: bool = Field(default=True, alias="MONITORING_ENABLED")
     monitoring_interval_seconds: int = Field(default=300, alias="MONITORING_INTERVAL_SECONDS")
     monitoring_memory_threshold_mb: int = Field(default=512, alias="MONITORING_MEMORY_THRESHOLD_MB")
-    monitoring_log_max_age_hours: int = Field(default=24, alias="MONITORING_LOG_MAX_AGE_HOURS")
     monitoring_tracing_window_seconds: int = Field(default=300, alias="MONITORING_TRACING_WINDOW_SECONDS")
 
     # ── Maintenance Schedule (automated runbook items) ───────────────
-    # These settings control the 3 automated runbook jobs scheduled by
-    # agent/cronjob.py: weekly backup, weekly VACUUM ANALYZE, daily log
-    # rotation. See docs/runbooks/weekly-maintenance.md for the full list.
+    # These settings control the 2 automated runbook jobs scheduled by
+    # agent/cronjob.py: weekly backup, weekly VACUUM ANALYZE.
+    # Log rotation is managed by CloudWatch retention policies.
+    # See docs/runbooks/weekly-maintenance.md for the full list.
     maintenance_backup_enabled: bool = Field(default=True, alias="MAINTENANCE_BACKUP_ENABLED")
     maintenance_vacuum_enabled: bool = Field(default=True, alias="MAINTENANCE_VACUUM_ENABLED")
-    maintenance_log_rotation_enabled: bool = Field(default=True, alias="MAINTENANCE_LOG_ROTATION_ENABLED")
     maintenance_backup_retention: int = Field(default=7, alias="MAINTENANCE_BACKUP_RETENTION")
-    maintenance_log_max_age_hours: int = Field(default=168, alias="MAINTENANCE_LOG_MAX_AGE_HOURS")  # 7 days
 
     model_config = {
         "env_file": ".env",

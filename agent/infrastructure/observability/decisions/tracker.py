@@ -1,38 +1,39 @@
-"""Thread-safe in-memory decision tracker with bounded FIFO eviction and disk persistence.
+"""Thread-safe in-memory decision tracker with bounded FIFO eviction and Supabase persistence.
 
 Maintains a deque of DecisionLogEntry instances, automatically evicting
 oldest records when the configurable maximum size is exceeded.
-Records are persisted to a JSON file and restored on startup.
+Records are persisted to Supabase ai_decisions table and restored on startup.
 Persistence is batched: writes occur after N records or T seconds, whichever comes first.
 """
 
 import hashlib
-import json
-import os
 import threading
 import time
 from collections import deque
-from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from config import settings
 
 from models.observability.decisions import DecisionLogEntry, DecisionMetricsResponse
+from infrastructure.observability.decisions.repository import SupabaseDecisionRepository
 
 
 class DecisionTracker:
-    """Thread-safe bounded store for AI decision records with disk persistence.
+    """Thread-safe bounded store for AI decision records with Supabase persistence.
 
     Records are indexed by run_id for fast lookup. When the store exceeds
     the configured maximum size, oldest records are evicted (FIFO).
-    All records are persisted to a JSON file and restored on startup.
-    Persistence is batched to reduce disk I/O under load.
+    All records are persisted to Supabase and restored on startup.
+    Persistence is batched to reduce API calls under load.
+
+    If no supabase_client is provided, falls back to file-based JSON persistence
+    for backward compatibility.
     """
 
     def __init__(
         self,
         maxlen: int = 10000,
-        persist_path: Optional[str] = None,
+        supabase_client: Optional[Any] = None,
         batch_size: int = 10,
         batch_interval: float = 30.0,
     ) -> None:
@@ -41,7 +42,6 @@ class DecisionTracker:
         self._index: Dict[str, DecisionLogEntry] = {}
         self._lock = threading.Lock()
         self._eviction_count = 0
-        self._persist_path = Path(persist_path) if persist_path else self._default_path()
 
         # Batching: save after N records or T seconds, whichever comes first
         self._batch_size = batch_size
@@ -49,14 +49,13 @@ class DecisionTracker:
         self._pending_count = 0
         self._last_save_time = time.time()
 
-        self._load()
+        # Persistence backend
+        self._repo: Optional[SupabaseDecisionRepository] = None
+        self._use_db = supabase_client is not None
+        if self._use_db:
+            self._repo = SupabaseDecisionRepository(supabase_client)
 
-    @staticmethod
-    def _default_path() -> Path:
-        """Return the default persistence file path."""
-        data_dir = Path(os.environ.get("DECISION_TRACKER_DATA_DIR", "data"))
-        data_dir.mkdir(parents=True, exist_ok=True)
-        return data_dir / "decisions.json"
+        self._load()
 
     def record(self, entry: DecisionLogEntry) -> None:
         """Add a decision record to the store.
@@ -81,6 +80,10 @@ class DecisionTracker:
                 self._index[entry.run_id] = entry
                 logger = __import__("logging").getLogger(__name__)
                 logger.debug(f"DecisionTracker: updated entry run_id={entry.run_id}")
+
+                # Persist feedback update immediately
+                if self._use_db and self._repo and entry.user_feedback:
+                    self._repo.update_user_feedback(entry.run_id, entry.user_feedback)
                 return
 
             if len(self._store) >= self._maxlen:
@@ -229,18 +232,47 @@ class DecisionTracker:
     # ── Persistence ───────────────────────────────────────────────────
 
     def _load(self) -> None:
-        """Load persisted decisions from disk on startup."""
-        if not self._persist_path.exists():
+        """Load persisted decisions from Supabase (or disk fallback) on startup."""
+        if self._use_db and self._repo:
+            self._load_from_db()
+        else:
+            self._load_from_disk()
+
+    def _load_from_db(self) -> None:
+        """Load decisions from Supabase ai_decisions table."""
+        try:
+            rows = self._repo.load_recent(limit=self._maxlen)
+            for row in rows:
+                entry_dict = SupabaseDecisionRepository.from_row(row)
+                entry = DecisionLogEntry(**entry_dict)
+                if len(self._store) >= self._maxlen:
+                    evicted = self._store.popleft()
+                    self._index.pop(evicted.run_id, None)
+                self._store.append(entry)
+                self._index[entry.run_id] = entry
+
+            from infrastructure.logging import logger
+            logger.info(f"DecisionTracker: loaded {len(self._store)} records from Supabase")
+        except Exception as e:
+            from infrastructure.logging import logger
+            logger.warning(f"DecisionTracker: failed to load from Supabase: {e}")
+            # Fall back to disk if DB load fails
+            self._load_from_disk()
+
+    def _load_from_disk(self) -> None:
+        """Load persisted decisions from disk (backward compatibility)."""
+        persist_path = self._default_disk_path()
+        if not persist_path.exists():
             return
 
         try:
-            with open(self._persist_path, "r", encoding="utf-8") as f:
+            import json
+            with open(persist_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
             entries = [DecisionLogEntry(**item) for item in data.get("entries", [])]
             self._eviction_count = data.get("eviction_count", 0)
 
-            # Rebuild store and index, respecting maxlen
             for entry in entries:
                 if len(self._store) >= self._maxlen:
                     evicted = self._store.popleft()
@@ -249,31 +281,91 @@ class DecisionTracker:
                 self._index[entry.run_id] = entry
 
             from infrastructure.logging import logger
-            logger.info(f"DecisionTracker: loaded {len(self._store)} records from {self._persist_path}")
+            logger.info(f"DecisionTracker: loaded {len(self._store)} records from {persist_path}")
         except Exception as e:
             from infrastructure.logging import logger
-            logger.warning(f"DecisionTracker: failed to load from {self._persist_path}: {e}")
+            logger.warning(f"DecisionTracker: failed to load from {persist_path}: {e}")
+
+    @staticmethod
+    def _default_disk_path():
+        """Return the default disk persistence file path (fallback only)."""
+        import os
+        from pathlib import Path
+        data_dir = Path(os.environ.get("DECISION_TRACKER_DATA_DIR", "data"))
+        data_dir.mkdir(parents=True, exist_ok=True)
+        return data_dir / "decisions.json"
 
     def _save(self) -> None:
-        """Persist current decisions to disk."""
+        """Persist current decisions to Supabase (or disk fallback)."""
+        if self._use_db and self._repo:
+            self._save_to_db()
+        else:
+            self._save_to_disk()
+
+    def _save_to_db(self) -> None:
+        """Persist pending decisions to Supabase ai_decisions table."""
         try:
-            self._persist_path.parent.mkdir(parents=True, exist_ok=True)
+            with self._lock:
+                # Collect only new entries since last save
+                all_entries = list(self._store)
+                # We persist all entries; Supabase upsert handles duplicates
+                # via the run_id primary key. But insert is simpler and safe
+                # because we only call this for new records.
+                # To avoid re-inserting, we track which run_ids we've persisted.
+                if not hasattr(self, "_persisted_ids"):
+                    self._persisted_ids = set()
+
+                new_entries = [
+                    e for e in all_entries
+                    if e.run_id not in self._persisted_ids
+                ]
+
+                if not new_entries:
+                    self._pending_count = 0
+                    self._last_save_time = time.time()
+                    return
+
+                rows = [
+                    SupabaseDecisionRepository.to_row(e.model_dump())
+                    for e in new_entries
+                ]
+
+            count = self._repo.insert_batch(rows)
+
+            with self._lock:
+                for e in new_entries:
+                    self._persisted_ids.add(e.run_id)
+                self._pending_count = 0
+                self._last_save_time = time.time()
+
+            if count > 0:
+                from infrastructure.logging import logger
+                logger.debug(f"DecisionTracker: persisted {count} records to Supabase")
+        except Exception as e:
+            from infrastructure.logging import logger
+            logger.warning(f"DecisionTracker: failed to save to Supabase: {e}")
+
+    def _save_to_disk(self) -> None:
+        """Persist current decisions to disk (backward compatibility)."""
+        import json
+        persist_path = self._default_disk_path()
+        try:
+            persist_path.parent.mkdir(parents=True, exist_ok=True)
             data = {
                 "entries": [entry.model_dump() for entry in self._store],
                 "eviction_count": self._eviction_count,
             }
-            # Write atomically via temp file + rename
-            tmp_path = self._persist_path.with_suffix(".tmp")
+            tmp_path = persist_path.with_suffix(".tmp")
             with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, default=str)
-            tmp_path.replace(self._persist_path)
+            tmp_path.replace(persist_path)
 
             with self._lock:
                 self._pending_count = 0
                 self._last_save_time = time.time()
         except Exception as e:
             from infrastructure.logging import logger
-            logger.warning(f"DecisionTracker: failed to save to {self._persist_path}: {e}")
+            logger.warning(f"DecisionTracker: failed to save to {persist_path}: {e}")
 
     def flush(self) -> None:
         """Force immediate persistence of all pending records.

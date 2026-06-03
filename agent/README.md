@@ -320,8 +320,7 @@ All settings are loaded from environment variables via `config/settings.py`.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LOG_LEVEL` | `INFO` | Logging verbosity |
-| `LOGGER_BACKEND` | `console` | Logger type: `console` or `file` |
-| `LOG_FILE` | — | Log file path (if `LOGGER_BACKEND=file`) |
+| `LOGGER_BACKEND` | `console` | Logger type: `console` (dev) or `cloudwatch` (prod) |
 | `DISCORD_WEBHOOK_URL` | — | Discord webhook for error alerts |
 | `ALERT_RATE_LIMIT_PER_MINUTE` | `5` | Max alerts per minute |
 
@@ -455,7 +454,7 @@ ls knowledge/raw_docs/
 
 # Check logs
 # If LOGGER_BACKEND=console: check stdout
-# If LOGGER_BACKEND=file: tail -f <LOG_FILE>
+# If LOGGER_BACKEND=cloudwatch: AWS Console → CloudWatch → Log groups → langchain-agent
 
 # Verify ingestion pipeline is running
 ps aux | grep cronjob

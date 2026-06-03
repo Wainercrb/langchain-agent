@@ -59,7 +59,6 @@ class MonitoringScheduler:
             ("embeddings", self._health_verifier.check_embeddings),
             ("tracing_completeness", self._health_verifier.check_tracing_completeness),
             ("memory_usage", self._health_verifier.check_memory_usage),
-            ("log_rotation", self._health_verifier.check_log_rotation),
             ("decision_drift", lambda: self._health_verifier.check_decision_drift(self._decision_tracker)),
         ]
 

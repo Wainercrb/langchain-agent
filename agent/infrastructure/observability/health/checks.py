@@ -5,7 +5,6 @@ All checks execute WITHOUT LLM invocation. Each returns (ok: bool, detail: str).
 
 import os
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Tuple
 
 from config import settings
@@ -124,27 +123,8 @@ class HealthVerifier:
             return False, f"Memory check failed: {str(e)}"
 
     async def check_log_rotation(self) -> Tuple[bool, str]:
-        """Check log file age if LOGGER_BACKEND=file and LOG_FILE is set."""
-        if settings.logger_backend != "file" or not settings.log_file:
-            return True, "Log backend is not file, log rotation check skipped"
-        try:
-            log_path = Path(settings.log_file)
-            if not log_path.exists():
-                return False, f"Log file not found: {settings.log_file}"
-
-            stat = log_path.stat()
-            mtime = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
-            age_hours = (datetime.now(timezone.utc) - mtime).total_seconds() / 3600
-            max_age = settings.monitoring_log_max_age_hours
-
-            if age_hours > max_age:
-                return False, (
-                    f"Log file is stale: {age_hours:.1f}h old "
-                    f"(max: {max_age}h)"
-                )
-            return True, f"Log file age {age_hours:.1f}h (max: {max_age}h)"
-        except Exception as e:
-            return False, f"Log rotation check failed: {str(e)}"
+        """Always passes — log rotation is managed by CloudWatch retention policies."""
+        return True, "Log rotation managed by CloudWatch retention policies"
 
     async def check_decision_drift(self, decision_tracker=None) -> Tuple[bool, str]:
         """Analyze recent decision quality trends and alert on degradation.

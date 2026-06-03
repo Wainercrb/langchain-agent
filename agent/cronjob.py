@@ -192,40 +192,6 @@ def _run_backup_cycle() -> None:
         _send_maintenance_alert("weekly_backup", str(e))
 
 
-def _run_log_rotation_check() -> None:
-    """Daily log rotation: delete log files older than maintenance_log_max_age_hours.
-
-    Scans the same directory as the configured log file (defaults to ./logs)
-    and removes any file matching *.log* whose mtime is older than the
-    threshold. Runs daily at 03:00.
-    """
-    if settings.log_file:
-        log_path = Path(settings.log_file)
-        log_dir = log_path.parent if log_path.parent else Path("./logs")
-    else:
-        log_dir = Path("./logs")
-
-    if not log_dir.exists():
-        logger.debug(f"Log directory does not exist: {log_dir}, nothing to rotate")
-        return
-
-    cutoff = time.time() - (settings.maintenance_log_max_age_hours * 3600)
-    rotated_count = 0
-    for log_file in log_dir.glob("*.log*"):
-        if log_file.is_file() and log_file.stat().st_mtime < cutoff:
-            try:
-                log_file.unlink()
-                rotated_count += 1
-                logger.info(f"Rotated old log file: {log_file.name}")
-            except OSError as e:
-                logger.warning(f"Failed to delete {log_file.name}: {e}")
-
-    if rotated_count:
-        logger.info(f"Log rotation complete: {rotated_count} file(s) removed")
-    else:
-        logger.debug("Log rotation: no files exceeded age threshold")
-
-
 def _run_vacuum_analyze() -> None:
     """Weekly VACUUM ANALYZE on high-write tables in Supabase.
 
@@ -328,18 +294,6 @@ def main() -> None:
             misfire_grace_time=3600,
         )
         logger.info("Scheduled weekly VACUUM ANALYZE: Sundays 04:00")
-
-    if settings.maintenance_log_rotation_enabled:
-        scheduler.add_job(
-            _run_log_rotation_check,
-            trigger=CronTrigger(hour=3, minute=0),
-            id="daily_log_rotation",
-            name="Daily log rotation check",
-            replace_existing=True,
-            max_instances=1,
-            misfire_grace_time=3600,
-        )
-        logger.info("Scheduled daily log rotation check: 03:00")
 
     # Graceful shutdown on SIGINT/SIGTERM
     def _shutdown(signum, frame):

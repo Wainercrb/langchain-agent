@@ -115,7 +115,7 @@ else:
 # ── Decision Tracker ─────────────────────────────────────────────────
 from infrastructure.observability.decisions import DecisionTracker
 
-decision_tracker = DecisionTracker(maxlen=10000)
+decision_tracker = DecisionTracker(maxlen=10000, supabase_client=supabase_client)
 
 # ── Agent ─────────────────────────────────────────────────────────────
 from domain.retrieval.retriever import Retriever
