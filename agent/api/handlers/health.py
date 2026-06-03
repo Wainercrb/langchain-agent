@@ -1,11 +1,11 @@
-"""Health endpoint — check service and database connectivity status."""
+"""Health endpoint — verify service readiness without invoking any LLM."""
 
 from datetime import datetime, timezone
 
 from fastapi import APIRouter
 
-from api.health_check import check_health
-from infrastructure.logging import logger
+from config import settings
+from infrastructure.container import vector_store
 from models import HealthResponse
 
 router = APIRouter(prefix="/v1", tags=["health"])
@@ -15,41 +15,32 @@ router = APIRouter(prefix="/v1", tags=["health"])
     "/health",
     response_model=HealthResponse,
     status_code=200,
-    responses={
-        500: {"model": "ErrorResponse", "description": "Health check failed"},
-    },
 )
 async def health() -> HealthResponse:
+    """Check service readiness.
+
+    Only DB performs an actual connectivity ping. LLM, LangSmith, and
+    embedding checks are configuration-only — no LLM invocations, no
+    token costs, no external API calls.
     """
-    Check service and database connectivity status.
-
-    This endpoint performs a lightweight health check including:
-    - Service availability
-    - Database connectivity (Supabase/pgvector)
-    - LangSmith tracing API connectivity (lightweight, no LLM invocation)
-    - Embedding service connectivity
-
-    Returns:
-        HealthResponse containing:
-            - status: "ok" if all checks pass, "error" if degraded
-            - timestamp: Check timestamp
-            - version: API version
-            - db_connected: Database connectivity status
-            - langsmith_connected: LangSmith tracing API availability
-            - embedding_connected: Embedding service availability
-
-    Raises:
-        Returns degraded status rather than raising, to allow clients to assess
-        partial system health (e.g., API available but database down).
-    """
-    logger.debug("Health check requested")
-    health_info = await check_health()
+    db_connected = False
+    try:
+        db_connected = bool(await vector_store.health_check())
+    except Exception:
+        pass
 
     return HealthResponse(
-        status=health_info["status"],
+        status="ok" if db_connected else "error",
         timestamp=datetime.now(timezone.utc),
-        db_connected=health_info.get("db_connected", False),
-        llm_connected=health_info.get("llm_connected", False),
-        langsmith_connected=health_info.get("langsmith_connected", False),
-        embedding_connected=health_info.get("embedding_connected", False),
+        db_connected=db_connected,
+        llm_connected=bool(
+            settings.google_api_key
+            or settings.openrouter_api_key
+            or settings.openai_api_key
+        ),
+        langsmith_connected=bool(
+            settings.enable_langsmith_tracing
+            and settings.langsmith_api_key
+        ),
+        embedding_connected=bool(settings.google_api_key),
     )
