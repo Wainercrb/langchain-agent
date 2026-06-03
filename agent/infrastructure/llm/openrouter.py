@@ -14,6 +14,10 @@ class OpenRouterProvider(LLMProvider):
 
     name = "openrouter"
 
+    @classmethod
+    def is_configured(cls) -> bool:
+        return bool(settings.openrouter_api_key)
+
     def __init__(
         self,
         model: str = "openai/gpt-4o",

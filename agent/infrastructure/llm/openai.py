@@ -14,6 +14,10 @@ class OpenAIProvider(LLMProvider):
 
     name = "openai"
 
+    @classmethod
+    def is_configured(cls) -> bool:
+        return bool(settings.openai_api_key)
+
     def __init__(
         self,
         model: str = "gpt-4o-mini",

@@ -35,13 +35,8 @@ class AlertProvider(Protocol):
 class MultiAlertProvider:
     """Dispatches alerts to multiple providers in parallel."""
 
-    def __init__(self, provider_classes: List[type]) -> None:
-        self._providers = []
-        for provider_cls in provider_classes:
-            try:
-                self._providers.append(provider_cls())
-            except (ValueError, TypeError):
-                pass  # Not configured, skip
+    def __init__(self, providers: List[AlertProvider]) -> None:
+        self._providers = providers
         if not self._providers:
             logger.warning("MultiAlertProvider: no providers configured")
 

@@ -14,6 +14,10 @@ class GoogleProvider(LLMProvider):
 
     name = "google"
 
+    @classmethod
+    def is_configured(cls) -> bool:
+        return bool(settings.google_api_key)
+
     def __init__(
         self,
         model: str = "gemini-2.5-flash",

@@ -4,6 +4,13 @@ Pure factories — no side effects, no global state mutation.
 Call these from the container wiring layer.
 """
 
+from typing import List, Type
+
+
+def _configured(provider_classes: List[Type]) -> list:
+    """Instantiate only providers that are properly configured."""
+    return [cls() for cls in provider_classes if cls.is_configured()]
+
 
 def _create_llm_providers():
     """Create and return the list of configured LLM providers."""
@@ -13,13 +20,7 @@ def _create_llm_providers():
         OpenRouterProvider,
     )
 
-    providers = []
-    for provider_cls in [GoogleProvider, OpenRouterProvider, OpenAIProvider]:
-        try:
-            providers.append(provider_cls())
-        except ValueError:
-            pass  # Not configured, skip
-    return providers
+    return _configured([GoogleProvider, OpenRouterProvider, OpenAIProvider])
 
 
 def _create_alert_providers():
@@ -30,10 +31,16 @@ def _create_alert_providers():
         SlackAlertProvider,
     )
 
-    return MultiAlertProvider([
+    providers = _configured([
         DiscordAlertProvider,
         SlackAlertProvider,
     ])
+
+    if len(providers) > 1:
+        return MultiAlertProvider(providers)
+    if len(providers) == 1:
+        return providers[0]
+    return DiscordAlertProvider()
 
 
 def _create_agent(llm_provider, decision_tracker, vector_store, embeddings):

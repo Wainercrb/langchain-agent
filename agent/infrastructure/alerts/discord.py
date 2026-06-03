@@ -27,6 +27,10 @@ class DiscordAlertProvider(AlertProviderBase):
 
     _enabled: bool = True
 
+    @classmethod
+    def is_configured(cls) -> bool:
+        return bool(settings.discord_webhook_url)
+
     def __init__(
         self,
         webhook_url: Optional[str] = None,
