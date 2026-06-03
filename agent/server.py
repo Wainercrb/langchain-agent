@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from api import router
 from api.global_exception import global_exception_handler
 from api.lifespan import lifespan
-from api.middleware_config import configure_correlation_middleware, configure_middleware
+from api.middleware import configure_middleware
 from config import settings
 
 
@@ -15,7 +15,6 @@ def create_app() -> FastAPI:
     app = FastAPI(title="LangChain Agent RAGAPI", version="1.0.0", docs_url="/docs", lifespan=lifespan)
 
     configure_middleware(app)
-    configure_correlation_middleware(app)
     app.include_router(router)
     app.exception_handler(Exception)(global_exception_handler)
 
