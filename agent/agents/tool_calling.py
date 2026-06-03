@@ -20,7 +20,8 @@ from config.constants import (
     TRUNCATE_QUERY_PREVIEW,
 )
 from config.prompts import SYSTEM_PROMPT_TOOL_CALLING as SYSTEM_PROMPT
-from observability.tracing import build_source_documents, capture_tracing_tags, extract_run_id
+from observability.tracing import capture_tracing_tags, extract_run_id
+from retrieval.formatting import build_source_documents
 from models import ChatResponse, SourceDocument
 from models.observability.decisions import DecisionLogEntry, DecisionQuality, ToolCallRecord
 from agents.base import Agent

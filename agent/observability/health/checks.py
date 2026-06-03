@@ -1,153 +1,186 @@
 """Health verifier — individual check methods for automated monitoring.
 
-All checks execute WITHOUT LLM invocation. Each returns (ok: bool, detail: str).
+All checks execute WITHOUT LLM invocation. Each returns a ``CheckResult``
+with status and human-readable detail.
 """
 
 import os
-from datetime import datetime, timezone
-from typing import Tuple
+from dataclasses import dataclass
+from typing import Callable, Optional
 
 from config import settings
+from embeddings import GoogleEmbeddingsWrapper
 from logging import logger
+from observability.decisions import DecisionTracker
+from vector_store import VectorStore
+
+
+@dataclass(frozen=True)
+class CheckResult:
+    """Immutable result of a single health check.
+
+    Attributes:
+        ok: Whether the check passed.
+        detail: Human-readable explanation of the result.
+    """
+
+    ok: bool
+    detail: str
+
+    @classmethod
+    def success(cls, detail: str) -> "CheckResult":
+        """Create a passing check result."""
+        return cls(ok=True, detail=detail)
+
+    @classmethod
+    def failure(cls, detail: str) -> "CheckResult":
+        """Create a failing check result."""
+        return cls(ok=False, detail=detail)
 
 
 class HealthVerifier:
-    """Performs individual health checks without LLM invocation."""
+    """Performs individual health checks without LLM invocation.
+
+    Each check method returns a ``CheckResult`` with status and detail.
+    Checks that depend on external services perform real connectivity tests.
+
+    Args:
+        vector_store: Vector store instance for DB connectivity checks.
+        embeddings: Embeddings provider instance for embedding checks.
+        metrics_store: Callable returning request metrics snapshot.
+        decision_tracker: DecisionTracker for drift analysis.
+    """
 
     def __init__(
         self,
-        vector_store=None,
-        embeddings=None,
+        vector_store: VectorStore,
+        embeddings: GoogleEmbeddingsWrapper,
+        metrics_store: Optional[Callable[[], dict]] = None,
+        decision_tracker: Optional[DecisionTracker] = None,
     ) -> None:
         self._vector_store = vector_store
         self._embeddings = embeddings
+        self._metrics_store = metrics_store
+        self._decision_tracker = decision_tracker
 
-    async def check_db(self) -> Tuple[bool, str]:
+    async def check_db(self) -> CheckResult:
         """Verify database connectivity via vector store health check."""
         try:
             result = await self._vector_store.health_check()
             if result:
-                return True, "Database connection healthy"
-            return False, "Database health check returned false"
+                return CheckResult.success("Database connection healthy")
+            return CheckResult.failure("Database health check returned false")
         except Exception as e:
-            return False, f"Database connection failed: {str(e)}"
+            return CheckResult.failure(f"Database connection failed: {str(e)}")
 
-    async def check_langsmith(self) -> Tuple[bool, str]:
+    async def check_langsmith(self) -> CheckResult:
         """Verify LangSmith API is reachable using list_projects()."""
         if not settings.enable_langsmith_tracing or not settings.langsmith_api_key:
-            return True, "LangSmith tracing not configured, skipping"
+            return CheckResult.success("LangSmith tracing not configured, skipping")
         try:
             from langsmith import Client as LangSmithClient
+
             client = LangSmithClient()
             list(client.list_projects(limit=1))
-            return True, "LangSmith API reachable"
+            return CheckResult.success("LangSmith API reachable")
         except Exception as e:
-            return False, f"LangSmith API unreachable: {str(e)}"
+            return CheckResult.failure(f"LangSmith API unreachable: {str(e)}")
 
-    async def check_embeddings(self) -> Tuple[bool, str]:
+    async def check_embeddings(self) -> CheckResult:
         """Verify embeddings provider is reachable."""
         try:
             vec = self._embeddings.embed_query("health")
             if vec and len(vec) > 0:
-                return True, "Embeddings provider reachable"
-            return False, "Embeddings returned empty vector"
+                return CheckResult.success("Embeddings provider reachable")
+            return CheckResult.failure("Embeddings returned empty vector")
         except Exception as e:
-            return False, f"Embeddings provider unreachable: {str(e)}"
+            return CheckResult.failure(f"Embeddings provider unreachable: {str(e)}")
 
-    async def check_tracing_completeness(self) -> Tuple[bool, str]:
-        """Compare LangSmith trace count against in-memory request count.
-
-        Uses langsmith.Client.list_runs() to count recent traces and compares
-        against RequestMetrics.request_count over a configurable time window.
-        """
+    async def check_tracing_completeness(self) -> CheckResult:
+        """Compare LangSmith trace count against in-memory request count."""
         if not settings.enable_langsmith_tracing or not settings.langsmith_api_key:
-            return True, "LangSmith tracing not configured, skipping"
+            return CheckResult.success("LangSmith tracing not configured, skipping")
+
+        if not self._metrics_store:
+            return CheckResult.success("Metrics store not available, tracing check skipped")
+
         try:
             from langsmith import Client as LangSmithClient
-            from api.metrics_store import get_request_metrics
 
             client = LangSmithClient()
-            now = datetime.now(timezone.utc)
             window = settings.monitoring_tracing_window_seconds
 
             runs = list(
                 client.list_runs(
                     project_name=settings.langsmith_project or "langchain-agent",
-                    start_time=now.timestamp() - window,
                     limit=1000,
                 )
             )
             trace_count = len(runs)
-            snapshot = get_request_metrics().snapshot()
+
+            snapshot = self._metrics_store()
             request_count = snapshot.get("request_count", 0)
 
             if request_count == 0:
-                return True, "No requests made yet, tracing completeness N/A"
+                return CheckResult.success("No requests made yet, tracing completeness N/A")
 
             if trace_count == 0 and request_count > 0:
-                return False, (
+                return CheckResult.failure(
                     f"Tracing gap: {request_count} requests but 0 traces "
                     f"in last {window}s window"
                 )
 
             mismatch = abs(request_count - trace_count)
             if mismatch > max(1, request_count * 0.1):
-                return False, (
+                return CheckResult.failure(
                     f"Trace mismatch: {request_count} requests vs {trace_count} "
                     f"traces ({mismatch} difference)"
                 )
 
-            return True, f"Tracing complete: {trace_count} traces for {request_count} requests"
+            return CheckResult.success(
+                f"Tracing complete: {trace_count} traces for {request_count} requests"
+            )
         except Exception as e:
-            return False, f"Tracing completeness check failed: {str(e)}"
+            return CheckResult.failure(f"Tracing completeness check failed: {str(e)}")
 
-    async def check_memory_usage(self) -> Tuple[bool, str]:
+    async def check_memory_usage(self) -> CheckResult:
         """Check process memory usage against threshold.
 
         Uses psutil if available, otherwise skips gracefully.
         """
         try:
             import psutil
+
             process = psutil.Process(os.getpid())
             memory_mb = process.memory_info().rss / (1024 * 1024)
             threshold = settings.monitoring_memory_threshold_mb
 
             if memory_mb > threshold:
-                return False, (
+                return CheckResult.failure(
                     f"Memory usage {memory_mb:.1f}MB exceeds threshold {threshold}MB"
                 )
-            return True, f"Memory usage {memory_mb:.1f}MB (threshold: {threshold}MB)"
+            return CheckResult.success(
+                f"Memory usage {memory_mb:.1f}MB (threshold: {threshold}MB)"
+            )
         except ImportError:
-            return True, "psutil not available, memory check skipped"
+            return CheckResult.success("psutil not available, memory check skipped")
         except Exception as e:
-            return False, f"Memory check failed: {str(e)}"
+            return CheckResult.failure(f"Memory check failed: {str(e)}")
 
-    async def check_decision_drift(self, decision_tracker=None) -> Tuple[bool, str]:
-        """Analyze recent decision quality trends and alert on degradation.
-
-        Compares the optimal decision ratio in the last N decisions against
-        a threshold. If the ratio drops below the threshold, it signals
-        potential model drift, prompt degradation, or tool availability issues.
-
-        Args:
-            decision_tracker: DecisionTracker instance to query.
-
-        Returns:
-            Tuple of (ok, detail).
-        """
-        if decision_tracker is None:
-            return True, "No decision tracker available, drift check skipped"
+    async def check_decision_drift(self) -> CheckResult:
+        """Analyze recent decision quality trends and alert on degradation."""
+        if self._decision_tracker is None:
+            return CheckResult.success("No decision tracker available, drift check skipped")
 
         try:
             from models.observability.decisions import DecisionQuality
 
-            # Analyze the last 50 decisions for drift
             window_size = 50
-            quality_threshold = 0.5  # 50% optimal ratio minimum
+            quality_threshold = 0.5
 
-            all_decisions = list(decision_tracker._store)[-window_size:]
+            all_decisions = self._decision_tracker.get_recent(window_size)
             if len(all_decisions) < 10:
-                return True, (
+                return CheckResult.success(
                     f"Insufficient data for drift analysis: "
                     f"{len(all_decisions)} decisions (need >= 10)"
                 )
@@ -164,17 +197,17 @@ class HealthVerifier:
             poor_ratio = poor_count / len(all_decisions)
 
             if optimal_ratio < quality_threshold:
-                return False, (
+                return CheckResult.failure(
                     f"Decision quality degradation: "
                     f"{optimal_ratio:.0%} optimal in last {len(all_decisions)} decisions "
                     f"(threshold: {quality_threshold:.0%}), "
                     f"{poor_ratio:.0%} poor"
                 )
 
-            return True, (
+            return CheckResult.success(
                 f"Decision quality stable: "
                 f"{optimal_ratio:.0%} optimal, {poor_ratio:.0%} poor "
                 f"(last {len(all_decisions)} decisions)"
             )
         except Exception as e:
-            return False, f"Decision drift check failed: {str(e)}"
+            return CheckResult.failure(f"Decision drift check failed: {str(e)}")

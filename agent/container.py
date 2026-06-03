@@ -55,11 +55,6 @@ vector_store = VectorStore(supabase_client)
 # ── Logger ────────────────────────────────────────────────────────────
 from logging import logger
 
-# ── Tracing Orchestrator ──────────────────────────────────────────────
-from observability.tracing import TracingOrchestratorImpl
-
-tracing_orchestrator = TracingOrchestratorImpl()
-
 # ── Parser Registry ──────────────────────────────────────────────────
 from ingestion.parsers.parser import ParserFactory
 
@@ -91,7 +86,7 @@ alert_service = _create_alert_providers()
 # ── Decision Tracker ─────────────────────────────────────────────────
 from observability.decisions import DecisionTracker
 
-decision_tracker = DecisionTracker(maxlen=10000, supabase_client=supabase_client)
+decision_tracker = DecisionTracker(vector_store=vector_store, maxlen=10000)
 
 # ── Retriever ──────────────────────────────────────────────────────────
 from retrieval.retriever import Retriever
@@ -146,7 +141,6 @@ rag_chain = RAGChain(
     llm=llm,
     decision_tracker=decision_tracker,
     logger=logger,
-    tracing_orchestrator=tracing_orchestrator,
 )
 
 # ── Ingestion Pipeline ─────────────────────────────────────────────────
@@ -165,14 +159,31 @@ pipeline = DocumentIngestionPipeline(
 # ── Monitoring ───────────────────────────────────────────────────────
 from observability.health import HealthVerifier, MonitoringScheduler
 
+
+def _metrics_snapshot():
+    """Return current request metrics snapshot for health checks."""
+    from api.metrics_store import get_request_metrics
+    return get_request_metrics().snapshot()
+
+
 _health_verifier = HealthVerifier(
     vector_store=vector_store,
     embeddings=embeddings,
+    metrics_store=_metrics_snapshot,
+    decision_tracker=decision_tracker,
 )
 
+_monitoring_checks = [
+    ("db", _health_verifier.check_db),
+    ("langsmith", _health_verifier.check_langsmith),
+    ("embeddings", _health_verifier.check_embeddings),
+    ("tracing_completeness", _health_verifier.check_tracing_completeness),
+    ("memory_usage", _health_verifier.check_memory_usage),
+    ("decision_drift", _health_verifier.check_decision_drift),
+]
+
 _monitoring_scheduler = MonitoringScheduler(
-    health_verifier=_health_verifier,
+    checks=_monitoring_checks,
     alert_service=alert_service,
-    settings_obj=settings,
-    decision_tracker=decision_tracker,
+    settings=settings,
 )

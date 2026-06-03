@@ -4,8 +4,9 @@ Pydantic models for recording tool selection, agent routing decisions,
 and decision quality metrics.
 """
 
+from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -108,6 +109,66 @@ class DecisionLogEntry(BaseModel):
         default=None,
         description="User feedback linked to this run (like/dislike)",
     )
+
+    # ── Database row conversion ────────────────────────────────────────
+
+    def to_db_row(self) -> Dict[str, Any]:
+        """Convert this entry to a Supabase-compatible row dict."""
+        ts = self.timestamp
+        if isinstance(ts, str):
+            try:
+                ts = datetime.fromisoformat(ts)
+            except (ValueError, TypeError):
+                ts = datetime.now(timezone.utc)
+
+        quality = self.decision_quality.value if hasattr(self.decision_quality, "value") else self.decision_quality
+
+        return {
+            "run_id": self.run_id,
+            "agent_type": self.agent_type,
+            "query_preview": self.query_preview,
+            "query_hash": self.query_hash,
+            "tools_used": self.tools_used,
+            "chain_length": self.chain_length,
+            "chain_tools": self.chain_tools,
+            "decision_quality": quality,
+            "timestamp": ts,
+            "model_used": self.model_used,
+            "top_k": self.top_k,
+            "temperature": self.temperature,
+            "latency_ms": self.latency_ms,
+            "reasoning_summary": self.reasoning_summary,
+            "tool_selection_rationale": self.tool_selection_rationale,
+            "user_feedback": self.user_feedback,
+        }
+
+    @classmethod
+    def from_db_row(cls, row: Dict[str, Any]) -> "DecisionLogEntry":
+        """Create a DecisionLogEntry from a Supabase row dict."""
+        ts = row.get("timestamp")
+        if isinstance(ts, datetime):
+            ts = ts.isoformat()
+        elif ts is None:
+            ts = datetime.now(timezone.utc).isoformat()
+
+        return cls(
+            run_id=row["run_id"],
+            agent_type=row["agent_type"],
+            query_preview=row["query_preview"],
+            query_hash=row["query_hash"],
+            tools_used=row.get("tools_used", []),
+            chain_length=row.get("chain_length", 0),
+            chain_tools=row.get("chain_tools", []),
+            decision_quality=row.get("decision_quality", "suboptimal"),
+            timestamp=ts,
+            model_used=row["model_used"],
+            top_k=row.get("top_k", 5),
+            temperature=row.get("temperature", 0.7),
+            latency_ms=row["latency_ms"],
+            reasoning_summary=row.get("reasoning_summary"),
+            tool_selection_rationale=row.get("tool_selection_rationale"),
+            user_feedback=row.get("user_feedback"),
+        )
 
 
 class DecisionMetricsResponse(BaseModel):

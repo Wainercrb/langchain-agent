@@ -13,10 +13,10 @@ from langsmith import traceable
 
 from config.constants import TRUNCATE_CONTENT_PREVIEW, TRUNCATE_QUERY_LOG, TRUNCATE_QUERY_PREVIEW
 from logging.base import Logger
-from observability.tracing import TracingOrchestratorImpl as TracingOrchestrator
+from observability.tracing import capture_tracing_tags, extract_run_id
 from models import ChatResponse
 from models.observability.decisions import DecisionLogEntry, DecisionQuality
-from retrieval.formatting import format_documents_as_context
+from retrieval.formatting import build_source_documents, format_documents_as_context
 
 from retrieval.retriever import Retriever
 
@@ -41,13 +41,11 @@ class RAGChain:
         llm: Any,
         decision_tracker: Optional[Any] = None,
         logger: Logger = None,
-        tracing_orchestrator: TracingOrchestrator = None,
     ) -> None:
         self._retriever = retriever
         self._llm = llm
         self._decision_tracker = decision_tracker
         self.logger = logger
-        self._tracing = tracing_orchestrator
         if self.logger:
             self.logger.info("RAGChain initialized")
 
@@ -102,25 +100,24 @@ class RAGChain:
 
             execution_time_ms = (time.time() - start_time) * 1000
 
-            run_id = self._tracing.extract_run_id() if self._tracing else str(hashlib.md5(query.encode()).hexdigest())
+            run_id = extract_run_id()
 
             decision_metadata = self._extract_decision_metadata(
                 run_id, query, execution_time_ms, top_k, temperature, len(retrieved)
             )
 
-            if self._tracing:
-                run_id, langsmith_tags = self._tracing.capture_tracing_tags(
-                    model_name=self._llm.model,
-                    agent_type="rag-chain",
-                    top_k=top_k,
-                    temperature=temperature,
-                    decision_metadata=decision_metadata,
-                    pre_run_id=run_id,
-                )
+            run_id, langsmith_tags = capture_tracing_tags(
+                model_name=self._llm.model,
+                agent_type="rag-chain",
+                top_k=top_k,
+                temperature=temperature,
+                decision_metadata=decision_metadata,
+                pre_run_id=run_id,
+            )
 
-            sources_list = self._tracing.build_source_documents(
+            sources_list = build_source_documents(
                 retrieved, include_sources, TRUNCATE_CONTENT_PREVIEW
-            ) if self._tracing else None
+            )
 
             if self._decision_tracker and decision_metadata:
                 try:

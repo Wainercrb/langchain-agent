@@ -61,6 +61,21 @@ class VectorStoreOps(ABC):
         """
         pass
 
+    @abstractmethod
+    def insert_ai_decisions(self, records: List[Dict[str, Any]]) -> int:
+        """Insert multiple AI decision records. Returns count inserted."""
+        pass
+
+    @abstractmethod
+    def load_ai_decisions(self, limit: int) -> List[Dict[str, Any]]:
+        """Load the most recent AI decision records, oldest first."""
+        pass
+
+    @abstractmethod
+    def update_ai_decision_feedback(self, run_id: str, feedback: Dict[str, Any]) -> bool:
+        """Update user feedback for a specific AI decision run_id."""
+        pass
+
 
 class IngestionLogger(ABC):
     """Ingestion logging concern."""

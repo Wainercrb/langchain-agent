@@ -27,21 +27,21 @@ async def health() -> HealthResponse:
     Runs real connectivity checks for DB, LangSmith, and embeddings.
     LLM check is configuration-only (no token costs).
     """
-    db_ok, _ = await _health_verifier.check_db()
-    langsmith_ok, _ = await _health_verifier.check_langsmith()
-    embedding_ok, _ = await _health_verifier.check_embeddings()
+    db_result = await _health_verifier.check_db()
+    langsmith_result = await _health_verifier.check_langsmith()
+    embedding_result = await _health_verifier.check_embeddings()
 
-    all_ok = db_ok and langsmith_ok and embedding_ok
+    all_ok = db_result.ok and langsmith_result.ok and embedding_result.ok
 
     return HealthResponse(
         status="ok" if all_ok else "degraded",
         timestamp=datetime.now(timezone.utc),
-        db_connected=db_ok,
+        db_connected=db_result.ok,
         llm_connected=bool(
             settings.google_api_key
             or settings.openrouter_api_key
             or settings.openai_api_key
         ),
-        langsmith_connected=langsmith_ok,
-        embedding_connected=embedding_ok,
+        langsmith_connected=langsmith_result.ok,
+        embedding_connected=embedding_result.ok,
     )

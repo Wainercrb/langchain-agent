@@ -201,3 +201,67 @@ class VectorStore(VectorStoreBase):
         except Exception as e:
             logger.error(f"Health check failed: {str(e)}")
             return False
+
+    # ── AI Decision persistence ────────────────────────────────────────
+
+    def insert_ai_decisions(self, records: List[Dict[str, Any]]) -> int:
+        """Insert multiple AI decision records.
+
+        Args:
+            records: List of row dicts matching the ai_decisions table schema.
+
+        Returns:
+            Number of records successfully inserted.
+        """
+        if not records:
+            return 0
+
+        try:
+            self.client.table("ai_decisions").insert(records).execute()
+            return len(records)
+        except Exception as e:
+            logger.warning(f"VectorStore: AI decision batch insert failed: {e}")
+            return 0
+
+    def load_ai_decisions(self, limit: int) -> List[Dict[str, Any]]:
+        """Load the most recent AI decision records, oldest first.
+
+        Args:
+            limit: Maximum number of records to load.
+
+        Returns:
+            List of row dicts ordered by timestamp DESC, reversed to oldest first.
+        """
+        try:
+            response = (
+                self.client.table("ai_decisions")
+                .select("*")
+                .order("timestamp", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            rows = response.data or []
+            rows.reverse()  # Oldest first (matches deque append order)
+            return rows
+        except Exception as e:
+            logger.warning(f"VectorStore: AI decision load failed: {e}")
+            return []
+
+    def update_ai_decision_feedback(self, run_id: str, feedback: Dict[str, Any]) -> bool:
+        """Update user feedback for a specific AI decision run_id.
+
+        Args:
+            run_id: LangSmith run ID.
+            feedback: Feedback dict (e.g. {"score": 1, "comment": "great"}).
+
+        Returns:
+            True on success, False on failure.
+        """
+        try:
+            self.client.table("ai_decisions").update(
+                {"user_feedback": feedback}
+            ).eq("run_id", run_id).execute()
+            return True
+        except Exception as e:
+            logger.warning(f"VectorStore: AI decision feedback update failed: {e}")
+            return False
