@@ -4,8 +4,6 @@ Pure factories — no side effects, no global state mutation.
 Call these from the container wiring layer.
 """
 
-from config import settings
-
 
 def _create_llm_providers():
     """Create and return the list of configured LLM providers."""
@@ -15,13 +13,13 @@ def _create_llm_providers():
         OpenRouterProvider,
     )
 
-    return [
-        p for p in [
-            GoogleProvider.from_settings(),
-            OpenRouterProvider.from_settings(),
-            OpenAIProvider.from_settings(),
-        ] if p is not None
-    ]
+    providers = []
+    for provider_cls in [GoogleProvider, OpenRouterProvider, OpenAIProvider]:
+        try:
+            providers.append(provider_cls())
+        except ValueError:
+            pass  # Not configured, skip
+    return providers
 
 
 def _create_alert_providers():
@@ -32,25 +30,23 @@ def _create_alert_providers():
         SlackAlertProvider,
     )
 
-    providers = [
-        p for p in [
-            DiscordAlertProvider.from_settings(),
-            SlackAlertProvider.from_settings(),
-        ] if p is not None
-    ]
+    providers = []
+    for alert_cls in [DiscordAlertProvider, SlackAlertProvider]:
+        try:
+            providers.append(alert_cls())
+        except ValueError:
+            pass
 
     if len(providers) > 1:
         return MultiAlertProvider(providers)
     if len(providers) == 1:
         return providers[0]
-    return DiscordAlertProvider(
-        webhook_url=None,
-        rate_limit_per_minute=settings.alert_rate_limit_per_minute,
-    )
+    return DiscordAlertProvider()  # No-op
 
 
 def _create_agent(llm_provider, decision_tracker, vector_store, embeddings):
     """Create the agent instance based on settings."""
+    from config import settings
     from domain.agents import RAGChainAgent
     from domain.core.chain import RAGChain
     from domain.retrieval.retriever import Retriever

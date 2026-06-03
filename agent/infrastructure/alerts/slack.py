@@ -25,14 +25,7 @@ from .base import AlertProviderBase
 class SlackAlertProvider(AlertProviderBase):
     """Sends alerts as Slack block kit messages with rate limiting and dedup."""
 
-    @classmethod
-    def from_settings(cls):
-        if not settings.slack_webhook_url:
-            return None
-        return cls(
-            webhook_url=settings.slack_webhook_url,
-            rate_limit_per_minute=settings.alert_rate_limit_per_minute,
-        )
+    _enabled: bool = True
 
     def __init__(
         self,
@@ -40,7 +33,10 @@ class SlackAlertProvider(AlertProviderBase):
         rate_limit_per_minute: int = 5,
     ) -> None:
         super().__init__(rate_limit_per_minute=rate_limit_per_minute)
-        self._webhook_url = webhook_url
+        self._webhook_url = webhook_url or settings.slack_webhook_url
+        if not self._webhook_url:
+            self._enabled = False
+            logger.warning("SlackAlertProvider: no webhook URL configured, alerts disabled")
 
     async def send_alert(
         self,

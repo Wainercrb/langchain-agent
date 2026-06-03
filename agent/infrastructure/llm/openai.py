@@ -14,17 +14,6 @@ class OpenAIProvider(LLMProvider):
 
     name = "openai"
 
-    @classmethod
-    def from_settings(cls):
-        if not settings.openai_api_key:
-            return None
-        return cls(
-            model=settings.openai_model,
-            temperature=settings.openai_temperature,
-            max_tokens=settings.openai_max_tokens,
-            api_key=settings.openai_api_key,
-        )
-
     def __init__(
         self,
         model: str = "gpt-4o-mini",
@@ -34,6 +23,9 @@ class OpenAIProvider(LLMProvider):
         timeout: int = 60,
         **kwargs,
     ):
+        api_key = api_key or settings.openai_api_key
+        if not api_key:
+            raise ValueError("openai_api_key is required")
         super().__init__(model=model, temperature=temperature, **kwargs)
         self._llm = ChatOpenAI(
             model=model,

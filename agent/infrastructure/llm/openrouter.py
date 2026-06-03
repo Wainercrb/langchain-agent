@@ -14,18 +14,6 @@ class OpenRouterProvider(LLMProvider):
 
     name = "openrouter"
 
-    @classmethod
-    def from_settings(cls):
-        if not settings.openrouter_api_key:
-            return None
-        return cls(
-            model=settings.openrouter_model,
-            temperature=settings.openrouter_temperature,
-            max_tokens=settings.openrouter_max_tokens,
-            api_key=settings.openrouter_api_key,
-            timeout=settings.llm_timeout_seconds,
-        )
-
     def __init__(
         self,
         model: str = "openai/gpt-4o",
@@ -35,6 +23,9 @@ class OpenRouterProvider(LLMProvider):
         timeout: int = 60,
         **kwargs,
     ):
+        api_key = api_key or settings.openrouter_api_key
+        if not api_key:
+            raise ValueError("openrouter_api_key is required")
         super().__init__(model=model, temperature=temperature, **kwargs)
         self._llm = ChatOpenAI(
             base_url="https://openrouter.ai/api/v1",

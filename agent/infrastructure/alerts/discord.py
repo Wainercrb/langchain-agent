@@ -25,14 +25,7 @@ from .base import AlertProviderBase
 class DiscordAlertProvider(AlertProviderBase):
     """Sends alerts as Discord embeds with rate limiting and dedup."""
 
-    @classmethod
-    def from_settings(cls):
-        if not settings.discord_webhook_url:
-            return None
-        return cls(
-            webhook_url=settings.discord_webhook_url,
-            rate_limit_per_minute=settings.alert_rate_limit_per_minute,
-        )
+    _enabled: bool = True
 
     def __init__(
         self,
@@ -40,7 +33,10 @@ class DiscordAlertProvider(AlertProviderBase):
         rate_limit_per_minute: int = 5,
     ) -> None:
         super().__init__(rate_limit_per_minute=rate_limit_per_minute)
-        self._webhook_url = webhook_url
+        self._webhook_url = webhook_url or settings.discord_webhook_url
+        if not self._webhook_url:
+            self._enabled = False
+            logger.warning("DiscordAlertProvider: no webhook URL configured, alerts disabled")
 
     async def send_alert(
         self,

@@ -14,17 +14,6 @@ class GoogleProvider(LLMProvider):
 
     name = "google"
 
-    @classmethod
-    def from_settings(cls):
-        if not settings.google_api_key:
-            return None
-        return cls(
-            model=settings.gemini_model,
-            temperature=settings.gemini_temperature,
-            max_tokens=settings.gemini_max_tokens,
-            api_key=settings.google_api_key,
-        )
-
     def __init__(
         self,
         model: str = "gemini-2.5-flash",
@@ -34,6 +23,9 @@ class GoogleProvider(LLMProvider):
         timeout: int = 60,
         **kwargs,
     ):
+        api_key = api_key or settings.google_api_key
+        if not api_key:
+            raise ValueError("google_api_key is required")
         super().__init__(model=model, temperature=temperature, **kwargs)
         self._llm = ChatGoogleGenerativeAI(
             model=model,
