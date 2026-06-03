@@ -1,0 +1,64 @@
+---
+// HamburgerToggle — Client-side island for mobile sidebar toggle
+// Hidden on desktop (md:hidden), shown on mobile
+---
+
+<button
+  id="hamburger-btn"
+  type="button"
+  class="flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition-colors duration-150 hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2"
+  aria-label="Toggle navigation menu"
+  aria-expanded="false"
+>
+  <!-- Hamburger icon (3 horizontal lines) -->
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <line x1="3" y1="6" x2="21" y2="6"/>
+    <line x1="3" y1="12" x2="21" y2="12"/>
+    <line x1="3" y1="18" x2="21" y2="18"/>
+  </svg>
+</button>
+
+<script>
+  function toggleSidebar() {
+    const isOpen = document.documentElement.classList.toggle('sidebar-open');
+    const btn = document.getElementById('hamburger-btn');
+    if (btn) {
+      btn.setAttribute('aria-expanded', String(isOpen));
+    }
+  }
+
+  function closeSidebar() {
+    document.documentElement.classList.remove('sidebar-open');
+    const btn = document.getElementById('hamburger-btn');
+    if (btn) {
+      btn.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  // Hamburger click
+  document.getElementById('hamburger-btn')?.addEventListener('click', toggleSidebar);
+
+  // Close sidebar on Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.documentElement.classList.contains('sidebar-open')) {
+      closeSidebar();
+    }
+  });
+
+  // Close sidebar when backdrop is clicked
+  const backdrop = document.getElementById('sidebar-backdrop');
+  if (backdrop) {
+    backdrop.addEventListener('click', closeSidebar);
+  }
+
+  // Close sidebar on window resize past md breakpoint (768px)
+  let resizeTimer: number | undefined;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(() => {
+      if (window.innerWidth >= 768) {
+        closeSidebar();
+      }
+    }, 150);
+  });
+</script>

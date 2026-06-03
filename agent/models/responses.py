@@ -195,6 +195,14 @@ class HealthResponse(BaseModel):
         ...,
         description="Database connectivity status",
     )
+    llm_connected: bool = Field(
+        default=False,
+        description=(
+            "LLM provider readiness (configuration check, NOT a connectivity check). "
+            "True if at least one LLM provider (Google, OpenRouter, or OpenAI) has "
+            "an API key configured. No real LLM invocation is performed."
+        ),
+    )
     langsmith_connected: bool = Field(
         default=False,
         description="LangSmith tracing API availability",

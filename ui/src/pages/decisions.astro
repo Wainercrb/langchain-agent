@@ -1,0 +1,125 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Decisions - Audit Trail">
+  <main class="mx-auto w-full max-w-1/2 px-4 py-8">
+    <header class="mb-6 flex items-baseline justify-between">
+      <h1 class="text-2xl font-bold text-[var(--color-text)]">Decision Audit Trail</h1>
+      <time id="last-updated" class="text-xs text-[var(--color-text-muted)]">--</time>
+    </header>
+    
+
+    <!-- Loading state -->
+    <div id="loading-state" class="flex items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-12">
+      <p class="text-sm text-[var(--color-text-muted)]">Loading decisions...</p>
+    </div>
+
+    <!-- Error state -->
+    <div id="error-state" class="hidden rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/5 p-8 text-center">
+      <p class="text-sm font-medium text-[var(--color-error)]">Unable to load decisions</p>
+      <p id="error-message" class="mt-1 text-xs text-[var(--color-text-muted)]"></p>
+      <button id="retry-btn" type="button" class="mt-4 rounded-md bg-[var(--color-error)] px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--color-error)]/90">Retry</button>
+    </div>
+
+    <!-- Empty state -->
+    <div id="empty-state" class="hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-12 text-center">
+      <p class="text-sm text-[var(--color-text-muted)]">No decisions recorded</p>
+    </div>
+
+    <!-- Table -->
+    <div id="table-wrapper" class="hidden overflow-x-auto rounded-lg border border-[var(--color-border)]">
+      <table class="w-full border-collapse text-left text-sm">
+        <thead>
+          <tr class="border-b border-[var(--color-border)] bg-[var(--color-surface-elevated)]">
+            <th class="px-4 py-3 font-semibold text-[var(--color-text)]">ID</th>
+            <th class="px-4 py-3 font-semibold text-[var(--color-text)]">Timestamp</th>
+            <th class="px-4 py-3 font-semibold text-[var(--color-text)]">Decision</th>
+            <th class="px-4 py-3 font-semibold text-[var(--color-text)]">Rationale</th>
+            <th class="px-4 py-3 font-semibold text-[var(--color-text)]">Status</th>
+          </tr>
+        </thead>
+        <tbody id="decisions-tbody"></tbody>
+      </table>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  import { fetchDecisions } from '../utils/api';
+  import type { DecisionRecord } from '../utils/api';
+
+  const API_BASE = import.meta.env.PUBLIC_API_URL || 'http://localhost:8000';
+  const POLL_INTERVAL_MS = 30_000;
+
+  async function loadDecisions() {
+    const loadingEl = document.getElementById('loading-state');
+    const errorEl = document.getElementById('error-state');
+    const emptyEl = document.getElementById('empty-state');
+    const tableWrapper = document.getElementById('table-wrapper');
+    const tbody = document.getElementById('decisions-tbody');
+    const errorMsg = document.getElementById('error-message');
+    const timeEl = document.getElementById('last-updated');
+
+    // Reset visibility
+    loadingEl?.classList.remove('hidden');
+    errorEl?.classList.add('hidden');
+    emptyEl?.classList.add('hidden');
+    tableWrapper?.classList.add('hidden');
+
+    try {
+      const data = await fetchDecisions();
+
+      loadingEl?.classList.add('hidden');
+
+      if (!Array.isArray(data) || data.length === 0) {
+        emptyEl?.classList.remove('hidden');
+        if (timeEl) timeEl.textContent = new Date().toLocaleTimeString();
+        return;
+      }
+
+      // Render table rows
+      if (tbody) {
+        tbody.innerHTML = data.map((row: DecisionRecord, i: number) => `
+          <tr class="${i % 2 === 0 ? 'bg-[var(--color-surface)]' : 'bg-[var(--color-bg)]'} border-b border-[var(--color-border)] last:border-b-0 transition-colors hover:bg-[var(--color-surface-elevated)]">
+            <td class="px-4 py-3 text-xs font-mono text-[var(--color-text-muted)]">${escapeHtml(String(row.id))}</td>
+            <td class="px-4 py-3 text-[var(--color-text)]">${escapeHtml(String(row.timestamp))}</td>
+            <td class="px-4 py-3 font-medium text-[var(--color-text)]">${escapeHtml(String(row.decision))}</td>
+            <td class="px-4 py-3 text-[var(--color-text-secondary)] max-w-xs truncate" title="${escapeHtml(String(row.rationale))}">${escapeHtml(String(row.rationale))}</td>
+            <td class="px-4 py-3">
+              <span class="inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusClass(row.status)}">${escapeHtml(String(row.status))}</span>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      tableWrapper?.classList.remove('hidden');
+      if (timeEl) timeEl.textContent = new Date().toLocaleTimeString();
+    } catch (err) {
+      loadingEl?.classList.add('hidden');
+      errorEl?.classList.remove('hidden');
+      if (errorMsg) {
+        errorMsg.textContent = err instanceof Error ? err.message : 'An unexpected error occurred';
+      }
+    }
+  }
+
+  function getStatusClass(status: string): string {
+    const s = status.toLowerCase();
+    if (s === 'completed' || s === 'approved' || s === 'success') return 'bg-green-100 text-green-800';
+    if (s === 'failed' || s === 'rejected') return 'bg-red-100 text-red-800';
+    if (s === 'pending' || s === 'in_progress') return 'bg-yellow-100 text-yellow-800';
+    return 'bg-gray-100 text-gray-700';
+  }
+
+  function escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  document.getElementById('retry-btn')?.addEventListener('click', loadDecisions);
+
+  loadDecisions();
+  setInterval(loadDecisions, POLL_INTERVAL_MS);
+</script>

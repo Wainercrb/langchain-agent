@@ -18,7 +18,11 @@ from .file import FileLogger
 
 def _build_logger() -> Logger:
     if settings.logger_backend == "file" and settings.log_file:
-        return FileLogger(settings.log_file)
+        return FileLogger(
+            path=settings.log_file,
+            max_bytes=settings.log_max_bytes,
+            backup_count=settings.log_backup_count,
+        )
     return Console()
 
 

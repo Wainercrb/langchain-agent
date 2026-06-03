@@ -2,6 +2,20 @@
 
 Run this checklist during the scheduled weekly maintenance window.
 
+> **Automation status:** Items marked `[AUTO]` are scheduled by `agent/cronjob.py`
+> and run without human intervention. Items marked `[MANUAL]` need a human
+> to execute and review. Ingestion itself is automated by cronjob's
+> ingestion cycle (every 5 minutes by default).
+>
+> | Job | Cadence | Implementation |
+> |---|---|---|
+> | Weekly database backup | Sundays 02:00 | `cronjob.py:_run_backup_cycle` → `scripts/backup.py` |
+> | Weekly VACUUM ANALYZE | Sundays 04:00 | `cronjob.py:_run_vacuum_analyze` → `psql` |
+> | Daily log rotation check | 03:00 daily | `cronjob.py:_run_log_rotation_check` |
+>
+> Each automated job dispatches an ERROR alert on failure. Tune via
+> `MAINTENANCE_*` env vars (see `agent/.env.example`).
+
 ---
 
 ## Log Review
@@ -32,6 +46,13 @@ Run this checklist during the scheduled weekly maintenance window.
 
 ## Database Health
 
+- [ ] **[AUTO]** Run automated backup script (Sundays 02:00):
+  ```bash
+  cd agent && python scripts/backup.py --retention 7
+  ```
+  - Verify backup file created in `backups/`
+  - Check backup size is reasonable (not 0 bytes)
+  - Review backup logs for warnings
 - [ ] Check table sizes:
   ```sql
   SELECT relname, pg_size_pretty(pg_total_relation_size(relid))
@@ -44,14 +65,20 @@ Run this checklist during the scheduled weekly maintenance window.
   FROM pg_stat_user_indexes
   ORDER BY idx_scan ASC;
   ```
-- [ ] Run VACUUM ANALYZE on high-write tables:
+- [ ] **[AUTO]** Run VACUUM ANALYZE on high-write tables (Sundays 04:00):
   ```sql
   VACUUM ANALYZE ingestion_logs;
+  VACUUM ANALYZE documents;
+  VACUUM ANALYZE document_chunks;
   ```
 
 ---
 
 ## Ingestion Pipeline
+
+> Ingestion cycle itself runs automatically every 5 minutes via
+> `agent/cronjob.py` (the ingestion scheduler) with automatic failure
+> alerting on `_alert_on_failures` with a 1h cooldown.
 
 - [ ] Check for stuck files in `knowledge/raw_docs/` (older than expected cycle time)
 - [ ] Review `knowledge/failed/` for files that need manual intervention

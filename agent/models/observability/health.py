@@ -1,4 +1,4 @@
-"""Pydantic models for monitoring status responses."""
+"""Pydantic models for health monitoring responses."""
 
 from datetime import datetime
 from typing import Optional

@@ -239,4 +239,38 @@ export function validateSettings(settings: unknown): ChatSettings {
   }
 }
 
+// ============================================
+// Decision & Health Types
+// ============================================
+
+export interface DecisionRecord {
+  id: string;
+  timestamp: string;
+  decision: string;
+  rationale: string;
+  status: string;
+}
+
+export interface HealthStatus {
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  details: Record<string, unknown>;
+  timestamp: string;
+}
+
+// ============================================
+// Decision & Health API
+// ============================================
+
+export async function fetchDecisions(): Promise<DecisionRecord[]> {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/v1/decisions`);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
+export async function fetchHealthStatus(): Promise<HealthStatus> {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/v1/monitoring/status`);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
 export { getErrorMessage };

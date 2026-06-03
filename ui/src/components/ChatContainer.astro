@@ -6,13 +6,7 @@
   <!-- Header -->
   <header class="shrink-0 text-center pt-8 pb-2 bg-[var(--color-bg)]">
     <div class="flex items-center justify-center gap-3">
-      <div class="w-10 h-10 rounded-full bg-[var(--color-ai-bubble)] flex items-center justify-center text-[#626567] shrink-0" aria-hidden="true">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path>
-        </svg>
-      </div>
       <div class="flex flex-col gap-1 items-start">
-        <h1 class="text-2xl font-semibold leading-8 tracking-tight text-[var(--color-primary)] m-0">FW Agent</h1>
         <p class="flex items-center gap-1 text-[10px] font-semibold tracking-widest uppercase text-[var(--color-text-secondary)] m-0">
           <span class="w-2 h-2 bg-[var(--color-success)] rounded-full animate-pulse" id="status-dot" aria-hidden="true"></span>
           <span id="status-text">System Online</span>
@@ -22,7 +16,7 @@
   </header>
 
   <!-- Chat messages area -->
-  <main class="flex-1 w-full max-w-[54rem] mx-auto overflow-y-auto min-h-0 relative px-[var(--container-margin)]" role="main">
+  <main class="flex-1 w-full mx-auto overflow-y-auto min-h-0 relative px-[var(--container-margin)]" role="main">
     <section class="bg-[var(--color-bg)] flex flex-col h-full" aria-label="Chat messages">
       <slot />
     </section>

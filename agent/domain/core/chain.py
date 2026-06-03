@@ -13,7 +13,7 @@ from langsmith import traceable
 from langsmith.run_trees import _context as run_tree_context
 
 from models import ChatResponse, SourceDocument
-from models.decision import DecisionLogEntry, DecisionQuality
+from models.observability.decisions import DecisionLogEntry, DecisionQuality
 from utils.formatting import format_documents_as_context
 
 from ..retrieval.retriever import Retriever
@@ -209,7 +209,7 @@ class RAGChain:
         """
         from datetime import timezone
 
-        from infrastructure.decision_tracker import DecisionTracker
+        from infrastructure.observability.decisions import DecisionTracker
 
         return DecisionLogEntry(
             run_id=run_id,
@@ -226,6 +226,11 @@ class RAGChain:
             temperature=temperature,
             latency_ms=execution_time_ms,
             reasoning_summary=f"RAG retrieval: {documents_retrieved} docs with top_k={top_k}",
+            tool_selection_rationale=(
+                f"Retrieved {documents_retrieved} document(s) via vector search "
+                f"(top_k={top_k}); "
+                f"{'proceeding with grounded generation' if documents_retrieved > 0 else 'no documents retrieved, falling back to direct LLM answer with no context'}"
+            ),
         )
 
     def _get_run_id(self) -> str:
@@ -278,6 +283,7 @@ class RAGChain:
                     "chain_length": decision_metadata.chain_length,
                     "tools_used": decision_metadata.tools_used,
                     "reasoning_summary": decision_metadata.reasoning_summary,
+                    "tool_selection_rationale": getattr(decision_metadata, "tool_selection_rationale", None),
                     "query_preview": decision_metadata.query_preview,
                     "latency_ms": decision_metadata.latency_ms,
                     "documents_retrieved": decision_metadata.top_k,

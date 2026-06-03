@@ -33,22 +33,44 @@ _QUERY_NOISE_PATTERNS = [
 def _clean_query(raw_query: str) -> str:
     """Strip conversational filler so the retriever gets pure semantic intent.
 
+    Only applies cleaning when the query looks like a raw user question
+    (starts with filler words). LLM-constructed tool inputs are already
+    focused and should NOT be cleaned.
+
     Example:
         "Find in the api documentation who is the maintainer?"
         → "who is the maintainer"
+        "maintainer in api documentation"
+        → "maintainer in api documentation"  (LLM-constructed, skip cleaning)
     """
     cleaned = raw_query.strip()
+
+    # Skip cleaning for LLM-constructed queries: if it doesn't start with
+    # conversational filler, the LLM already made it focused
+    _FILLER_STARTERS = (
+        "find ", "search ", "look up ", "tell me ", "can you ",
+        "please ", "what does ", "where in ", "i need ",
+    )
+    if not cleaned.lower().startswith(_FILLER_STARTERS):
+        return cleaned
+
+    # Apply cleaning patterns one at a time, but never reduce to empty
     for pattern in _QUERY_NOISE_PATTERNS:
-        cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    # Ensure we never send an empty string
+        result = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
+        result = re.sub(r"\s+", " ", result).strip()
+        # Only apply if result is non-empty and meaningfully shorter
+        if result and len(result) < len(cleaned):
+            cleaned = result
+
     return cleaned or raw_query.strip()
 
 
 class SearchDocumentsInput(BaseModel):
     """Input schema for the search_documents tool."""
 
-    query: str = Field(description="The user's search query or question")
+    query: str = Field(
+        description="The user's FULL original question. Do NOT shorten, rephrase, or extract keywords. Pass it exactly as the user wrote it."
+    )
     top_k: int = Field(default=5, description="Number of documents to retrieve (1-20)")
 
 
@@ -71,7 +93,10 @@ def create_search_documents_tool(
     """
 
     def _search_docs(query: str, top_k: int = 5) -> str:
-        """Search the document knowledge base for relevant information.
+        """Search the ingested document knowledge base for relevant information.
+
+        IMPORTANT: Pass the user's FULL original query. Do NOT shorten or
+        rephrase it. The semantic search works best with complete questions.
 
         Use when the user asks to find, search, or look up information
         in uploaded documents using phrases like: 'find the ...', 'search for ...',

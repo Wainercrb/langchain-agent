@@ -9,7 +9,7 @@
 - **LLM Routing**: OpenRouter (primary), Google Gemini, OpenAI
 - **LangChain**: langchain 1.3, langchain-core 1.4, langchain-google-genai 4.2, langchain-openai 1.0
 - **Tracing**: LangSmith (`@traceable` decorators)
-- **Retry**: Tenacity (exponential backoff)
+- **Retry**: Hand-rolled exponential backoff with jitter (`infrastructure/llm/base.py:196`) + CircuitBreaker (`base.py:33`)
 - **Search**: DuckDuckGo (ddgs)
 - **Documents**: pdfplumber, python-docx
 - **Testing**: pytest 9.0, FastAPI TestClient

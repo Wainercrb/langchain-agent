@@ -5,7 +5,7 @@ and decision quality metrics.
 """
 
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -99,6 +99,10 @@ class DecisionLogEntry(BaseModel):
     reasoning_summary: Optional[str] = Field(
         default=None,
         description="Summary of the AI's reasoning for tool selection",
+    )
+    tool_selection_rationale: Optional[str] = Field(
+        default=None,
+        description="Raw LLM reasoning text explaining WHY tools were selected",
     )
     user_feedback: Optional[dict] = Field(
         default=None,

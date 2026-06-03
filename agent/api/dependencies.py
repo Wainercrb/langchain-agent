@@ -43,6 +43,7 @@ async def check_health() -> dict:
     health = {
         "status": "ok",
         "db_connected": False,
+        "llm_connected": False,
         "langsmith_connected": False,
         "embedding_connected": False,
     }
@@ -53,6 +54,16 @@ async def check_health() -> dict:
         health["db_connected"] = bool(result)
     except Exception as e:
         logger.error(f"DB health check failed: {str(e)}")
+
+    # LLM check — CONFIGURATION only, no real LLM invoke.
+    # Reports whether the system is ready to make LLM calls (i.e. at least one
+    # provider has an API key). For verification dashboards this avoids the
+    # cost of a real invoke while still showing readiness accurately.
+    health["llm_connected"] = bool(
+        settings.google_api_key
+        or settings.openrouter_api_key
+        or settings.openai_api_key
+    )
 
     # LangSmith check — lightweight API call, no LLM invocation needed
     if settings.enable_langsmith_tracing and settings.langsmith_api_key:

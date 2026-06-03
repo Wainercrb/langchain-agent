@@ -10,11 +10,12 @@ from datetime import datetime, timezone
 
 from api import router
 from api.middleware.rate_limit import RateLimitMiddleware
+from api.middleware.traffic_shedding import TrafficSheddingMiddleware
 from config import configure_tracing, settings
 from infrastructure.container import alert_service, _monitoring_scheduler
 from infrastructure.logging import logger
 from utils.correlation import set_correlation_id, get_correlation_id
-from utils.exceptions import Severity
+from utils.exceptions import Severity, RAGException
 
 
 @asynccontextmanager
@@ -50,6 +51,15 @@ app.add_middleware(
 
 # Add rate limiting middleware (applies to /v1/chat and /v1/rag only)
 app.add_middleware(RateLimitMiddleware)
+
+# Add traffic shedding middleware (returns 503 when system is degraded)
+if settings.traffic_shedding_enabled:
+    app.add_middleware(
+        TrafficSheddingMiddleware,
+        shed_on_status=["error"],
+        retry_after_seconds=settings.traffic_shedding_retry_after,
+    )
+    logger.info("Traffic shedding middleware enabled")
 
 
 @app.middleware("http")
