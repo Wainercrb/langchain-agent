@@ -30,18 +30,10 @@ def _create_alert_providers():
         SlackAlertProvider,
     )
 
-    providers = []
-    for alert_cls in [DiscordAlertProvider, SlackAlertProvider]:
-        try:
-            providers.append(alert_cls())
-        except ValueError:
-            pass
-
-    if len(providers) > 1:
-        return MultiAlertProvider(providers)
-    if len(providers) == 1:
-        return providers[0]
-    return DiscordAlertProvider()  # No-op
+    return MultiAlertProvider([
+        DiscordAlertProvider,
+        SlackAlertProvider,
+    ])
 
 
 def _create_agent(llm_provider, decision_tracker, vector_store, embeddings):
