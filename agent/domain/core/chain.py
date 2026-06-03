@@ -132,8 +132,14 @@ class RAGChain:
                 agent_type=decision_metadata.agent_type if decision_metadata else "rag_chain",
                 tools_used=decision_metadata.tools_used if decision_metadata else [],
                 chain_length=decision_metadata.chain_length if decision_metadata else 0,
-                decision_quality=decision_metadata.decision_quality.value if decision_metadata else DecisionQuality.SUBOPTIMAL.value,
-                reasoning_summary=decision_metadata.reasoning_summary if decision_metadata else None,
+                decision_quality=(
+                    decision_metadata.decision_quality.value
+                    if decision_metadata
+                    else DecisionQuality.SUBOPTIMAL.value
+                ),
+                reasoning_summary=(
+                    decision_metadata.reasoning_summary if decision_metadata else None
+                ),
             )
 
         except Exception as e:

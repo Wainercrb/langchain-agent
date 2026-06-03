@@ -56,10 +56,6 @@ class MetricsResponse(BaseModel):
         default=None,
         description="Link to LangSmith project dashboard (null if tracing disabled)",
     )
-    langsmith_audit_url: Optional[str] = Field(
-        default=None,
-        description="Link to LangSmith audit/project URL (null if tracing disabled)",
-    )
     ai_decisions: Optional[Dict[str, Any]] = Field(
         default=None,
         description="AI decision summary statistics (total_decisions, by_agent_type, by_quality, etc.)",

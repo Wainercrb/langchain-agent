@@ -52,7 +52,7 @@ class LLMProvider(ABC):
         """
         pass
 
-    def _classify_error(self, error: Exception, provider: str) -> Exception:
+    def classify_error(self, error: Exception, provider: str) -> Exception:
         """Classify an error as transient (retriable) or permanent.
 
         Args:

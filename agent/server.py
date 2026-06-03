@@ -10,12 +10,19 @@ from api.middleware_config import configure_correlation_middleware, configure_mi
 from config import settings
 
 
-app = FastAPI(title="LangChain Agent RAGAPI", version="1.0.0", docs_url="/docs", lifespan=lifespan)
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
+    app = FastAPI(title="LangChain Agent RAGAPI", version="1.0.0", docs_url="/docs", lifespan=lifespan)
 
-configure_middleware(app)
-configure_correlation_middleware(app)
-app.include_router(router)
-app.exception_handler(Exception)(global_exception_handler)
+    configure_middleware(app)
+    configure_correlation_middleware(app)
+    app.include_router(router)
+    app.exception_handler(Exception)(global_exception_handler)
+
+    return app
+
+
+app = create_app()
 
 
 if __name__ == "__main__":

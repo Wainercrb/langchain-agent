@@ -11,9 +11,7 @@ from api.error_responses import internal_error_response, not_found_response, val
 from api.metrics import build_metrics_snapshot, get_llm_usage_metrics, get_request_metrics
 from api.response_builders import (
     build_chat_response,
-    build_circuit_response,
     build_metrics_response,
-    build_monitoring_response,
 )
 from config import settings
 from models import (
@@ -415,10 +413,12 @@ async def monitoring_status() -> MonitoringStatusResponse:
     """
     from infrastructure.container import _monitoring_scheduler
 
+    from models.observability.health import MonitoringStatusResponse
+
     results = _monitoring_scheduler.last_results
     checks = list(results.values())
 
-    return build_monitoring_response(
+    return MonitoringStatusResponse(
         enabled=settings.monitoring_enabled,
         last_check=_monitoring_scheduler.last_check,
         interval_seconds=settings.monitoring_interval_seconds,
@@ -440,6 +440,8 @@ async def circuit_status() -> CircuitStatusResponse:
     """
     from infrastructure.container import llm
 
-    return build_circuit_response(
+    from models.observability.circuits import CircuitStatusResponse
+
+    return CircuitStatusResponse(
         circuits=llm.circuit_status() if hasattr(llm, "circuit_status") else {},
     )

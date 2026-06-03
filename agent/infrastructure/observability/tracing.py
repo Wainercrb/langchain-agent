@@ -94,46 +94,6 @@ def capture_tracing_tags(
     return run_id, langsmith_tags
 
 
-def add_decision_metadata_to_run(
-    decision_metadata: Any,
-) -> None:
-    """Add decision quality metadata to the current LangSmith run.
-
-    Args:
-        decision_metadata: DecisionLogEntry with routing and quality metadata.
-    """
-    current_run = run_tree_context.get_current_run_tree()
-    if not current_run or not decision_metadata:
-        return
-
-    try:
-        current_run.add_metadata({
-            "agent_type": decision_metadata.agent_type,
-            "decision_quality": decision_metadata.decision_quality.value,
-            "chain_length": decision_metadata.chain_length,
-            "tools_used": decision_metadata.tools_used,
-            "reasoning_summary": decision_metadata.reasoning_summary,
-            "tool_selection_rationale": getattr(decision_metadata, "tool_selection_rationale", None),
-            "query_preview": decision_metadata.query_preview,
-            "latency_ms": decision_metadata.latency_ms,
-            "documents_retrieved": decision_metadata.top_k,
-        })
-
-        if decision_metadata.chain_tools:
-            current_run.add_metadata({
-                "chain_tools": [
-                    {
-                        "tool": t.tool_name,
-                        "order": t.order,
-                        "output_summary": t.output_summary,
-                    }
-                    for t in decision_metadata.chain_tools
-                ],
-            })
-    except Exception:
-        pass
-
-
 def build_source_documents(
     documents: list,
     include_sources: bool,

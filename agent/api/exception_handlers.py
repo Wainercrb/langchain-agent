@@ -1,10 +1,9 @@
 """Global exception handler with alert dispatch."""
 
-from datetime import datetime, timezone
-
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from api.error_responses import internal_error_response
 from config.constants import TRUNCATE_ALERT_MESSAGE
 from infrastructure.container import alert_service
 from infrastructure.logging import logger
@@ -39,8 +38,5 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 
     return JSONResponse(
         status_code=500,
-        content={
-            "error": "internal_error",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        },
+        content=internal_error_response("Internal server error"),
     )

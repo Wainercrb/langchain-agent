@@ -38,7 +38,6 @@ class CircuitBreaker:
         self._recovery_timeout = recovery_timeout
         self._state = CircuitState.CLOSED
         self._failure_count = 0
-        self._last_failure_time: float = 0.0
         self._opened_at: float = 0.0
 
     @property
@@ -59,12 +58,10 @@ class CircuitBreaker:
         """Record a successful call. Resets circuit to CLOSED."""
         self._state = CircuitState.CLOSED
         self._failure_count = 0
-        self._last_failure_time = 0.0
 
     def record_failure(self) -> None:
         """Record a failed call. May transition to OPEN."""
         self._failure_count += 1
-        self._last_failure_time = time.monotonic()
 
         if self._state == CircuitState.HALF_OPEN:
             self._state = CircuitState.OPEN

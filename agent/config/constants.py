@@ -1,6 +1,6 @@
 """Named constants — eliminates magic numbers across the codebase."""
 
-# ── Truncation Limits ────────────────────────────────────────────────
+# ── Truncation limits ────────────────────────────────────────────────
 TRUNCATE_TOOL_NAME = 50
 TRUNCATE_TOOL_ARGS = 80
 TRUNCATE_ERROR_MSG = 200
@@ -15,18 +15,8 @@ TRUNCATE_QUERY_PREVIEW = 200
 TRUNCATE_CONTENT_PREVIEW = 200
 TRUNCATE_OUTPUT_SUMMARY = 200
 TRUNCATE_ALERT_MESSAGE = 200
-TRUNCATE_MAINTENANCE_ERROR = 500
 
-# ── Retry / Backoff ──────────────────────────────────────────────────
-DEFAULT_RETRY_COUNT = 3
-DEFAULT_BACKOFF_BASE = 1.0
-DEFAULT_BACKOFF_MAX = 30.0
-
-# ── Alert Dedup / Rate Limiting ──────────────────────────────────────
+# ── Alert dedup / rate limiting ──────────────────────────────────────
 DEDUP_COOLDOWN_SECONDS = 300
 RATE_LIMIT_WINDOW_SECONDS = 60
-SECONDS_PER_MINUTE = 60
-
-# ── Decision Quality Defaults ────────────────────────────────────────
-DECISION_TOP_K_DEFAULT = 5
-DECISION_TEMPERATURE_DEFAULT = 0.7
+RATE_LIMITER_WINDOW_SECONDS = 60

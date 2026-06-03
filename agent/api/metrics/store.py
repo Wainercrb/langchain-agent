@@ -89,7 +89,6 @@ class MetricsStore:
             snapshot["ai_decisions"] = {
                 "total_decisions": decision_tracker.size,
                 "decisions_evicted": decision_tracker.eviction_count,
-                "store_size": decision_tracker.size,
             }
 
         return snapshot

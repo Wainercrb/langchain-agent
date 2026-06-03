@@ -19,38 +19,12 @@ from config.constants import (
     TRUNCATE_QUERY_LOG,
     TRUNCATE_QUERY_PREVIEW,
 )
+from config.prompts import SYSTEM_PROMPT_TOOL_CALLING as SYSTEM_PROMPT
 from infrastructure.observability.tracing import build_source_documents, capture_tracing_tags, extract_run_id
 from models import ChatResponse, SourceDocument
 from models.observability.decisions import DecisionLogEntry, DecisionQuality, ToolCallRecord
 from infrastructure.agent.base import Agent
 from infrastructure.logging import logger
-
-SYSTEM_PROMPT = """You are a helpful assistant that answers questions based on available tools.
-
-RULES:
-1. Read the user's question carefully.
-2. Pick EXACTLY ONE tool that matches the question type. Do not chain tools unless necessary.
-3. If no tool is needed, answer directly from your training knowledge.
-4. Be concise and accurate.
-
-TOOL SELECTION GUIDE:
-- User says "find the ...", "search for ...", "look up ...", "find in the ...", "find in the api documentation", "find in the requirement documents", "find in the UIQCG documents", "what does the document say about ...", "where in the docs is ..." → Use: search_documents
-- Question asks about news, weather, sports, celebrities, current events → Use: web_search
-- Greeting, general questions, or anything not matching above → Answer directly, no tools
-
-EXAMPLES:
-- "Find in the api documentation who is the maintainer" → search_documents
-- "Search for API documentation" → search_documents
-- "Find in the requirement documents the security policy" → search_documents
-- "Find in the UIQCG documents the workflow steps" → search_documents
-- "Who won the World Cup 2022?" → web_search
-- "Hello, how are you?" → Direct answer
-
-When you use search_documents, the tool returns actual document content.
-ALWAYS answer the user's question using that content — do not reject it just because
-the document filename is unexpected or the text is brief.
-Only say "I don't have that information" if the retrieved documents are completely empty.
-"""
 
 
 class _TokenCallback(BaseCallbackHandler):
@@ -130,7 +104,7 @@ class ToolCallingAgent(Agent):
             ]
         )
 
-    def _build_executor(self, temperature: float) -> AgentExecutor:
+    def _build_executor(self) -> AgentExecutor:
         """Build AgentExecutor with injected tools."""
         prompt = self._build_prompt()
         llm_with_tools = self._llm.bind_tools(self._tools)
@@ -175,7 +149,7 @@ class ToolCallingAgent(Agent):
             )
 
             token_cb = _TokenCallback()
-            executor = self._build_executor(temperature=temperature)
+            executor = self._build_executor()
 
             llm_latency_ms, response_text, executor_result = self._execute(
                 executor, query, token_cb

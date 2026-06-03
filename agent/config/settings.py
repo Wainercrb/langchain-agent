@@ -29,13 +29,13 @@ class Settings(BaseSettings):
     gemini_max_tokens: int = Field(default=1000, alias="GEMINI_MAX_TOKENS")
 
     # ── OpenAI ───────────────────────────────────────────────────────
-    openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
+    openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL")
     openai_temperature: float = Field(default=0.7, alias="OPENAI_TEMPERATURE")
     openai_max_tokens: int = Field(default=1000, alias="OPENAI_MAX_TOKENS")
 
     # ── OpenRouter ───────────────────────────────────────────────────
-    openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
+    openrouter_api_key: Optional[str] = Field(default=None, alias="OPENROUTER_API_KEY")
     openrouter_model: str = Field(default="openai/gpt-4o", alias="OPENROUTER_MODEL")
     openrouter_temperature: float = Field(default=0.7, alias="OPENROUTER_TEMPERATURE")
     openrouter_max_tokens: int = Field(default=800, alias="OPENROUTER_MAX_TOKENS")

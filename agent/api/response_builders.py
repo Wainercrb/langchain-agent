@@ -3,8 +3,6 @@
 from typing import Any, Optional
 
 from models import ChatResponse, MetricsResponse
-from models.observability.health import MonitoringStatusResponse
-from models.observability.circuits import CircuitStatusResponse
 
 
 def build_chat_response(
@@ -53,28 +51,5 @@ def build_metrics_response(
         total_output_tokens=data["total_output_tokens"],
         avg_tokens_per_request=data["avg_tokens_per_request"],
         langsmith_dashboard_url=langsmith_dashboard_url,
-        langsmith_audit_url=langsmith_dashboard_url,
         ai_decisions=data.get("ai_decisions"),
     )
-
-
-def build_monitoring_response(
-    enabled: bool,
-    last_check: Any,
-    interval_seconds: int,
-    checks: list,
-    overall_status: str,
-) -> MonitoringStatusResponse:
-    """Build a MonitoringStatusResponse."""
-    return MonitoringStatusResponse(
-        enabled=enabled,
-        last_check=last_check,
-        interval_seconds=interval_seconds,
-        checks=checks,
-        overall_status=overall_status,
-    )
-
-
-def build_circuit_response(circuits: dict[str, Any]) -> CircuitStatusResponse:
-    """Build a CircuitStatusResponse."""
-    return CircuitStatusResponse(circuits=circuits)

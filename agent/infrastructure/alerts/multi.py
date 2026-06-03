@@ -11,16 +11,16 @@ Normal usage:
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
 from infrastructure.logging import logger
 from utils.exceptions import Severity
 
 
-class AlertProvider(ABC):
-    """Simple ABC for alert providers that don't need rate limiting/dedup."""
+@runtime_checkable
+class AlertProvider(Protocol):
+    """Protocol for alert providers — only requires send_alert."""
 
-    @abstractmethod
     async def send_alert(
         self,
         severity: Severity,
@@ -31,11 +31,8 @@ class AlertProvider(ABC):
         """Send an alert via the concrete backend."""
         ...
 
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}()"
 
-
-class MultiAlertProvider(AlertProvider):
+class MultiAlertProvider:
     """Dispatches alerts to multiple providers in parallel."""
 
     def __init__(self, providers: List[AlertProvider]) -> None:

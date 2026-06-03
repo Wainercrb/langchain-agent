@@ -123,7 +123,7 @@ class ResilientChatModel(Runnable):
 
             except Exception as e:
                 cb.record_failure()
-                classified = provider._classify_error(e, provider=provider.name)
+                classified = provider.classify_error(e, provider=provider.name)
 
                 if isinstance(classified, PermanentLLMError):
                     logger.error(
@@ -173,7 +173,7 @@ class ResilientChatModel(Runnable):
 
             except Exception as e:
                 cb.record_failure()
-                classified = provider._classify_error(e, provider=provider.name)
+                classified = provider.classify_error(e, provider=provider.name)
 
                 if isinstance(classified, PermanentLLMError):
                     logger.error(
@@ -303,31 +303,6 @@ class ResilientLLMProvider(LLMProvider):
             attempted_providers=attempted,
             errors=errors,
         )
-
-    def invoke_with_fallback(
-        self, messages: List[Dict[str, str]], **kwargs
-    ) -> LLMResponse:
-        """Like invoke() but returns a fallback response instead of raising."""
-        try:
-            return self.invoke(messages, **kwargs)
-        except AllProvidersExhaustedError:
-            if self._fallback_response:
-                logger.error(
-                    "All LLM providers exhausted, returning fallback response"
-                )
-                return LLMResponse(
-                    content=self._fallback_response,
-                    model="fallback",
-                    provider="fallback",
-                    metadata={
-                        "degraded": True,
-                        "message": (
-                            "All AI providers are currently unavailable. "
-                            "Please try again in a few minutes."
-                        ),
-                    },
-                )
-            raise
 
     def _enrich_response(
         self,
