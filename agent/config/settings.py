@@ -104,13 +104,6 @@ class Settings(BaseSettings):
     llm_backoff_base: float = Field(default=1.0, alias="LLM_BACKOFF_BASE")
     llm_backoff_max: float = Field(default=30.0, alias="LLM_BACKOFF_MAX")
 
-    # ── Agent / Tool Calling ────────────────────────────────────────────
-    use_tool_agent: bool = Field(
-        default=False,
-        alias="USE_TOOL_AGENT",
-        description="Use the intelligent tool-calling agent instead of the hardcoded RAGChain",
-    )
-
     # ── Rate Limiting ─────────────────────────────────────────────────
     rate_limit_enabled: bool = Field(default=True, alias="RATE_LIMIT_ENABLED")
     rate_limit_requests_per_minute: int = Field(

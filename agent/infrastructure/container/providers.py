@@ -36,42 +36,30 @@ def _create_alert_providers():
         SlackAlertProvider,
     ])
 
-    if len(providers) > 1:
-        return MultiAlertProvider(providers)
-    if len(providers) == 1:
-        return providers[0]
-    return DiscordAlertProvider()
-
+    return MultiAlertProvider(providers)
 
 def _create_agent(llm_provider, decision_tracker, vector_store, embeddings):
-    """Create the agent instance based on settings."""
-    from config import settings
-    from domain.agents import RAGChainAgent
-    from domain.core.chain import RAGChain
+    """Create the ToolCallingAgent with search and document tools."""
+    from infrastructure.tools import create_search_documents_tool, web_search_tool
     from domain.retrieval.retriever import Retriever
     from infrastructure.agent import ToolCallingAgent
 
     retriever = Retriever(vector_store=vector_store, embeddings=embeddings)
+    search_artifact_store = []
 
-    if settings.use_tool_agent:
-        search_artifact_store = []
-        from infrastructure.tools import create_search_documents_tool, web_search_tool
-
-        agent_tools = [
-            create_search_documents_tool(
-                retriever=retriever,
-                artifact_store=search_artifact_store,
-                default_latest_only=True,
-            ),
-            web_search_tool,
-        ]
-        return ToolCallingAgent(
-            llm=llm_provider.chat_model,
-            tools=agent_tools,
+    agent_tools = [
+        create_search_documents_tool(
+            retriever=retriever,
             artifact_store=search_artifact_store,
-            default_top_k=5,
-            decision_tracker=decision_tracker,
-        ), search_artifact_store
+            default_latest_only=True,
+        ),
+        web_search_tool,
+    ]
 
-    chain = RAGChain(retriever=retriever, llm=llm_provider, decision_tracker=decision_tracker)
-    return RAGChainAgent(chain=chain), None
+    return ToolCallingAgent(
+        llm=llm_provider.chat_model,
+        tools=agent_tools,
+        artifact_store=search_artifact_store,
+        default_top_k=5,
+        decision_tracker=decision_tracker,
+    ), search_artifact_store
