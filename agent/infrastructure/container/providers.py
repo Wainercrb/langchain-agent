@@ -15,32 +15,13 @@ def _create_llm_providers():
         OpenRouterProvider,
     )
 
-    providers = []
-
-    if settings.google_api_key:
-        providers.append(GoogleProvider(
-            model=settings.gemini_model,
-            temperature=settings.gemini_temperature,
-            max_tokens=settings.gemini_max_tokens,
-            api_key=settings.google_api_key,
-        ))
-    if settings.openrouter_api_key:
-        providers.append(OpenRouterProvider(
-            model=settings.openrouter_model,
-            temperature=settings.openrouter_temperature,
-            max_tokens=settings.openrouter_max_tokens,
-            api_key=settings.openrouter_api_key,
-            timeout=settings.llm_timeout_seconds,
-        ))
-    if settings.openai_api_key:
-        providers.append(OpenAIProvider(
-            model=settings.openai_model,
-            temperature=settings.openai_temperature,
-            max_tokens=settings.openai_max_tokens,
-            api_key=settings.openai_api_key,
-        ))
-
-    return providers
+    return [
+        p for p in [
+            GoogleProvider.from_settings(),
+            OpenRouterProvider.from_settings(),
+            OpenAIProvider.from_settings(),
+        ] if p is not None
+    ]
 
 
 def _create_alert_providers():
@@ -51,25 +32,17 @@ def _create_alert_providers():
         SlackAlertProvider,
     )
 
-    providers = []
-
-    if settings.discord_webhook_url:
-        providers.append(DiscordAlertProvider(
-            webhook_url=settings.discord_webhook_url,
-            rate_limit_per_minute=settings.alert_rate_limit_per_minute,
-        ))
-
-    if settings.slack_webhook_url:
-        providers.append(SlackAlertProvider(
-            webhook_url=settings.slack_webhook_url,
-            rate_limit_per_minute=settings.alert_rate_limit_per_minute,
-        ))
+    providers = [
+        p for p in [
+            DiscordAlertProvider.from_settings(),
+            SlackAlertProvider.from_settings(),
+        ] if p is not None
+    ]
 
     if len(providers) > 1:
         return MultiAlertProvider(providers)
     if len(providers) == 1:
         return providers[0]
-    # No webhooks configured — use a no-op provider that logs warnings
     return DiscordAlertProvider(
         webhook_url=None,
         rate_limit_per_minute=settings.alert_rate_limit_per_minute,

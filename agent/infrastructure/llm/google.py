@@ -4,6 +4,7 @@ from typing import Dict, List
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
+from config import settings
 from .base import LLMProvider, LLMResponse
 from infrastructure.logging import logger
 
@@ -12,6 +13,17 @@ class GoogleProvider(LLMProvider):
     """Google Gemini LLM provider."""
 
     name = "google"
+
+    @classmethod
+    def from_settings(cls):
+        if not settings.google_api_key:
+            return None
+        return cls(
+            model=settings.gemini_model,
+            temperature=settings.gemini_temperature,
+            max_tokens=settings.gemini_max_tokens,
+            api_key=settings.google_api_key,
+        )
 
     def __init__(
         self,

@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 
 import httpx
 
+from config import settings
 from config.constants import (
     TRUNCATE_DESCRIPTION,
     TRUNCATE_ERROR_DETAIL,
@@ -23,6 +24,15 @@ from .base import AlertProviderBase
 
 class DiscordAlertProvider(AlertProviderBase):
     """Sends alerts as Discord embeds with rate limiting and dedup."""
+
+    @classmethod
+    def from_settings(cls):
+        if not settings.discord_webhook_url:
+            return None
+        return cls(
+            webhook_url=settings.discord_webhook_url,
+            rate_limit_per_minute=settings.alert_rate_limit_per_minute,
+        )
 
     def __init__(
         self,

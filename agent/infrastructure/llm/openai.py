@@ -4,6 +4,7 @@ from typing import Dict, List
 
 from langchain_openai import ChatOpenAI
 
+from config import settings
 from .base import LLMProvider, LLMResponse
 from infrastructure.logging import logger
 
@@ -12,6 +13,17 @@ class OpenAIProvider(LLMProvider):
     """OpenAI LLM provider."""
 
     name = "openai"
+
+    @classmethod
+    def from_settings(cls):
+        if not settings.openai_api_key:
+            return None
+        return cls(
+            model=settings.openai_model,
+            temperature=settings.openai_temperature,
+            max_tokens=settings.openai_max_tokens,
+            api_key=settings.openai_api_key,
+        )
 
     def __init__(
         self,

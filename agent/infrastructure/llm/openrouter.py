@@ -4,6 +4,7 @@ from typing import Dict, List
 
 from langchain_openai import ChatOpenAI
 
+from config import settings
 from .base import LLMProvider, LLMResponse
 from infrastructure.logging import logger
 
@@ -12,6 +13,18 @@ class OpenRouterProvider(LLMProvider):
     """OpenRouter LLM provider (OpenAI-compatible gateway)."""
 
     name = "openrouter"
+
+    @classmethod
+    def from_settings(cls):
+        if not settings.openrouter_api_key:
+            return None
+        return cls(
+            model=settings.openrouter_model,
+            temperature=settings.openrouter_temperature,
+            max_tokens=settings.openrouter_max_tokens,
+            api_key=settings.openrouter_api_key,
+            timeout=settings.llm_timeout_seconds,
+        )
 
     def __init__(
         self,
