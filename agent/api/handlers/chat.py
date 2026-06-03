@@ -10,7 +10,7 @@ from api.error_responses import internal_error_response, validation_error_respon
 from api.response_builders import build_chat_response
 from infrastructure.container import agent
 from infrastructure.logging import logger
-from api.metrics import get_llm_usage_metrics, get_request_metrics
+from api.metrics_store import get_llm_usage_metrics, get_request_metrics
 from models import ChatRequest, ChatResponse, ErrorResponse
 from utils.exceptions import Severity, AllProvidersExhaustedError
 

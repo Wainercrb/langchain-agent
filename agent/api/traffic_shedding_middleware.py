@@ -7,8 +7,6 @@ instead of accepting requests that will fail.
 This prevents resource waste and user frustration during outages.
 """
 
-from typing import Callable
-
 from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
 

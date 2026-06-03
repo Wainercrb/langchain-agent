@@ -1,11 +1,10 @@
 """Unified metrics store — consolidates request and LLM-usage counters.
 
-Single thread-safe store for all operational metrics. Replaces the separate
-RequestMetrics and LLMUsageMetrics singletons.
+Single thread-safe store for all operational metrics. Provides backward-compatible
+re-exports of get_request_metrics(), get_llm_usage_metrics(), and get_metrics_store().
 """
 
 import threading
-from typing import Any, Optional
 
 
 class MetricsStore:
@@ -52,17 +51,11 @@ class MetricsStore:
             self._total_output_tokens += output_tokens
             self._llm_record_count += 1
 
-    def snapshot(self, decision_tracker: Optional[Any] = None) -> dict:
+    def snapshot(self) -> dict:
         """Return a point-in-time snapshot of all counters.
 
-        Args:
-            decision_tracker: Optional DecisionTracker instance to include AI
-                decision aggregates (total_decisions, decisions_evicted, store_size)
-                under the `ai_decisions` key.
-
         Returns:
-            Dictionary with request counters, token counters, and optionally
-            decision aggregates.
+            Dictionary with request counters and token counters.
         """
         with self._lock:
             avg_latency = (
@@ -76,7 +69,7 @@ class MetricsStore:
                 if self._llm_record_count > 0
                 else 0.0
             )
-            snapshot = {
+            return {
                 "request_count": self._request_count,
                 "error_count": self._error_count,
                 "avg_latency_ms": avg_latency,
@@ -85,14 +78,6 @@ class MetricsStore:
                 "avg_tokens_per_request": avg_tokens,
             }
 
-        if decision_tracker is not None:
-            snapshot["ai_decisions"] = {
-                "total_decisions": decision_tracker.size,
-                "decisions_evicted": decision_tracker.eviction_count,
-            }
-
-        return snapshot
-
 
 _metrics_store = MetricsStore()
 
@@ -100,3 +85,22 @@ _metrics_store = MetricsStore()
 def get_metrics_store() -> MetricsStore:
     """Return the global MetricsStore singleton."""
     return _metrics_store
+
+
+def get_request_metrics() -> MetricsStore:
+    """Return the global MetricsStore singleton (backward-compatible)."""
+    return _metrics_store
+
+
+def get_llm_usage_metrics() -> MetricsStore:
+    """Return the global MetricsStore singleton (backward-compatible)."""
+    return _metrics_store
+
+
+def build_metrics_snapshot() -> dict:
+    """Return a point-in-time snapshot of all counters.
+
+    Returns:
+        Dictionary with request counters and token counters.
+    """
+    return _metrics_store.snapshot()

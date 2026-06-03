@@ -64,7 +64,7 @@ class HealthVerifier:
             return True, "LangSmith tracing not configured, skipping"
         try:
             from langsmith import Client as LangSmithClient
-            from api.metrics import get_request_metrics
+            from api.metrics_store import get_request_metrics
 
             client = LangSmithClient()
             now = datetime.now(timezone.utc)

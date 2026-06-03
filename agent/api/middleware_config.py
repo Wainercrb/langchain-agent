@@ -5,8 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from api.middleware.rate_limit import RateLimitMiddleware
-from api.middleware.traffic_shedding import TrafficSheddingMiddleware
+from api.rate_limit_middleware import RateLimitMiddleware
+from api.traffic_shedding_middleware import TrafficSheddingMiddleware
 from config import settings
 from utils.correlation import set_correlation_id, get_correlation_id
 

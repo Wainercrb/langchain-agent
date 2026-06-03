@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from api.response_builders import build_metrics_response
 from config import get_langsmith_dashboard_url
 from infrastructure.container import decision_tracker
-from api.metrics import build_metrics_snapshot
+from api.metrics_store import build_metrics_snapshot
 from models import MetricsResponse
 
 router = APIRouter(prefix="/v1", tags=["metrics"])
@@ -35,7 +35,11 @@ async def metrics_endpoint(
         MetricsResponse with request_count, error_count, avg_latency_ms,
         and langsmith_dashboard_url (if tracing is configured).
     """
-    data = build_metrics_snapshot(decision_tracker=tracker)
+    data = build_metrics_snapshot()
+    data["ai_decisions"] = {
+        "total_decisions": tracker.size,
+        "decisions_evicted": tracker.eviction_count,
+    }
 
     langsmith_url = get_langsmith_dashboard_url()
 
