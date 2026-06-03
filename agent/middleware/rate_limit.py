@@ -6,7 +6,7 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from config import settings
-from api.middleware.rate_limiter import RateLimiter
+from middleware.rate_limiter import RateLimiter
 
 _rate_limiter = RateLimiter(requests_per_minute=settings.rate_limit_requests_per_minute)
 
