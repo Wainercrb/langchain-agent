@@ -82,6 +82,8 @@ python server.py
 ```bash
 python cronjob.py
 # Watches knowledge/raw_docs/ and processes new files
+# Note: for local dev only — Docker launches server.py + cronjob.py together
+# via the container's CMD (see Dockerfile).
 ```
 
 **Docker** (both services):
@@ -380,8 +382,10 @@ All settings are loaded from environment variables via `config/settings.py`.
 # Terminal 1: API server
 python server.py
 
-# Terminal 2: Ingestion pipeline
+# Terminal 2: Ingestion pipeline (local dev only)
 python cronjob.py
+# In Docker, the container's CMD launches both processes automatically —
+# no need to run cronjob.py manually.
 ```
 
 ### Run Tests
