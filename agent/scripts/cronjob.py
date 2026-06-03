@@ -161,7 +161,7 @@ def _run_backup_cycle() -> None:
     on catastrophic failure. We add an additional ERROR alert at the
     cronjob level so failures are visible in the maintenance summary.
     """
-    backup_script = Path(__file__).parent / "scripts" / "backup.py"
+    backup_script = Path(__file__).parent / "backup.py"
     if not backup_script.exists():
         logger.error(f"Backup script not found: {backup_script}")
         _send_maintenance_alert("weekly_backup", f"Script not found: {backup_script}")

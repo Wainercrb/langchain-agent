@@ -1,53 +1,47 @@
-"""Metrics aggregator — combines request and LLM-usage snapshots.
+"""Metrics aggregator — unified MetricsStore for all operational counters.
 
-This package replaces the legacy monolithic `api.metrics` module. Each metric
-family lives in its own submodule with a single responsibility:
+This package provides a single MetricsStore that consolidates:
+- HTTP request counters (request_count, error_count, avg_latency_ms)
+- LLM token counters (input/output tokens, avg per request)
 
-- `request`: HTTP request counters (request_count, error_count, avg_latency_ms)
-- `llm_usage`: LLM token counters (input/output tokens, avg per request)
-
-The optional `decision_tracker` parameter on `build_metrics_snapshot` lets the
-route handler attach AI decision aggregates without coupling the metrics
-classes to the DecisionTracker.
+Backward-compatible re-exports are provided for legacy code:
+- `get_request_metrics()` returns the unified store (has record_request/record_error)
+- `get_llm_usage_metrics()` returns the unified store (has record_tokens)
+- `build_metrics_snapshot()` delegates to the unified store's snapshot()
 """
 
 from typing import Any, Optional
 
-from .llm_usage import LLMUsageMetrics, get_llm_usage_metrics
-from .request import RequestMetrics, get_request_metrics
+from .store import MetricsStore, get_metrics_store
 
 __all__ = [
-    "LLMUsageMetrics",
-    "RequestMetrics",
+    "MetricsStore",
     "build_metrics_snapshot",
+    "get_metrics_store",
     "get_llm_usage_metrics",
     "get_request_metrics",
 ]
 
 
+def get_request_metrics() -> MetricsStore:
+    """Return the global MetricsStore singleton (backward-compatible)."""
+    return get_metrics_store()
+
+
+def get_llm_usage_metrics() -> MetricsStore:
+    """Return the global MetricsStore singleton (backward-compatible)."""
+    return get_metrics_store()
+
+
 def build_metrics_snapshot(decision_tracker: Optional[Any] = None) -> dict:
-    """Combine request and LLM-usage snapshots, optionally with decision aggregates.
+    """Return a snapshot of all metrics, optionally with decision aggregates.
 
     Args:
         decision_tracker: Optional DecisionTracker instance to include AI
-            decision aggregates (total_decisions, decisions_evicted, store_size)
-            under the `ai_decisions` key.
+            decision aggregates under the `ai_decisions` key.
 
     Returns:
         Dictionary merging request counters, token counters, and (optionally)
-        decision aggregates. Backward-compatible with the legacy
-        `SimpleMetrics.snapshot()` output shape.
+        decision aggregates.
     """
-    snapshot = {
-        **get_request_metrics().snapshot(),
-        **get_llm_usage_metrics().snapshot(),
-    }
-
-    if decision_tracker is not None:
-        snapshot["ai_decisions"] = {
-            "total_decisions": decision_tracker.size,
-            "decisions_evicted": decision_tracker.eviction_count,
-            "store_size": decision_tracker.size,
-        }
-
-    return snapshot
+    return get_metrics_store().snapshot(decision_tracker=decision_tracker)

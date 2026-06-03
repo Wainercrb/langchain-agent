@@ -3,6 +3,8 @@
 import time
 from collections import deque
 
+from config.constants import SECONDS_PER_MINUTE
+
 
 class RateLimiter:
     """Rate limiter for API quotas (requests per minute)."""
@@ -11,7 +13,7 @@ class RateLimiter:
         self.requests_per_minute = requests_per_minute
         self.request_timestamps = deque()  # Track request times (last 60 seconds)
         self.min_interval = (
-            60.0 / requests_per_minute
+            SECONDS_PER_MINUTE / requests_per_minute
         )  # Seconds between requests (~0.6s for 100/min)
 
     def wait_if_needed(self):
@@ -22,14 +24,14 @@ class RateLimiter:
 
         # Remove timestamps older than 60 seconds
         while (
-            self.request_timestamps and self.request_timestamps[0] < current_time - 60
+            self.request_timestamps and self.request_timestamps[0] < current_time - SECONDS_PER_MINUTE
         ):
             self.request_timestamps.popleft()
 
         # Check if we need to wait for quota reset
         if len(self.request_timestamps) >= self.requests_per_minute:
             oldest_request = self.request_timestamps[0]
-            wait_time = (oldest_request + 60) - current_time
+            wait_time = (oldest_request + SECONDS_PER_MINUTE) - current_time
             if wait_time > 0:
                 logger.warning(
                     f"Quota limit reached ({len(self.request_timestamps)}/{self.requests_per_minute}). "
@@ -40,7 +42,7 @@ class RateLimiter:
                 current_time = time.time()
                 while (
                     self.request_timestamps
-                    and self.request_timestamps[0] < current_time - 60
+                    and self.request_timestamps[0] < current_time - SECONDS_PER_MINUTE
                 ):
                     self.request_timestamps.popleft()
 
@@ -61,7 +63,7 @@ class RateLimiter:
         current_time = time.time()
 
         while (
-            self.request_timestamps and self.request_timestamps[0] < current_time - 60
+            self.request_timestamps and self.request_timestamps[0] < current_time - SECONDS_PER_MINUTE
         ):
             self.request_timestamps.popleft()
 
@@ -75,7 +77,7 @@ class RateLimiter:
         """Get current request count in the last minute."""
         current_time = time.time()
         while (
-            self.request_timestamps and self.request_timestamps[0] < current_time - 60
+            self.request_timestamps and self.request_timestamps[0] < current_time - SECONDS_PER_MINUTE
         ):
             self.request_timestamps.popleft()
         return len(self.request_timestamps)
@@ -83,15 +85,15 @@ class RateLimiter:
     def get_reset_timestamp(self) -> float:
         """Get the timestamp when the current window resets."""
         if not self.request_timestamps:
-            return time.time() + 60
+            return time.time() + SECONDS_PER_MINUTE
         oldest = self.request_timestamps[0]
-        return oldest + 60
+        return oldest + SECONDS_PER_MINUTE
 
     def get_remaining(self) -> int:
         """Get remaining requests in current window."""
         current_time = time.time()
         while (
-            self.request_timestamps and self.request_timestamps[0] < current_time - 60
+            self.request_timestamps and self.request_timestamps[0] < current_time - SECONDS_PER_MINUTE
         ):
             self.request_timestamps.popleft()
         remaining = self.requests_per_minute - len(self.request_timestamps)

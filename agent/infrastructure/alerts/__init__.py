@@ -14,9 +14,16 @@ Multi-provider (send to all configured backends):
     await multi.send_alert(Severity.ERROR, "Something broke", error=exc)
 """
 
-from .base import AlertProvider
+from .base import AlertProviderBase, AlertProvider, ENABLED_SEVERITIES
 from .discord import DiscordAlertProvider
 from .slack import SlackAlertProvider
 from .multi import MultiAlertProvider
 
-__all__ = ["AlertProvider", "DiscordAlertProvider", "SlackAlertProvider", "MultiAlertProvider"]
+__all__ = [
+    "AlertProvider",
+    "AlertProviderBase",
+    "DiscordAlertProvider",
+    "SlackAlertProvider",
+    "MultiAlertProvider",
+    "ENABLED_SEVERITIES",
+]

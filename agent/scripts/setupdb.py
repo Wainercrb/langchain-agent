@@ -70,7 +70,7 @@ def reset_database() -> None:
 
 def run_migrations() -> int:
     """Run alembic migrations."""
-    ini = Path(__file__).parent / "alembic.ini"
+    ini = Path(__file__).parent.parent / "alembic.ini"
     if not ini.exists():
         print(f"ERROR: alembic.ini not found at {ini}")
         return 1

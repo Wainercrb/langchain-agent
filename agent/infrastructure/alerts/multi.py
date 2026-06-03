@@ -10,12 +10,29 @@ Normal usage:
 """
 
 import asyncio
+from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
 from infrastructure.logging import logger
 from utils.exceptions import Severity
 
-from .base import AlertProvider
+
+class AlertProvider(ABC):
+    """Simple ABC for alert providers that don't need rate limiting/dedup."""
+
+    @abstractmethod
+    async def send_alert(
+        self,
+        severity: Severity,
+        message: str,
+        error: Optional[Exception] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Send an alert via the concrete backend."""
+        ...
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}()"
 
 
 class MultiAlertProvider(AlertProvider):

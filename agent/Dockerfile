@@ -45,4 +45,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # Run the application — launch both the FastAPI server and the APScheduler cronjob
 # in the same container. `wait -n` makes the container exit if EITHER process dies,
 # so a crashed cronjob triggers a restart instead of running silently dead.
-CMD ["bash", "-c", "python cronjob.py & python server.py & wait -n"]
+CMD ["bash", "-c", "python scripts/cronjob.py & python server.py & wait -n"]

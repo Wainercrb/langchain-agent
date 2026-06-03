@@ -5,7 +5,6 @@ Tools are INJECTED via constructor — the container decides which tools are act
 """
 
 import time
-import uuid
 from typing import Any, Dict, List, Optional
 
 from langchain_core.callbacks import BaseCallbackHandler
@@ -13,8 +12,14 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import BaseTool
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langsmith import traceable
-from langsmith.run_trees import _context as run_tree_context
 
+from config.constants import (
+    TRUNCATE_CONTENT_PREVIEW,
+    TRUNCATE_OUTPUT_SUMMARY,
+    TRUNCATE_QUERY_LOG,
+    TRUNCATE_QUERY_PREVIEW,
+)
+from infrastructure.observability.tracing import build_source_documents, capture_tracing_tags, extract_run_id
 from models import ChatResponse, SourceDocument
 from models.observability.decisions import DecisionLogEntry, DecisionQuality, ToolCallRecord
 from infrastructure.agent.base import Agent
@@ -165,7 +170,7 @@ class ToolCallingAgent(Agent):
         start_time = time.time()
         try:
             logger.info(
-                f"ToolCallingAgent.invoke: query={query[:50]}..., "
+                f"ToolCallingAgent.invoke: query={query[:TRUNCATE_QUERY_LOG]}..., "
                 f"tools={[t.name for t in self._tools]}"
             )
 
@@ -180,14 +185,19 @@ class ToolCallingAgent(Agent):
 
             sources_list = self._extract_sources(include_sources)
 
-            run_id = self._get_run_id()
+            run_id = extract_run_id()
 
             decision_metadata = self._extract_decision_metadata(
                 run_id, query, executor_result, execution_time_ms, top_k, temperature
             )
 
-            run_id, langsmith_tags = self._capture_tracing_metadata(
-                top_k, temperature, decision_metadata, run_id
+            run_id, langsmith_tags = capture_tracing_tags(
+                model_name=getattr(self._llm, "model", "unknown"),
+                agent_type="tool-calling",
+                top_k=top_k,
+                temperature=temperature,
+                decision_metadata=decision_metadata,
+                pre_run_id=run_id,
             )
 
             if self._decision_tracker and decision_metadata:
@@ -197,7 +207,7 @@ class ToolCallingAgent(Agent):
                     logger.warning(f"Failed to record decision: {str(e)}")
 
             logger.info(
-                f"ToolCallingAgent complete: query={query[:50]}..., "
+                f"ToolCallingAgent complete: query={query[:TRUNCATE_QUERY_LOG]}..., "
                 f"time={execution_time_ms:.0f}ms, llm_time={llm_latency_ms:.0f}ms, "
                 f"sources={len(sources_list or [])}"
             )
@@ -221,7 +231,7 @@ class ToolCallingAgent(Agent):
 
         except Exception as e:
             logger.error(
-                f"ToolCallingAgent.invoke failed: query={query[:50]}..., error={str(e)}",
+                f"ToolCallingAgent.invoke failed: query={query[:TRUNCATE_QUERY_LOG]}..., error={str(e)}",
                 exc_info=True,
             )
             raise
@@ -282,13 +292,13 @@ class ToolCallingAgent(Agent):
                 action = step[0]
                 tool_name = getattr(action, "tool", None) or str(action)
                 tool_input = getattr(action, "tool_input", {})
-                output_summary = str(step[1])[:200]
+                output_summary = str(step[1])[:TRUNCATE_OUTPUT_SUMMARY]
                 rationale = getattr(action, "log", None)
             # Format 2: object with .tool attribute
             elif hasattr(step, "tool"):
                 tool_name = step.tool
                 tool_input = getattr(step, "tool_input", {})
-                output_summary = str(getattr(step, "observation", ""))[:200]
+                output_summary = str(getattr(step, "observation", ""))[:TRUNCATE_OUTPUT_SUMMARY]
                 rationale = getattr(step, "log", None)
 
             if not tool_name:
@@ -327,7 +337,7 @@ class ToolCallingAgent(Agent):
         return DecisionLogEntry(
             run_id=run_id,
             agent_type="tool_calling",
-            query_preview=query[:200],
+            query_preview=query[:TRUNCATE_QUERY_PREVIEW],
             query_hash=DecisionTracker.compute_query_hash(query),
             tools_used=tools_used,
             chain_length=chain_length,
@@ -341,78 +351,6 @@ class ToolCallingAgent(Agent):
             reasoning_summary=reasoning_summary,
             tool_selection_rationale=rationale_text,
         )
-
-    def _get_run_id(self) -> str:
-        """Extract or generate a run ID for this invocation.
-
-        Returns:
-            LangSmith run ID or UUID fallback.
-        """
-        current_run = run_tree_context.get_current_run_tree()
-        return str(current_run.id) if current_run else str(uuid.uuid4())
-
-    def _capture_tracing_metadata(
-        self, top_k: int, temperature: float, decision_metadata: Optional[Any] = None, pre_run_id: Optional[str] = None
-    ) -> tuple[str, Optional[List[str]]]:
-        """Extract LangSmith run ID and apply dynamic tags.
-
-        Args:
-            top_k: Number of documents retrieved.
-            temperature: LLM temperature setting.
-            decision_metadata: Optional DecisionLogEntry for decision tags.
-            pre_run_id: Optional pre-computed run_id to use.
-
-        Returns:
-            Tuple of (run_id, langsmith_tags).
-        """
-        current_run = run_tree_context.get_current_run_tree()
-        run_id = pre_run_id or (str(current_run.id) if current_run else str(uuid.uuid4()))
-
-        if not current_run:
-            return run_id, None
-
-        langsmith_tags = [
-            f"model:{getattr(self._llm, 'model', 'unknown')}",
-            "agent:tool-calling",
-            f"top_k:{top_k}",
-            f"temperature:{temperature}",
-        ]
-
-        if decision_metadata:
-            try:
-                langsmith_tags.append(f"decision_quality:{decision_metadata.decision_quality.value}")
-                langsmith_tags.append(f"chain_length:{decision_metadata.chain_length}")
-                if decision_metadata.tools_used:
-                    langsmith_tags.append(f"tools_used:{','.join(decision_metadata.tools_used)}")
-
-                # Standard LangSmith metadata for structured querying
-                current_run.add_metadata({
-                    "agent_type": decision_metadata.agent_type,
-                    "decision_quality": decision_metadata.decision_quality.value,
-                    "chain_length": decision_metadata.chain_length,
-                    "tools_used": decision_metadata.tools_used,
-                    "reasoning_summary": decision_metadata.reasoning_summary,
-                    "tool_selection_rationale": getattr(decision_metadata, "tool_selection_rationale", None),
-                    "query_preview": decision_metadata.query_preview,
-                    "latency_ms": decision_metadata.latency_ms,
-                })
-
-                if decision_metadata.chain_tools:
-                    current_run.add_metadata({
-                        "chain_tools": [
-                            {
-                                "tool": t.tool_name,
-                                "order": t.order,
-                                "output_summary": t.output_summary,
-                            }
-                            for t in decision_metadata.chain_tools
-                        ],
-                    })
-            except Exception:
-                pass
-
-        current_run.add_tags(langsmith_tags)
-        return run_id, langsmith_tags
 
     def _extract_sources(
         self, include_sources: bool
@@ -430,14 +368,4 @@ class ToolCallingAgent(Agent):
         if not all_sources:
             return None
 
-        return [
-            SourceDocument(
-                document_id=doc.document_id,
-                filename=doc.filename,
-                similarity_score=doc.similarity_score,
-                version_date=doc.version_date,
-                content_preview=doc.text[:200],
-                chunk_id=doc.chunk_id,
-            )
-            for doc in all_sources
-        ]
+        return build_source_documents(all_sources, True, TRUNCATE_CONTENT_PREVIEW)

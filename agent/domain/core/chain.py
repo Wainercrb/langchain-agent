@@ -5,14 +5,14 @@ Fully traced via LangSmith @traceable decorator.
 """
 
 import time
-import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from langsmith import traceable
-from langsmith.run_trees import _context as run_tree_context
 
-from models import ChatResponse, SourceDocument
+from config.constants import TRUNCATE_CONTENT_PREVIEW, TRUNCATE_QUERY_LOG, TRUNCATE_QUERY_PREVIEW
+from infrastructure.observability.tracing import build_source_documents, capture_tracing_tags, extract_run_id
+from models import ChatResponse
 from models.observability.decisions import DecisionLogEntry, DecisionQuality
 from utils.formatting import format_documents_as_context
 
@@ -66,7 +66,7 @@ class RAGChain:
         start_time = time.time()
         try:
             logger.info(
-                f"RAGChain.invoke: query={query[:50]}..., top_k={top_k}, "
+                f"RAGChain.invoke: query={query[:TRUNCATE_QUERY_LOG]}..., top_k={top_k}, "
                 f"temperature={temperature}, include_sources={include_sources}, "
                 f"version_filter={version_filter}, latest_only={latest_only}"
             )
@@ -88,18 +88,23 @@ class RAGChain:
 
             execution_time_ms = (time.time() - start_time) * 1000
 
-            run_id = self._get_run_id()
+            run_id = extract_run_id()
 
             decision_metadata = self._extract_decision_metadata(
                 run_id, query, execution_time_ms, top_k, temperature, len(retrieved)
             )
 
-            run_id, langsmith_tags = self._capture_tracing_metadata(
-                top_k, temperature, decision_metadata, run_id
+            run_id, langsmith_tags = capture_tracing_tags(
+                model_name=self._llm.model,
+                agent_type="rag-chain",
+                top_k=top_k,
+                temperature=temperature,
+                decision_metadata=decision_metadata,
+                pre_run_id=run_id,
             )
 
-            sources_list = self._format_sources(
-                retrieved, include_sources
+            sources_list = build_source_documents(
+                retrieved, include_sources, TRUNCATE_CONTENT_PREVIEW
             )
 
             if self._decision_tracker and decision_metadata:
@@ -109,7 +114,7 @@ class RAGChain:
                     logger.warning(f"Failed to record decision: {str(e)}")
 
             logger.info(
-                f"RAGChain.invoke complete: query={query[:50]}..., "
+                f"RAGChain.invoke complete: query={query[:TRUNCATE_QUERY_LOG]}..., "
                 f"time={execution_time_ms:.0f}ms, llm_time={llm_latency_ms:.0f}ms, "
                 f"sources={len(sources_list or [])}"
             )
@@ -133,7 +138,7 @@ class RAGChain:
 
         except Exception as e:
             logger.error(
-                f"RAGChain.invoke failed: query={query[:50]}..., error={str(e)}",
+                f"RAGChain.invoke failed: query={query[:TRUNCATE_QUERY_LOG]}..., error={str(e)}",
                 exc_info=True,
             )
             raise
@@ -214,7 +219,7 @@ class RAGChain:
         return DecisionLogEntry(
             run_id=run_id,
             agent_type="rag_chain",
-            query_preview=query[:200],
+            query_preview=query[:TRUNCATE_QUERY_PREVIEW],
             query_hash=DecisionTracker.compute_query_hash(query),
             tools_used=[],
             chain_length=0,
@@ -232,88 +237,3 @@ class RAGChain:
                 f"{'proceeding with grounded generation' if documents_retrieved > 0 else 'no documents retrieved, falling back to direct LLM answer with no context'}"
             ),
         )
-
-    def _get_run_id(self) -> str:
-        """Extract or generate a run ID for this invocation.
-
-        Returns:
-            LangSmith run ID or UUID fallback.
-        """
-        current_run = run_tree_context.get_current_run_tree()
-        return str(current_run.id) if current_run else str(uuid.uuid4())
-
-    def _capture_tracing_metadata(
-        self, top_k: int, temperature: float, decision_metadata: Optional[Any] = None, pre_run_id: Optional[str] = None
-    ) -> tuple[str, Optional[List[str]]]:
-        """Extract LangSmith run ID and apply dynamic tags.
-
-        Args:
-            top_k: Number of documents retrieved.
-            temperature: LLM temperature setting.
-            decision_metadata: Optional DecisionLogEntry for decision tags.
-            pre_run_id: Optional pre-computed run_id to use.
-
-        Returns:
-            Tuple of (run_id, langsmith_tags).
-        """
-        current_run = run_tree_context.get_current_run_tree()
-        run_id = pre_run_id or (str(current_run.id) if current_run else str(uuid.uuid4()))
-
-        if not current_run:
-            return run_id, None
-
-        langsmith_tags = [
-            f"model:{self._llm.model}",
-            "agent:rag-chain",
-            f"top_k:{top_k}",
-            f"temperature:{temperature}",
-        ]
-
-        if decision_metadata:
-            try:
-                langsmith_tags.append(f"decision_quality:{decision_metadata.decision_quality.value}")
-                langsmith_tags.append(f"chain_length:{decision_metadata.chain_length}")
-                if decision_metadata.tools_used:
-                    langsmith_tags.append(f"tools_used:{','.join(decision_metadata.tools_used)}")
-
-                # Standard LangSmith metadata for structured querying
-                current_run.add_metadata({
-                    "agent_type": decision_metadata.agent_type,
-                    "decision_quality": decision_metadata.decision_quality.value,
-                    "chain_length": decision_metadata.chain_length,
-                    "tools_used": decision_metadata.tools_used,
-                    "reasoning_summary": decision_metadata.reasoning_summary,
-                    "tool_selection_rationale": getattr(decision_metadata, "tool_selection_rationale", None),
-                    "query_preview": decision_metadata.query_preview,
-                    "latency_ms": decision_metadata.latency_ms,
-                    "documents_retrieved": decision_metadata.top_k,
-                })
-            except Exception:
-                pass
-
-        current_run.add_tags(langsmith_tags)
-        return run_id, langsmith_tags
-
-    def _format_sources(
-        self, retrieved: list, include_sources: bool
-    ) -> Optional[List[SourceDocument]]:
-        """Format retrieved documents as SourceDocument list.
-
-        Returns None if sources are not requested or no documents were retrieved.
-        """
-        if not include_sources or not retrieved:
-            return None
-
-        sources_list = [
-            SourceDocument(
-                document_id=doc.document_id,
-                filename=doc.filename,
-                similarity_score=doc.similarity_score,
-                version_date=doc.version_date,
-                content_preview=doc.text[:200],
-                chunk_id=doc.chunk_id,
-            )
-            for doc in retrieved
-        ]
-        logger.debug(f"Formatted {len(sources_list)} source documents")
-        return sources_list

@@ -1,33 +1,27 @@
-"""Slack webhook alert provider with rate limiting and dedup decorators.
+"""Slack webhook alert provider.
 
-Combines transport (Slack blocks) with flow control (severity filter,
-sliding-window rate limit, fingerprint dedup) in one class.
-
-Normal usage:
-    from infrastructure.alerts import SlackAlertProvider, Severity
-    provider = SlackAlertProvider(
-        webhook_url="...",
-        rate_limit_per_minute=5,
-        enabled_severities="ERROR,CRITICAL",
-    )
-    await provider.send_alert(Severity.ERROR, "Database timeout", error=exc)
+Sends alerts as Slack block kit messages. Rate limiting and dedup are handled
+by AlertProviderBase.
 """
 
-import hashlib
-import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import httpx
 
+from config.constants import (
+    TRUNCATE_DESCRIPTION,
+    TRUNCATE_ERROR_DETAIL,
+    TRUNCATE_METADATA,
+    TRUNCATE_TITLE,
+)
 from infrastructure.logging import logger
 from utils.exceptions import Severity
 
-from .base import AlertProvider
-from .discord import ENABLED_SEVERITIES, _rate_limited, _deduplicated
+from .base import AlertProviderBase
 
 
-class SlackAlertProvider(AlertProvider):
+class SlackAlertProvider(AlertProviderBase):
     """Sends alerts as Slack block kit messages with rate limiting and dedup."""
 
     def __init__(
@@ -35,13 +29,8 @@ class SlackAlertProvider(AlertProvider):
         webhook_url: Optional[str] = None,
         rate_limit_per_minute: int = 5,
     ) -> None:
+        super().__init__(rate_limit_per_minute=rate_limit_per_minute)
         self._webhook_url = webhook_url
-        self._rate_limit = rate_limit_per_minute
-        self._enabled_severities = ENABLED_SEVERITIES
-        self._window_seconds = 60
-        self._sliding_window: Dict[str, list] = {}
-        self._dedup_cache: Dict[str, float] = {}
-        self._dedup_cooldown = 300  # 5 minutes
 
     async def send_alert(
         self,
@@ -66,47 +55,16 @@ class SlackAlertProvider(AlertProvider):
         payload = self._build_payload(severity, message, error, metadata)
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.post(self._webhook_url, json=payload)
-                response.raise_for_status()
-                logger.info(f"Slack alert sent: severity={severity.value}")
+            await self._send(payload)
+            logger.info(f"Slack alert sent: severity={severity.value}")
         except Exception as e:
             logger.error(f"Slack webhook failed: {e}")
 
-    def _should_send(self, severity: Severity, fingerprint: str) -> bool:
-        """Check whether this alert should be dispatched."""
-        if severity.value not in self._enabled_severities:
-            return False
-
-        now = time.time()
-
-        if not _deduplicated(
-            fingerprint,
-            self._dedup_cache,
-            self._dedup_cooldown,
-            now,
-        ):
-            return False
-
-        if fingerprint not in self._sliding_window:
-            self._sliding_window[fingerprint] = []
-
-        window = self._sliding_window[fingerprint]
-        if not _rate_limited(
-            fingerprint, window, self._rate_limit, self._window_seconds, now
-        ):
-            return False
-
-        return True
-
-    @staticmethod
-    def _fingerprint(
-        severity: Severity, message: str, error: Optional[Exception]
-    ) -> str:
-        """Create a stable fingerprint for deduplication."""
-        error_type = type(error).__name__ if error is not None else "NO_ERROR"
-        key = f"{severity.value}:{error_type}:{message[:50]}"
-        return hashlib.sha256(key.encode()).hexdigest()
+    async def _send(self, payload: dict) -> None:
+        """Send payload to Slack webhook."""
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(self._webhook_url, json=payload)
+            response.raise_for_status()
 
     @staticmethod
     def _build_payload(
@@ -128,7 +86,7 @@ class SlackAlertProvider(AlertProvider):
                 "type": "header",
                 "text": {
                     "type": "plain_text",
-                    "text": f"[{severity.value}] {message[:80]}",
+                    "text": f"[{severity.value}] {message[:TRUNCATE_TITLE]}",
                     "emoji": True,
                 },
             },
@@ -136,7 +94,7 @@ class SlackAlertProvider(AlertProvider):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": message[:2000],
+                    "text": message[:TRUNCATE_DESCRIPTION],
                 },
             },
         ]
@@ -147,12 +105,12 @@ class SlackAlertProvider(AlertProvider):
                 {"type": "mrkdwn", "text": f"*Error Type:* {type(error).__name__}"}
             )
             fields.append(
-                {"type": "mrkdwn", "text": f"*Details:* {str(error)[:1000]}"}
+                {"type": "mrkdwn", "text": f"*Details:* {str(error)[:TRUNCATE_ERROR_DETAIL]}"}
             )
 
         if metadata:
             for k, v in metadata.items():
-                fields.append({"type": "mrkdwn", "text": f"*{k}:* {str(v)[:200]}"})
+                fields.append({"type": "mrkdwn", "text": f"*{k}:* {str(v)[:TRUNCATE_METADATA]}"})
 
         if fields:
             blocks.append({

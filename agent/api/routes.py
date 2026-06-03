@@ -7,7 +7,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 
 from api.dependencies import check_health, get_agent, get_decision_tracker, get_feedback_service
+from api.error_responses import internal_error_response, not_found_response, validation_error_response
 from api.metrics import build_metrics_snapshot, get_llm_usage_metrics, get_request_metrics
+from api.response_builders import (
+    build_chat_response,
+    build_circuit_response,
+    build_metrics_response,
+    build_monitoring_response,
+)
 from config import settings
 from models import (
     ChatRequest,
@@ -39,18 +46,6 @@ def _extract_tokens(response: Any) -> Tuple[int, int]:
         usage.get("input_tokens", usage.get("prompt_tokens", 0)),
         usage.get("output_tokens", usage.get("completion_tokens", 0)),
     )
-
-
-def _safe_get(response: Any, field: str, default: Any = None) -> Any:
-    """Safely extract an optional field from an agent response.
-
-    Handles MagicMock test doubles and missing attributes gracefully.
-    """
-    try:
-        value = getattr(response, field, default)
-        return value if isinstance(value, (dict, list, str, int, float, type(None))) else default
-    except Exception:
-        return default
 
 
 @router.post(
@@ -118,21 +113,11 @@ async def chat(
         input_tokens, output_tokens = _extract_tokens(response)
         get_llm_usage_metrics().record_tokens(input_tokens, output_tokens)
 
-        return ChatResponse(
-            response=response.response,
-            query=request.query,
-            sources=response.sources if request.include_sources else None,
+        return build_chat_response(
+            response=response,
+            request_query=request.query,
+            include_sources=request.include_sources,
             execution_time_ms=execution_time_ms,
-            model=response.model,
-            run_id=_safe_get(response, "run_id"),
-            usage_metadata=_safe_get(response, "usage_metadata"),
-            llm_latency_ms=_safe_get(response, "llm_latency_ms"),
-            langsmith_tags=_safe_get(response, "langsmith_tags"),
-            agent_type=_safe_get(response, "agent_type", "tool_calling"),
-            tools_used=_safe_get(response, "tools_used", []),
-            chain_length=_safe_get(response, "chain_length", 0),
-            decision_quality=_safe_get(response, "decision_quality", "suboptimal"),
-            reasoning_summary=_safe_get(response, "reasoning_summary"),
         )
 
     except ValueError as e:
@@ -147,11 +132,7 @@ async def chat(
 
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": "invalid_request",
-                "message": "Invalid request parameters",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            },
+            detail=validation_error_response("Invalid request parameters"),
         )
 
     except AllProvidersExhaustedError as e:
@@ -192,11 +173,7 @@ async def chat(
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "error": "internal_error",
-                "message": "Failed to process query",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            },
+            detail=internal_error_response("Failed to process query"),
         )
 
 
@@ -268,11 +245,7 @@ async def feedback(
         logger.error(f"Feedback error: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "error": "internal_error",
-                "message": "Failed to process feedback",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            },
+            detail=internal_error_response("Failed to process feedback"),
         )
 
 
@@ -307,17 +280,7 @@ async def metrics(
         project = settings.langsmith_project or "langchain-agent"
         langsmith_url = f"https://smith.langchain.com/o/default/projects/p/{project}"
 
-    return MetricsResponse(
-        request_count=data["request_count"],
-        error_count=data["error_count"],
-        avg_latency_ms=data["avg_latency_ms"],
-        total_input_tokens=data["total_input_tokens"],
-        total_output_tokens=data["total_output_tokens"],
-        avg_tokens_per_request=data["avg_tokens_per_request"],
-        langsmith_dashboard_url=langsmith_url,
-        langsmith_audit_url=langsmith_url,
-        ai_decisions=data.get("ai_decisions"),
-    )
+    return build_metrics_response(data=data, langsmith_dashboard_url=langsmith_url)
 
 
 @router.get(
@@ -429,11 +392,7 @@ async def get_decision(
     if entry is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "error": "decision_not_found",
-                "message": f"No decision record found for run_id: {run_id}",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            },
+            detail=not_found_response("Decision", f"run_id: {run_id}"),
         )
     return entry
 
@@ -459,7 +418,7 @@ async def monitoring_status() -> MonitoringStatusResponse:
     results = _monitoring_scheduler.last_results
     checks = list(results.values())
 
-    return MonitoringStatusResponse(
+    return build_monitoring_response(
         enabled=settings.monitoring_enabled,
         last_check=_monitoring_scheduler.last_check,
         interval_seconds=settings.monitoring_interval_seconds,
@@ -481,6 +440,6 @@ async def circuit_status() -> CircuitStatusResponse:
     """
     from infrastructure.container import llm
 
-    return CircuitStatusResponse(
+    return build_circuit_response(
         circuits=llm.circuit_status() if hasattr(llm, "circuit_status") else {},
     )

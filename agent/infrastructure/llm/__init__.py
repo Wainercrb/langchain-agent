@@ -10,7 +10,9 @@ Each provider implements LLMProvider (ABC). Instantiate directly:
     # llm = AnthropicProvider(model="claude-3-5-sonnet", ...)
 """
 
-from .base import LLMProvider, ResilientLLMProvider, ResilientChatModel, LLMResponse
+from .base import LLMProvider, LLMResponse
+from .circuit_breaker import CircuitBreaker, CircuitState
+from .resilient import ResilientLLMProvider, ResilientChatModel
 from utils.exceptions import LLMProviderError, TransientLLMError, PermanentLLMError, AllProvidersExhaustedError
 from .google import GoogleProvider
 from .openai import OpenAIProvider
@@ -21,6 +23,8 @@ __all__ = [
     "ResilientLLMProvider",
     "ResilientChatModel",
     "LLMResponse",
+    "CircuitBreaker",
+    "CircuitState",
     "LLMProviderError",
     "TransientLLMError",
     "PermanentLLMError",
