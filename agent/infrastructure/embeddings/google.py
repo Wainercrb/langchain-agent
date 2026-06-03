@@ -3,7 +3,7 @@
 from typing import List
 
 from infrastructure.embeddings.base import Embeddings
-from middleware.rate_limiter import RateLimiter
+from api.middleware.rate_limiter import RateLimiter
 from utils.exceptions import EmbeddingError
 from infrastructure.logging import logger
 

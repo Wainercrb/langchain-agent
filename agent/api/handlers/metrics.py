@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from api.response_builders import build_metrics_response
 from config import get_langsmith_dashboard_url
 from infrastructure.container import decision_tracker
-from metrics import build_metrics_snapshot
+from api.metrics import build_metrics_snapshot
 from models import MetricsResponse
 
 router = APIRouter(prefix="/v1", tags=["metrics"])
