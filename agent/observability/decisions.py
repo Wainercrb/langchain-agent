@@ -20,8 +20,8 @@ from vector_store import VectorStore
 
 
 @dataclass
-class AggregateStats:
-    """Aggregate statistics over a set of decision entries."""
+class _AggregateStats:
+    """Aggregate statistics over a set of decision entries (internal)."""
 
     total_decisions: int = 0
     by_agent_type: Dict[str, int] = field(default_factory=dict)
@@ -148,7 +148,7 @@ class DecisionTracker:
         start = (page - 1) * per_page
         end = start + per_page
         page_items = filtered[start:end]
-        aggregates = self._compute_aggregates(filtered)
+        aggregates = DecisionTracker._compute_aggregates(filtered)
 
         return DecisionMetricsResponse(
             total=total,
@@ -185,10 +185,11 @@ class DecisionTracker:
         """Compute a deterministic hash of a query string."""
         return hashlib.sha256(query.encode("utf-8")).hexdigest()[:50]
 
-    def _compute_aggregates(self, entries: List[DecisionLogEntry]) -> AggregateStats:
-        """Compute aggregate statistics over a list of decision entries."""
+    @staticmethod
+    def _compute_aggregates(entries: List[DecisionLogEntry]) -> _AggregateStats:
+        """Aggregate statistics over a list of decision entries."""
         if not entries:
-            return AggregateStats()
+            return _AggregateStats()
 
         by_agent_type: Dict[str, int] = {}
         by_quality: Dict[str, int] = {}
@@ -202,7 +203,7 @@ class DecisionTracker:
             for tool_name in entry.tools_used:
                 tool_counts[tool_name] = tool_counts.get(tool_name, 0) + 1
 
-        return AggregateStats(
+        return _AggregateStats(
             total_decisions=len(entries),
             by_agent_type=by_agent_type,
             by_quality=by_quality,

@@ -5,38 +5,14 @@ with status and human-readable detail.
 """
 
 import os
-from dataclasses import dataclass
 from typing import Callable, Optional
 
 from config import settings
 from embeddings import GoogleEmbeddingsWrapper
 from loggers import logger
 from observability.decisions import DecisionTracker
-from agent.observability.base import ObservabilityProvider
+from agent.observability.base import CheckResult, ObservabilityProvider
 from vector_store import VectorStore
-
-
-@dataclass(frozen=True)
-class CheckResult:
-    """Immutable result of a single health check.
-
-    Attributes:
-        ok: Whether the check passed.
-        detail: Human-readable explanation of the result.
-    """
-
-    ok: bool
-    detail: str
-
-    @classmethod
-    def success(cls, detail: str) -> "CheckResult":
-        """Create a passing check result."""
-        return cls(ok=True, detail=detail)
-
-    @classmethod
-    def failure(cls, detail: str) -> "CheckResult":
-        """Create a failing check result."""
-        return cls(ok=False, detail=detail)
 
 
 class HealthVerifier:
@@ -94,52 +70,39 @@ class HealthVerifier:
             return CheckResult.failure(f"Embeddings provider unreachable: {str(e)}")
 
     async def check_tracing_completeness(self) -> CheckResult:
-        """Compare trace count against in-memory request count.
+        """Compare LangSmith trace count against in-memory request count.
 
-        Delegates to the configured observability provider for backend-specific
-        trace counting. Falls back to a skip if the provider doesn't support
-        trace enumeration.
+        LangSmith-specific: reads traces via ``LangSmithClient`` directly.
         """
         if self._observability is None or not self._observability.is_configured():
             return CheckResult.success("Observability not configured, skipping")
-
         if not self._metrics_store:
             return CheckResult.success("Metrics store not available, tracing check skipped")
 
         try:
             snapshot = self._metrics_store()
             request_count = snapshot.get("request_count", 0)
-
             if request_count == 0:
                 return CheckResult.success("No requests made yet, tracing completeness N/A")
 
-            # LangSmith-specific trace counting
             from langsmith import Client as LangSmithClient
-
-            client = LangSmithClient()
-            window = settings.monitoring_tracing_window_seconds
-
             runs = list(
-                client.list_runs(
-                    project_name=settings.langsmith_project or "langchain-agent",
-                    limit=1000,
+                LangSmithClient().list_runs(
+                    project_name=settings.langsmith_project or "langchain-agent", limit=1000
                 )
             )
             trace_count = len(runs)
 
-            if trace_count == 0 and request_count > 0:
+            if trace_count == 0:
                 return CheckResult.failure(
-                    f"Tracing gap: {request_count} requests but 0 traces "
-                    f"in last {window}s window"
+                    f"Tracing gap: {request_count} requests but 0 traces"
                 )
-
             mismatch = abs(request_count - trace_count)
             if mismatch > max(1, request_count * 0.1):
                 return CheckResult.failure(
                     f"Trace mismatch: {request_count} requests vs {trace_count} "
                     f"traces ({mismatch} difference)"
                 )
-
             return CheckResult.success(
                 f"Tracing complete: {trace_count} traces for {request_count} requests"
             )

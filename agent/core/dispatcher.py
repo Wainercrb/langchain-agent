@@ -1,7 +1,15 @@
-"""Multi-provider alert dispatcher — sends to all configured backends in parallel.
+"""Multi-provider alert dispatcher — fans alerts out to N backends in parallel.
 
-Normal usage:
-    from alerts import MultiAlertProvider, DiscordAlertProvider, SlackAlertProvider
+The dispatcher has exactly one responsibility: given a list of
+``AlertProvider`` instances, send an alert to ALL of them concurrently
+and isolate per-provider failures so one broken webhook never aborts
+the others.
+
+Typical usage::
+
+    from core.dispatcher import MultiAlertProvider
+    from alerts import DiscordAlertProvider, SlackAlertProvider
+
     multi = MultiAlertProvider([
         DiscordAlertProvider(webhook_url="discord-url"),
         SlackAlertProvider(webhook_url="slack-url"),
@@ -10,32 +18,59 @@ Normal usage:
 """
 
 import asyncio
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Dict, List, Optional, Protocol, runtime_checkable
 
 from loggers import logger
 from shared.exceptions import Severity
 
 
+__all__ = ["AlertProvider", "MultiAlertProvider"]
+
+
+# ── Provider contract ────────────────────────────────────────────────
+
+
 @runtime_checkable
 class AlertProvider(Protocol):
-    """Protocol for alert providers — only requires send_alert."""
+    """Anything that can receive an alert.
+
+    Concrete implementations (Discord, Slack, Email, ...) live in the
+    ``alerts/`` package and adapt each backend to this contract.
+    Implementations need only expose ``send_alert`` — no inheritance,
+    no base class, just structural typing.
+    """
 
     async def send_alert(
         self,
         severity: Severity,
         message: str,
         error: Optional[Exception] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, object]] = None,
     ) -> None:
-        """Send an alert via the concrete backend."""
+        """Send one alert through this provider's backend."""
         ...
 
 
+# ── Fan-out dispatcher ───────────────────────────────────────────────
+
+
 class MultiAlertProvider:
-    """Dispatches alerts to multiple providers in parallel."""
+    """Sends one alert to many providers in parallel, isolating failures.
+
+    Each provider runs in its own task via ``asyncio.gather``. A failure
+    in any one provider is logged at ``ERROR`` level and swallowed — the
+    whole point of the "multi" prefix is that one broken backend never
+    takes the others down with it.
+
+    Args:
+        providers: Backends that will receive every alert. May be empty
+            (in which case ``send_alert`` is a silent no-op).
+    """
 
     def __init__(self, providers: List[AlertProvider]) -> None:
-        self._providers = providers
+        # Defensive copy: callers should not be able to mutate the list
+        # after construction.
+        self._providers: List[AlertProvider] = list(providers)
         if not self._providers:
             logger.warning("MultiAlertProvider: no providers configured")
 
@@ -44,30 +79,28 @@ class MultiAlertProvider:
         severity: Severity,
         message: str,
         error: Optional[Exception] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, object]] = None,
     ) -> None:
-        """Send alert to all configured providers in parallel."""
+        """Fan the alert out to every configured provider in parallel."""
         if not self._providers:
             return
+        await asyncio.gather(*(
+            self._send_safely(provider, severity, message, error, metadata)
+            for provider in self._providers
+        ))
 
-        tasks = []
-        for provider in self._providers:
-            tasks.append(self._safe_send(provider, severity, message, error, metadata))
-
-        await asyncio.gather(*tasks)
-
-    @staticmethod
-    async def _safe_send(
+    async def _send_safely(
+        self,
         provider: AlertProvider,
         severity: Severity,
         message: str,
         error: Optional[Exception],
-        metadata: Optional[Dict[str, Any]],
+        metadata: Optional[Dict[str, object]],
     ) -> None:
-        """Send alert to a single provider, catching any exceptions."""
+        """Send to a single provider, logging any exception (never raises)."""
         try:
             await provider.send_alert(severity, message, error, metadata)
-        except Exception as e:
+        except Exception as exc:
             logger.error(
-                f"MultiAlertProvider: {type(provider).__name__} failed: {e}"
+                f"MultiAlertProvider: {type(provider).__name__} failed: {exc}"
             )

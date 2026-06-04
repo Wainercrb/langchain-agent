@@ -11,10 +11,10 @@ from typing import Awaitable, Callable, Dict, List, Optional, Tuple
 
 from alerts.base import AlertProviderBase
 from config import Settings
-from config import settings as default_settings
+from config import settings as _global_settings
 from loggers import logger
 from models.observability.health import HealthCheckResult
-from observability.health.checks import CheckResult
+from agent.observability.base import CheckResult
 from shared.exceptions import Severity
 
 # Type alias for a named check: (check_name, async_callable returning CheckResult)
@@ -30,21 +30,23 @@ class MonitoringScheduler:
     Args:
         checks: List of (name, async_callable) check definitions.
         alert_service: Alert provider for failure notifications.
-        settings: Settings instance (uses global settings if None).
+        settings_override: Settings instance (uses global settings if None).
     """
 
     def __init__(
         self,
         checks: List[CheckDefinition],
         alert_service: AlertProviderBase,
-        settings: Optional[Settings] = None,
+        settings_override: Optional[Settings] = None,
     ) -> None:
         self._checks = checks
         self._alert_service = alert_service
-        self._settings = settings or default_settings
+        self._settings = settings_override or _global_settings
         self._task: Optional[asyncio.Task[None]] = None
         self._last_results: Dict[str, HealthCheckResult] = {}
         self._last_check: Optional[datetime] = None
+
+    # ── Public lifecycle ──────────────────────────────────────────────
 
     async def start(self) -> None:
         """Start the background monitoring task."""
@@ -58,63 +60,78 @@ class MonitoringScheduler:
         """Cancel the background monitoring task."""
         if not self._settings.monitoring_enabled:
             return
-        if self._task is not None:
-            self._task.cancel()
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
-            self._task = None
-            logger.info("Monitoring scheduler stopped")
+        if self._task is None:
+            return
+        self._task.cancel()
+        try:
+            await self._task
+        except asyncio.CancelledError:
+            pass
+        self._task = None
+        logger.info("Monitoring scheduler stopped")
+
+    # ── Loop ───────────────────────────────────────────────────────────
 
     async def _run_loop(self) -> None:
-        """Main loop: run all checks on interval with crash protection."""
-        interval = self._settings.monitoring_interval_seconds
-
+        """Main loop: tick on a fixed interval with crash protection."""
         while True:
             try:
-                any_failed = await self._execute_checks()
-
-                self._last_check = datetime.now(timezone.utc)
-
-                if any_failed:
-                    logger.warning("One or more monitoring checks failed")
-                else:
-                    logger.debug("All monitoring checks passed")
-
+                await self._tick()
             except asyncio.CancelledError:
                 logger.info("Monitoring scheduler loop cancelled")
                 return
             except Exception as e:
                 logger.error(f"Monitoring scheduler loop crashed: {e}", exc_info=True)
-                await self._send_critical_alert(f"Monitoring scheduler crashed: {str(e)}")
+                await self._alert(
+                    Severity.CRITICAL,
+                    f"Monitoring scheduler crashed: {e}",
+                    suppress_errors=True,
+                )
+            await asyncio.sleep(self._settings.monitoring_interval_seconds)
 
-            await asyncio.sleep(interval)
+    async def _tick(self) -> None:
+        """Run one complete cycle of all checks."""
+        any_failed = await self._execute_checks()
+        self._last_check = datetime.now(timezone.utc)
+        if any_failed:
+            logger.warning("One or more monitoring checks failed")
+        else:
+            logger.debug("All monitoring checks passed")
+
+    # ── Check execution ────────────────────────────────────────────────
 
     async def _execute_checks(self) -> bool:
-        """Run all configured checks and store results.
-
-        Returns:
-            True if any check failed, False otherwise.
-        """
-        any_failed = False
+        """Run all configured checks. Returns True if any failed."""
+        failed = False
 
         for check_name, check_method in self._checks:
-            result = await self._run_single_check(check_name, check_method)
-            if not result.ok:
-                any_failed = True
-                await self._send_alert(check_name, result.detail)
+            health_result = await self._run_single_check(check_name, check_method)
+            self._last_results[check_name] = health_result
 
-        return any_failed
+            if not health_result.ok:
+                failed = True
+                await self._alert(
+                    Severity.ERROR,
+                    f"Monitoring: {check_name} check failed",
+                    metadata={"check_name": check_name, "detail": health_result.detail},
+                )
 
+        return failed
+
+    @staticmethod
     async def _run_single_check(
-        self, check_name: str, check_method: Callable[[], Awaitable[CheckResult]]
+        check_name: str,
+        check_method: Callable[[], Awaitable[CheckResult]],
     ) -> HealthCheckResult:
-        """Execute a single check with error handling and result recording."""
+        """Execute one check with error isolation and result recording.
+
+        Returns a HealthCheckResult regardless of success or failure —
+        the caller decides how to react.
+        """
         try:
             result = await check_method()
         except Exception as e:
-            result = CheckResult.failure(f"Check crashed: {str(e)}")
+            result = CheckResult.failure(f"Check crashed: {e}")
             logger.error(f"Monitoring check {check_name} crashed: {e}", exc_info=True)
 
         health_result = HealthCheckResult(
@@ -123,33 +140,42 @@ class MonitoringScheduler:
             detail=result.detail,
             last_checked=datetime.now(timezone.utc),
         )
-        self._last_results[check_name] = health_result
 
         if not result.ok:
             logger.warning(f"Monitoring check {check_name} failed: {result.detail}")
 
         return health_result
 
-    async def _send_alert(self, check_name: str, detail: str) -> None:
-        """Send an alert for a failed check."""
-        try:
-            await self._alert_service.send_alert(
-                severity=Severity.ERROR,
-                message=f"Monitoring: {check_name} check failed",
-                metadata={"check_name": check_name, "detail": detail},
-            )
-        except Exception:
-            logger.error(f"Failed to send alert for {check_name}", exc_info=True)
+    # ── Alerting ───────────────────────────────────────────────────────
 
-    async def _send_critical_alert(self, message: str) -> None:
-        """Send a critical-level alert for scheduler failures."""
+    async def _alert(
+        self,
+        severity: Severity,
+        message: str,
+        metadata: Optional[Dict[str, str]] = None,
+        *,
+        suppress_errors: bool = False,
+    ) -> None:
+        """Send an alert through the configured provider.
+
+        Args:
+            severity: Alert severity level.
+            message: Human-readable alert message.
+            metadata: Optional structured context.
+            suppress_errors: If True, provider failures are silently ignored
+                (use for critical alerts to avoid alert-on-alert loops).
+        """
         try:
             await self._alert_service.send_alert(
-                severity=Severity.CRITICAL,
+                severity=severity,
                 message=message,
+                metadata=metadata,
             )
         except Exception:
-            pass
+            if not suppress_errors:
+                logger.error("Failed to send alert", exc_info=True)
+
+    # ── Status ─────────────────────────────────────────────────────────
 
     @property
     def last_results(self) -> Dict[str, HealthCheckResult]:

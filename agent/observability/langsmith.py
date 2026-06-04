@@ -39,14 +39,21 @@ class LangSmithObservabilityProvider(ObservabilityProvider):
         current_run = run_tree_context.get_current_run_tree()
         return str(current_run.id) if current_run else None
 
-    def apply_tags(self, run_id: str, tags: List[str]) -> None:
-        """Attach tags to the active LangSmith run."""
+    def apply_tags(self, _run_id: str, tags: List[str]) -> None:
+        """Attach tags to the active LangSmith run.
+
+        ``_run_id`` is accepted for ABC conformance but not used here —
+        LangSmith's ``run_tree_context`` already points to the current run.
+        """
         current_run = run_tree_context.get_current_run_tree()
         if current_run:
             current_run.add_tags(tags)
 
-    def apply_metadata(self, run_id: str, metadata: Dict[str, Any]) -> None:
+    def apply_metadata(self, _run_id: str, metadata: Dict[str, Any]) -> None:
         """Attach metadata to the active LangSmith run.
+
+        ``_run_id`` is accepted for ABC conformance but not used here —
+        LangSmith's ``run_tree_context`` already points to the current run.
 
         Silently skips if attachment fails — tracing should never break
         the primary request flow.
@@ -109,7 +116,7 @@ class LangSmithObservabilityProvider(ObservabilityProvider):
 
     async def health_check(self) -> "CheckResult":
         """Verify LangSmith API is reachable using list_projects()."""
-        from observability.health.checks import CheckResult
+        from agent.observability.base import CheckResult
 
         if not self.is_configured():
             return CheckResult.success("LangSmith tracing not configured, skipping")

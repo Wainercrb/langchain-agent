@@ -57,7 +57,6 @@ from loggers import logger
 from ingestion.parsers.parser import ParserFactory
 
 # ── Observability ─────────────────────────────────────────────────────
-
 def _create_observability_provider():
     """Create the observability provider based on configuration."""
     from observability import set_observability_provider
@@ -72,7 +71,6 @@ def _create_observability_provider():
 observability = _create_observability_provider()
 
 # ── Alerts ────────────────────────────────────────────────────────────
-
 def _create_alert_providers():
     """Create and return the configured alert service."""
     from alerts import (
@@ -155,7 +153,6 @@ pipeline = DocumentIngestionPipeline(
 
 # ── Monitoring ───────────────────────────────────────────────────────
 from observability.health import HealthVerifier, MonitoringScheduler
-
 
 def _metrics_snapshot():
     """Return current request metrics snapshot for health checks."""

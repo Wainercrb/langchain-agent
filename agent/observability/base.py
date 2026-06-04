@@ -1,27 +1,40 @@
-"""Abstract observability provider interface.
+"""Observability provider interface — swap backends without touching agent code.
 
-Strategy Pattern: swap LangSmith ↔ No-Op ↔ future backends (OpenTelemetry,
-Datadog, etc.) by changing the concrete class wired in container.py.
-
-Unifies tracing (run lifecycle, tags, metadata) and feedback (like/dislike)
-into a single injection point.
+Strategy Pattern: LangSmith ↔ future backends (OpenTelemetry, Datadog, etc.)
+by changing the concrete class wired in ``container.py``.
 """
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Literal, Optional
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Literal, Optional
 
 from models.feedback import FeedbackResponse
 
-if TYPE_CHECKING:
-    from observability.health.checks import CheckResult
+
+# ── Shared result type (belongs here, not in health/checks.py) ──────────
+
+
+@dataclass(frozen=True)
+class CheckResult:
+    """Immutable result of a single health check."""
+
+    ok: bool
+    detail: str
+
+    @classmethod
+    def success(cls, detail: str) -> "CheckResult":
+        return cls(ok=True, detail=detail)
+
+    @classmethod
+    def failure(cls, detail: str) -> "CheckResult":
+        return cls(ok=False, detail=detail)
+
+
+# ── ABC ────────────────────────────────────────────────────────────────
 
 
 class ObservabilityProvider(ABC):
-    """Abstract base for pluggable observability backends.
-
-    Handles trace lifecycle (start/end, tags, metadata), user feedback,
-    and health checks. Implementations decide where data is persisted.
-    """
+    """Pluggable observability backend (tracing, feedback, health checks)."""
 
     # ── Trace lifecycle ──────────────────────────────────────────────
 
@@ -46,16 +59,7 @@ class ObservabilityProvider(ABC):
         feedback_type: Literal["like", "dislike"],
         comment: Optional[str] = None,
     ) -> FeedbackResponse:
-        """Record user feedback correlated to a run ID.
-
-        Args:
-            run_id: Unique identifier for the run being rated.
-            feedback_type: "like" (score=1.0) or "dislike" (score=0.0).
-            comment: Optional free-text comment from the user.
-
-        Returns:
-            FeedbackResponse with status "recorded" or "accepted".
-        """
+        """Record user feedback correlated to a run ID."""
 
     # ── Discovery & health ───────────────────────────────────────────
 
@@ -68,7 +72,7 @@ class ObservabilityProvider(ABC):
         """Return True if this backend has valid credentials/config."""
 
     @abstractmethod
-    async def health_check(self) -> "CheckResult":
+    async def health_check(self) -> CheckResult:
         """Verify the observability backend is reachable."""
 
     # ── Decorator support ────────────────────────────────────────────
@@ -84,18 +88,7 @@ class ObservabilityProvider(ABC):
         """Wrap a function call with tracing.
 
         Default: call the function directly. Subclasses override to
-        integrate with their backend's trace lifecycle (e.g. LangSmith's
-        @traceable decorator).
-
-        Args:
-            fn: The function to wrap.
-            name: Human-readable name for the trace span.
-            run_type: Type of run ("chain", "llm", "tool", etc.).
-            args: Positional arguments to pass to fn.
-            kwargs: Keyword arguments to pass to fn.
-
-        Returns:
-            The return value of fn.
+        integrate with their backend's trace lifecycle.
         """
         return fn(*args, **kwargs)
 
@@ -103,7 +96,7 @@ class ObservabilityProvider(ABC):
         return f"{self.__class__.__name__}()"
 
 
-# ── Global accessor (set by container.py at startup) ─────────────────
+# ── Global accessor ───────────────────────────────────────────────────
 
 _provider: Optional[ObservabilityProvider] = None
 
@@ -114,6 +107,6 @@ def set_observability_provider(provider: ObservabilityProvider) -> None:
     _provider = provider
 
 
-def get_observability_provider() -> ObservabilityProvider:
-    """Return the configured provider, falling back to NoOp if unset."""
+def get_observability_provider() -> Optional[ObservabilityProvider]:
+    """Return the configured provider, or None if unset."""
     return _provider

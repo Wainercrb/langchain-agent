@@ -140,6 +140,94 @@ def _tag_trace(provider_name: str) -> None:
         pass
 
 
+# ── Shared failover loop ─────────────────────────────────────────────────
+
+
+def _try_providers(
+    providers: list,
+    circuit_breakers: Dict[str, CircuitBreaker],
+    call_provider: Any,  # Callable[[Any], Any] — per-provider invocation logic
+    name_fn: Any,  # Callable[[Any], str] — extracts the provider name for keys/logs
+    backoff_base: float,
+    backoff_max: float,
+    on_transient: Any = None,  # Optional[Callable[[str, Exception], None]]
+) -> Any:
+    """Try providers in order with circuit breaker, backoff, and error classification.
+
+    The *only* thing that differs between callers is ``call_provider`` —
+    everything else (circuit checks, error classification, backoff, exhausting)
+    is handled here once.
+
+    Args:
+        providers: Ordered list of provider instances.
+        circuit_breakers: Dict mapping provider name -> CircuitBreaker.
+        call_provider: Invoked as ``call_provider(provider)``. Must raise
+            ``PermanentLLMError`` on non-retryable errors; any other exception
+            is classified internally.
+        name_fn: ``name_fn(provider) -> str`` — used for circuit breaker keys,
+            logging, and trace tagging.
+        backoff_base: Base delay in seconds for exponential backoff.
+        backoff_max: Maximum delay cap in seconds.
+        on_transient: Optional callback invoked as ``on_transient(name, exc)``
+            after each transient failure. Used by callers that need to track
+            which providers failed before eventual success (e.g. for metadata).
+
+    Raises:
+        PermanentLLMError: If any provider raises a permanent-failure error.
+        AllProvidersExhaustedError: If all providers fail transiently.
+
+    Returns:
+        The result of the first successful ``call_provider(provider)``.
+    """
+    errors: list = []
+    attempt_index: int = 0
+
+    for i, provider in enumerate(providers):
+        name = name_fn(provider)
+        cb = circuit_breakers[name]
+
+        if not cb.can_execute():
+            logger.info(f"Circuit OPEN, skipping {name} ({cb})")
+            continue
+
+        try:
+            result = call_provider(provider)
+            cb.record_success()
+            _tag_trace(name)
+            return result
+        except PermanentLLMError:
+            raise
+        except Exception as e:
+            classified = _classify(e, name)
+            if isinstance(classified, PermanentLLMError):
+                logger.error(
+                    f"Provider {name} permanent error: {e}"
+                )
+                raise
+            cb.record_failure()
+            logger.warning(
+                f"Provider {name} transient error, trying next ({cb})"
+            )
+            errors.append(e)
+            if on_transient is not None:
+                on_transient(name, e)
+            if i < len(providers) - 1:
+                time.sleep(
+                    _backoff(
+                        attempt=attempt_index,
+                        base=backoff_base,
+                        max_wait=backoff_max,
+                    )
+                )
+            attempt_index += 1
+
+    raise AllProvidersExhaustedError(
+        message=f"All {len(errors)} LLM providers exhausted",
+        attempted_providers=[name_fn(p) for p in providers],
+        errors=errors,
+    )
+
+
 # ── MultiProviderChatModel (LangChain Runnable) ─────────────────────────
 
 
@@ -186,62 +274,25 @@ class MultiProviderChatModel(Runnable):
                 response.content = " ".join(text_parts)
         return response
 
-    def _try_provider(
-        self, invoke_fn: callable, input: Any, config: Optional[dict], kwargs: dict
-    ) -> Any:
-        """Try each provider in order; skip open circuits; raise AllProvidersExhaustedError if all fail."""
-        errors = []
-        attempt_index = 0
-        for i, provider in enumerate(self._providers):
-            cb = self._circuit_breakers[provider.name]
-            if not cb.can_execute():
-                logger.info(
-                    f"MultiProviderChatModel: provider={provider.name} circuit OPEN, skipping ({cb})"
-                )
-                continue
-
-            try:
-                raw_model = provider.chat_model
-                if self._tools:
-                    bound_model = raw_model.bind_tools(self._tools, **kwargs)
-                else:
-                    bound_model = raw_model
-                response = invoke_fn(bound_model, input, config=config, **kwargs)
-                response = self._normalize_content(response)
-                cb.record_success()
-                _tag_trace(provider.name)
-                logger.info(f"MultiProviderChatModel: provider={provider.name}, success")
-                return response
-            except Exception as e:
-                classified = _classify(e, provider.name)
-                if isinstance(classified, PermanentLLMError):
-                    logger.error(
-                        f"MultiProviderChatModel: provider={provider.name} permanent error: {e}"
-                    )
-                    raise
-                cb.record_failure()
-                logger.warning(
-                    f"MultiProviderChatModel: provider={provider.name} transient error, "
-                    f"trying next ({cb})"
-                )
-                errors.append(e)
-                if i < len(self._providers) - 1:
-                    time.sleep(_backoff(attempt=attempt_index, base=self._backoff_base, max_wait=self._backoff_max))
-                attempt_index += 1
-
-        raise AllProvidersExhaustedError(
-            message=f"All {len(errors)} LLM providers exhausted in MultiProviderChatModel",
-            attempted_providers=[p.name for p in self._providers],
-            errors=errors,
-        )
-
     def invoke(self, input: Any, config: Optional[dict] = None, **kwargs) -> Any:
         """Try providers in order, failover on transient error (sync)."""
-        return self._try_provider(
-            lambda m, i, config, **k: m.invoke(i, config=config, **k),
-            input, config, kwargs,
-        )
+        def _call(provider: object) -> Any:
+            raw_model = provider.chat_model  # type: ignore[attr-defined]
+            if self._tools:
+                bound = raw_model.bind_tools(self._tools, **kwargs)
+            else:
+                bound = raw_model
+            response = bound.invoke(input, config=config, **kwargs)
+            return self._normalize_content(response)
 
+        return _try_providers(
+            providers=self._providers,
+            circuit_breakers=self._circuit_breakers,
+            call_provider=_call,
+            name_fn=lambda p: p.name,
+            backoff_base=self._backoff_base,
+            backoff_max=self._backoff_max,
+        )
 
 
 # ── MultiProviderLLM (LLMProvider interface) ────────────────────────────
@@ -295,67 +346,39 @@ class MultiProviderLLM(LLMProvider):
 
         Raises PermanentLLMError on permanent errors, AllProvidersExhaustedError if all fail.
         """
-        attempted = []
-        errors = []
-        attempt_index = 0
+        failed_providers: List[str] = []
 
-        for i, provider in enumerate(self._providers):
-            cb = self._circuit_breakers[provider.name]
-
-            if not cb.can_execute():
-                logger.info(
-                    f"MultiProviderLLM: provider={provider.name} circuit OPEN, skipping ({cb})"
-                )
-                continue
-
-            try:
-                response = provider.invoke(messages, **kwargs)
-
-            except Exception as e:
-                classified = _classify(e, provider.name)
-                if isinstance(classified, PermanentLLMError):
-                    raise
-                cb.record_failure()
-                logger.warning(
-                    f"MultiProviderLLM: provider={provider.name} transient error, "
-                    f"trying next ({cb})"
-                )
-                attempted.append(provider.name)
-                errors.append(e)
-                if i < len(self._providers) - 1:  # don't sleep on the last provider
-                    time.sleep(
-                        _backoff(
-                            attempt=attempt_index,
-                            base=self._backoff_base,
-                            max_wait=self._backoff_max,
-                        )
-                    )
-                attempt_index += 1
-                continue
-
-            cb.record_success()
+        def _call(provider: LLMProvider) -> LLMResponse:
+            response = provider.invoke(messages, **kwargs)
             response.metadata["provider"] = provider.name
-            response.metadata["failover"] = bool(attempted)
-            if attempted:
-                response.metadata["failed_providers"] = list(attempted)
-
-            _tag_trace(provider.name)
-
-            if attempted:
-                logger.info(
-                    f"provider={provider.name}, failover=true, "
-                    f"failed_providers={list(attempted)}"
-                )
-            else:
-                logger.info(f"provider={provider.name}, failover=false")
-
+            response.metadata["failover"] = bool(failed_providers)
+            if failed_providers:
+                response.metadata["failed_providers"] = list(failed_providers)
             return response
 
-        raise AllProvidersExhaustedError(
-            message=f"All {len(errors)} LLM providers exhausted",
-            attempted_providers=attempted,
-            errors=errors,
+        result: LLMResponse = _try_providers(
+            providers=self._providers,
+            circuit_breakers=self._circuit_breakers,
+            call_provider=_call,
+            name_fn=lambda p: p.name,
+            backoff_base=self._backoff_base,
+            backoff_max=self._backoff_max,
+            on_transient=lambda name, _: failed_providers.append(name),
         )
+
+        # Logging: after successful result, _call already enriched the metadata.
+        # We log here (outside the hot loop) once, instead of per-provider.
+        if failed_providers:
+            logger.info(
+                f"provider={result.metadata.get('provider')}, "
+                f"failover=true, failed_providers={list(failed_providers)}"
+            )
+        else:
+            logger.info(
+                f"provider={result.metadata.get('provider')}, failover=false"
+            )
+
+        return result
 
     def circuit_status(self) -> Dict[str, str]:
         """Return current circuit breaker status for all providers."""

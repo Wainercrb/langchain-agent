@@ -1,124 +1,193 @@
-"""Tool-calling agent implementation — uses LangChain AgentExecutor.
+"""Tool-calling agent — orchestrates the LLM tool-selection strategy.
 
-The LLM decides which tools to call (or none) based on the query.
-Tools are INJECTED via constructor — the container decides which tools are active.
-Tracing and feedback go through the pluggable ObservabilityProvider.
+The agent itself is a thin orchestrator: it builds the LangChain executor,
+delegates the heavy lifting to focused helpers, and assembles the final
+``ChatResponse``. All complex logic (token accounting, decision extraction,
+quality classification, tag/metadata building) lives in
+``tool_calling_components.py``.
+
+Tools are INJECTED via constructor — the container decides which tools are
+active. Tracing and feedback go through the pluggable ``ObservabilityProvider``.
 """
 
 import time
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Final
+from typing import List, Mapping, Optional
 
-from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import BaseTool
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 
 from config.constants import (
     TRUNCATE_CONTENT_PREVIEW,
-    TRUNCATE_OUTPUT_SUMMARY,
     TRUNCATE_QUERY_LOG,
-    TRUNCATE_QUERY_PREVIEW,
 )
 from config.prompts import SYSTEM_PROMPT_TOOL_CALLING as SYSTEM_PROMPT
+from loggers import logger
+from models import ChatResponse, SourceDocument
+from models.observability.decisions import DecisionLogEntry
+from models.retrieval import RetrievedDocument
 from observability.decorator import trace
-from observability.decisions import DecisionTracker
 from agent.observability.base import ObservabilityProvider
 from retrieval.formatting import build_source_documents
-from models import ChatResponse, SourceDocument
-from models.observability.decisions import DecisionLogEntry, DecisionQuality, ToolCallRecord
+
 from .base import Agent
-from loggers import logger
+from .tool_calling_components import (
+    ChatModelLike,
+    DecisionMetadataExtractor,
+    DecisionQualityClassifier,
+    DecisionRecorder,
+    TokenUsageCollector,
+    TracingTagBuilder,
+)
 
-# Agent type has two intentionally distinct forms (per user Option 3):
-# AGENT_TYPE_DATA = data-of-record (API JSON, DB column, decision log).
-# AGENT_TYPE_TAG  = human-readable LangSmith tracing tag.
+
+# ── Module-level constants ───────────────────────────────────────────
+
+MAX_AGENT_ITERATIONS: int = 10
+EARLY_STOPPING_METHOD: str = "force"
+
+# Public agent-type identifiers (intentionally two distinct forms, per the
+# original design — see ADR notes in the git history):
+# - AGENT_TYPE_DATA: data-of-record (DB column, decision log, API JSON)
+# - AGENT_TYPE_TAG : human-readable LangSmith tracing tag
 # Unifying these would be a public API change and is explicitly out of scope.
-MAX_AGENT_ITERATIONS: Final[int] = 10
-EARLY_STOPPING_METHOD: Final[str] = "force"
-AGENT_TYPE_DATA: Final[str] = "tool_calling"
-AGENT_TYPE_TAG: Final[str] = "tool-calling"
+AGENT_TYPE_DATA: str = "tool_calling"
+AGENT_TYPE_TAG: str = "tool-calling"
 
 
-class _TokenCallback(BaseCallbackHandler):
-    """Captures LLM token usage from callback events."""
-
-    def __init__(self) -> None:
-        self.input_tokens: int = 0
-        self.output_tokens: int = 0
-
-    def on_llm_end(self, response: Any, **kwargs: Any) -> None:
-        """Extract token counts from the LLM response."""
-        usage = getattr(response, "usage_metadata", None) or getattr(response, "usage", None)
-        if not usage:
-            llm_output = getattr(response, "llm_output", None) or {}
-            usage = llm_output.get("token_usage", {}) if isinstance(llm_output, dict) else None
-
-        if not usage:
-            return
-
-        if isinstance(usage, dict):
-            self.input_tokens += usage.get("input_tokens", usage.get("prompt_tokens", 0))
-            self.output_tokens += usage.get("output_tokens", usage.get("completion_tokens", 0))
-        elif hasattr(usage, "input_tokens"):
-            self.input_tokens += usage.input_tokens or 0
-            self.output_tokens += usage.output_tokens or 0
-
-    def as_dict(self) -> Optional[Dict[str, int]]:
-        """Return token counts as a dict, or None if no tokens were captured."""
-        if self.input_tokens == 0 and self.output_tokens == 0:
-            return None
-        return {
-            "input_tokens": self.input_tokens,
-            "output_tokens": self.output_tokens,
-            "total_tokens": self.input_tokens + self.output_tokens,
-        }
+# ── Agent ────────────────────────────────────────────────────────────
 
 
 class ToolCallingAgent(Agent):
     """LangChain tool-calling agent.
 
-    Tools are injected at construction time by the container.
-    This makes the agent fully pluggable — add/remove tools without touching this file.
+    Tools are injected at construction time by the container, so the
+    strategy is fully pluggable. All observability side effects (tags,
+    metadata, decision records) are routed through injected services.
+
+    All dependencies are REQUIRED (no defaults). The container wires
+    them at startup; for tests, pass a no-op recorder and the NoOp
+    observability provider.
+
+    Args:
+        llm: Chat model that supports tool binding. See ``ChatModelLike``.
+        tools: Tools the LLM may choose to invoke.
+        artifact_store: Shared list populated by tools (e.g. ``search_documents``)
+            to return retrieved sources. Drained after each invocation.
+        decision_tracker: Sink for ``DecisionLogEntry`` records.
+        observability: Pluggable tracing + feedback backend.
     """
 
     def __init__(
         self,
-        llm: Any,
+        llm: ChatModelLike,
         tools: List[BaseTool],
-        artifact_store: Optional[list] = None,
-        decision_tracker: Optional[Any] = None,
-        observability: Optional[ObservabilityProvider] = None,
+        artifact_store: List[RetrievedDocument],
+        decision_tracker: DecisionRecorder,
+        observability: ObservabilityProvider,
     ) -> None:
         self._llm = llm
         self._tools = tools
         self._artifact_store = artifact_store
         self._decision_tracker = decision_tracker
         self._observability = observability
+        self._decision_extractor = DecisionMetadataExtractor(DecisionQualityClassifier())
         logger.info(f"ToolCallingAgent initialized with {len(tools)} tools")
 
+    # ── Public API ──────────────────────────────────────────────────
+
+    @trace(name="ToolCallingAgent.invoke", run_type="chain")
+    def invoke(
+        self,
+        query: str,
+        top_k: int = 5,
+        temperature: float = 0.7,
+        include_sources: bool = True,
+    ) -> ChatResponse:
+        """Process a user query through the tool-calling strategy.
+
+        Args:
+            query: Natural language question.
+            top_k: Number of documents to retrieve (passed to search tool).
+            temperature: LLM creativity (0.0-1.0).
+            include_sources: Whether to include source documents in the response.
+
+        Returns:
+            ``ChatResponse`` with answer, sources, and execution metadata.
+        """
+        start_time = time.time()
+        try:
+            self._log_invocation_start(query)
+
+            token_collector = TokenUsageCollector()
+            executor = self._build_executor()
+            llm_latency_ms, response_text, executor_result = self._run_executor(
+                executor, query, token_collector
+            )
+            execution_time_ms = (time.time() - start_time) * 1000
+
+            decision = self._decision_extractor.extract(
+                run_id=self._current_run_id() or "",
+                query=query,
+                agent_type=AGENT_TYPE_DATA,
+                model_name=self._model_name,
+                executor_result=executor_result,
+                execution_time_ms=execution_time_ms,
+                top_k=top_k,
+                temperature=temperature,
+            )
+
+            sources = self._extract_sources(include_sources)
+            self._publish_observability(decision, top_k, temperature)
+            self._record_decision(decision)
+
+            self._log_invocation_end(
+                query=query,
+                execution_time_ms=execution_time_ms,
+                llm_latency_ms=llm_latency_ms,
+                sources_count=len(sources or []),
+                tools_used=decision.tools_used,
+            )
+
+            return self._build_response(
+                query=query,
+                response_text=response_text,
+                sources=sources,
+                execution_time_ms=execution_time_ms,
+                llm_latency_ms=llm_latency_ms,
+                token_collector=token_collector,
+                decision=decision,
+                top_k=top_k,
+                temperature=temperature,
+            )
+        except Exception as exc:
+            logger.error(
+                f"ToolCallingAgent.invoke failed: "
+                f"query={query[:TRUNCATE_QUERY_LOG]}..., error={exc}",
+                exc_info=True,
+            )
+            raise
+
+    # ── LangChain wiring ────────────────────────────────────────────
+
     def _build_prompt(self) -> ChatPromptTemplate:
-        """Build agent prompt with dynamic tool descriptions."""
+        """Build the agent prompt with the active tool catalogue."""
         tool_descriptions = "\n".join(
             f"- {t.name}: {t.description}" for t in self._tools
         )
         system = f"{SYSTEM_PROMPT}\n\nAVAILABLE TOOLS:\n{tool_descriptions}"
-
-        return ChatPromptTemplate.from_messages(
-            [
-                ("system", system),
-                MessagesPlaceholder(variable_name="chat_history", optional=True),
-                ("human", "{input}"),
-                MessagesPlaceholder(variable_name="agent_scratchpad"),
-            ]
-        )
+        return ChatPromptTemplate.from_messages([
+            ("system", system),
+            MessagesPlaceholder(variable_name="chat_history", optional=True),
+            ("human", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ])
 
     def _build_executor(self) -> AgentExecutor:
-        """Build AgentExecutor with injected tools."""
+        """Build an ``AgentExecutor`` bound to the injected tools."""
         prompt = self._build_prompt()
         llm_with_tools = self._llm.bind_tools(self._tools)
         agent = create_tool_calling_agent(llm_with_tools, self._tools, prompt)
-
         return AgentExecutor(
             agent=agent,
             tools=self._tools,
@@ -129,274 +198,142 @@ class ToolCallingAgent(Agent):
             return_intermediate_steps=True,
         )
 
-    @trace(name="ToolCallingAgent.invoke", run_type="chain")
-    def invoke(
+    def _run_executor(
         self,
+        executor: AgentExecutor,
         query: str,
-        top_k: int = 5,
-        temperature: float = 0.7,
-        include_sources: bool = True,
-    ) -> ChatResponse:
-        """Process query using tool-calling agent.
-
-        Args:
-            query: User's natural language question.
-            top_k: Number of documents to retrieve (passed to search tool).
-            temperature: LLM creativity (0.0-1.0).
-            include_sources: Whether to include source documents in response.
+        token_collector: TokenUsageCollector,
+    ) -> tuple[float, str, Mapping[str, object]]:
+        """Invoke the executor and measure LLM latency.
 
         Returns:
-            ChatResponse with answer, sources, and metadata.
+            ``(llm_latency_ms, response_text, full_executor_result)``.
         """
-        start_time = time.time()
-        try:
-            logger.info(
-                f"ToolCallingAgent.invoke: query={query[:TRUNCATE_QUERY_LOG]}..., "
-                f"tools={[t.name for t in self._tools]}"
-            )
+        llm_start = time.time()
+        result: Mapping[str, object] = executor.invoke(
+            {"input": query},
+            config={"callbacks": [token_collector]},
+        )
+        llm_latency_ms = (time.time() - llm_start) * 1000
+        output = result.get("output", "")
+        return llm_latency_ms, output if isinstance(output, str) else str(output), result
 
-            token_cb = _TokenCallback()
-            executor = self._build_executor()
+    # ── Response assembly ───────────────────────────────────────────
 
-            llm_latency_ms, response_text, executor_result = self._execute(
-                executor, query, token_cb
-            )
-
-            execution_time_ms = (time.time() - start_time) * 1000
-
-            sources_list = self._extract_sources(include_sources)
-
-            run_id = self._observability.get_current_run_id()
-
-            decision_metadata = self._extract_decision_metadata(
-                run_id, query, executor_result, execution_time_ms, top_k, temperature
-            )
-
-            tags = self._build_tags(
-                model_name=getattr(self._llm, "model", "unknown"),
+    def _build_response(
+        self,
+        *,
+        query: str,
+        response_text: str,
+        sources: Optional[List[SourceDocument]],
+        execution_time_ms: float,
+        llm_latency_ms: float,
+        token_collector: TokenUsageCollector,
+        decision: DecisionLogEntry,
+        top_k: int,
+        temperature: float,
+    ) -> ChatResponse:
+        """Assemble the final ``ChatResponse`` with all metadata."""
+        return ChatResponse(
+            response=response_text,
+            query=query,
+            sources=sources,
+            execution_time_ms=execution_time_ms,
+            model=self._model_name,
+            run_id=self._current_run_id(),
+            usage_metadata=token_collector.as_dict(),
+            llm_latency_ms=llm_latency_ms,
+            tracing_tags=TracingTagBuilder.build_tags(
+                model_name=self._model_name,
                 agent_type=AGENT_TYPE_TAG,
                 top_k=top_k,
                 temperature=temperature,
-                decision_metadata=decision_metadata,
-            )
-            self._observability.apply_tags(run_id, tags)
-            self._apply_decision_metadata(run_id, decision_metadata)
-
-            if self._decision_tracker and decision_metadata:
-                try:
-                    self._decision_tracker.record(decision_metadata)
-                except Exception as e:
-                    logger.warning(f"Failed to record decision: {str(e)}")
-
-            logger.info(
-                f"ToolCallingAgent complete: query={query[:TRUNCATE_QUERY_LOG]}..., "
-                f"time={execution_time_ms:.0f}ms, llm_time={llm_latency_ms:.0f}ms, "
-                f"sources={len(sources_list or [])}"
-            )
-
-            return ChatResponse(
-                response=response_text,
-                query=query,
-                sources=sources_list,
-                execution_time_ms=execution_time_ms,
-                model=getattr(self._llm, "model", "unknown"),
-                run_id=run_id,
-                usage_metadata=token_cb.as_dict(),
-                llm_latency_ms=llm_latency_ms,
-                tracing_tags=tags,
-                agent_type=decision_metadata.agent_type if decision_metadata else AGENT_TYPE_DATA,
-                tools_used=decision_metadata.tools_used if decision_metadata else [],
-                chain_length=decision_metadata.chain_length if decision_metadata else 0,
-                decision_quality=decision_metadata.decision_quality.value if decision_metadata else DecisionQuality.SUBOPTIMAL.value,
-                reasoning_summary=decision_metadata.reasoning_summary if decision_metadata else None,
-            )
-
-        except Exception as e:
-            logger.error(
-                f"ToolCallingAgent.invoke failed: query={query[:TRUNCATE_QUERY_LOG]}..., error={str(e)}",
-                exc_info=True,
-            )
-            raise
-
-    def _execute(
-        self, executor: AgentExecutor, query: str, token_cb: _TokenCallback
-    ) -> tuple[float, str, Any]:
-        """Execute the agent and measure LLM latency.
-
-        Returns:
-            Tuple of (llm_latency_ms, response_text, executor_result).
-        """
-        llm_start = time.time()
-        result = executor.invoke({"input": query}, config={"callbacks": [token_cb]})
-        llm_latency_ms = (time.time() - llm_start) * 1000
-        return llm_latency_ms, result.get("output", ""), result
-
-    def _build_tags(
-        self,
-        model_name: str,
-        agent_type: str,
-        top_k: int,
-        temperature: float,
-        decision_metadata: Optional[DecisionLogEntry],
-    ) -> List[str]:
-        """Build the list of tracing tag strings."""
-        tags = [
-            f"model:{model_name}",
-            f"agent:{agent_type}",
-            f"top_k:{top_k}",
-            f"temperature:{temperature}",
-        ]
-
-        if decision_metadata:
-            tags.append(f"decision_quality:{decision_metadata.decision_quality.value}")
-            tags.append(f"chain_length:{decision_metadata.chain_length}")
-            if decision_metadata.tools_used:
-                tags.append(f"tools_used:{','.join(decision_metadata.tools_used)}")
-
-        return tags
-
-    def _apply_decision_metadata(
-        self, run_id: str, decision_metadata: Optional[DecisionLogEntry]
-    ) -> None:
-        """Attach decision metadata to the active trace."""
-        if not decision_metadata or not self._observability:
-            return
-
-        metadata = {
-            "agent_type": decision_metadata.agent_type,
-            "decision_quality": decision_metadata.decision_quality.value,
-            "chain_length": decision_metadata.chain_length,
-            "tools_used": decision_metadata.tools_used,
-            "reasoning_summary": decision_metadata.reasoning_summary,
-            "tool_selection_rationale": decision_metadata.tool_selection_rationale,
-            "query_preview": decision_metadata.query_preview,
-            "latency_ms": decision_metadata.latency_ms,
-            "documents_retrieved": decision_metadata.top_k,
-        }
-
-        if decision_metadata.chain_tools:
-            metadata["chain_tools"] = [
-                {
-                    "tool": t.tool_name,
-                    "order": t.order,
-                    "output_summary": t.output_summary,
-                }
-                for t in decision_metadata.chain_tools
-            ]
-
-        self._observability.apply_metadata(run_id, metadata)
-
-    def _extract_decision_metadata(
-        self,
-        run_id: str,
-        query: str,
-        executor_result: Any,
-        execution_time_ms: float,
-        top_k: int,
-        temperature: float,
-    ) -> Optional[DecisionLogEntry]:
-        """Extract decision metadata from AgentExecutor result.
-
-        Args:
-            run_id: Run ID for this invocation.
-            query: Original user query.
-            executor_result: Full result dict from AgentExecutor.invoke().
-            execution_time_ms: Total execution time.
-            top_k: Number of documents retrieved.
-            temperature: LLM temperature setting.
-
-        Returns:
-            DecisionLogEntry with tool selection and quality metadata.
-        """
-        intermediate_steps = executor_result.get("intermediate_steps", [])
-
-        chain_tools: List[ToolCallRecord] = []
-        tools_used: List[str] = []
-        tool_selection_rationale: List[str] = []
-
-        for i, step in enumerate(intermediate_steps):
-            tool_name = None
-            tool_input = {}
-            output_summary = None
-            rationale = None
-
-            if isinstance(step, (list, tuple)) and len(step) >= 2:
-                action = step[0]
-                tool_name = getattr(action, "tool", None) or str(action)
-                tool_input = getattr(action, "tool_input", {})
-                output_summary = str(step[1])[:TRUNCATE_OUTPUT_SUMMARY]
-                rationale = getattr(action, "log", None)
-            elif hasattr(step, "tool"):
-                tool_name = step.tool
-                tool_input = getattr(step, "tool_input", {})
-                output_summary = str(getattr(step, "observation", ""))[:TRUNCATE_OUTPUT_SUMMARY]
-                rationale = getattr(step, "log", None)
-
-            if not tool_name:
-                continue
-
-            tools_used.append(tool_name)
-            if rationale:
-                tool_selection_rationale.append(rationale.strip())
-            chain_tools.append(ToolCallRecord(
-                tool_name=tool_name,
-                tool_input=tool_input if isinstance(tool_input, dict) else {},
-                output_summary=output_summary,
-                order=i,
-            ))
-
-        chain_length = len(tools_used)
-
-        logger.debug(
-            f"Decision extraction: found {chain_length} tools in intermediate_steps, "
-            f"tools={tools_used}, result_keys={list(executor_result.keys())}"
-        )
-
-        if chain_length == 0:
-            decision_quality = DecisionQuality.POOR
-            reasoning_summary = "No tool selected — direct answer or failed selection"
-            rationale_text = None
-        elif chain_length == 1:
-            decision_quality = DecisionQuality.OPTIMAL
-            reasoning_summary = f"Single tool call: {tools_used[0]}"
-            rationale_text = tool_selection_rationale[0] if tool_selection_rationale else None
-        else:
-            decision_quality = DecisionQuality.SUBOPTIMAL
-            reasoning_summary = f"Chained {chain_length} tools: {', '.join(tools_used)}"
-            rationale_text = "\n---\n".join(tool_selection_rationale) if tool_selection_rationale else None
-
-        return DecisionLogEntry(
-            run_id=run_id,
-            agent_type=AGENT_TYPE_DATA,
-            query_preview=query[:TRUNCATE_QUERY_PREVIEW],
-            query_hash=DecisionTracker.compute_query_hash(query),
-            tools_used=tools_used,
-            chain_length=chain_length,
-            chain_tools=chain_tools,
-            decision_quality=decision_quality,
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            model_used=getattr(self._llm, "model", "unknown"),
-            top_k=top_k,
-            temperature=temperature,
-            latency_ms=execution_time_ms,
-            reasoning_summary=reasoning_summary,
-            tool_selection_rationale=rationale_text,
+                decision=decision,
+            ),
+            agent_type=decision.agent_type,
+            tools_used=decision.tools_used,
+            chain_length=decision.chain_length,
+            decision_quality=decision.decision_quality.value,
+            reasoning_summary=decision.reasoning_summary,
         )
 
     def _extract_sources(
         self, include_sources: bool
     ) -> Optional[List[SourceDocument]]:
-        """Extract sources from the shared artifact store.
+        """Drain the shared artifact store into ``SourceDocument`` objects.
 
-        The search_documents tool populates this list during invocation.
+        The ``search_documents`` tool populates this list during invocation;
+        we drain it once per request and pass the captured sources downstream.
         """
-        if not include_sources or not self._artifact_store:
+        if not include_sources:
             return None
-
-        all_sources = list(self._artifact_store)
+        captured = list(self._artifact_store)
         self._artifact_store.clear()
-
-        if not all_sources:
+        if not captured:
             return None
+        return build_source_documents(captured, True, TRUNCATE_CONTENT_PREVIEW)
 
-        return build_source_documents(all_sources, True, TRUNCATE_CONTENT_PREVIEW)
+    # ── Observability side effects ──────────────────────────────────
+
+    def _publish_observability(
+        self,
+        decision: DecisionLogEntry,
+        top_k: int,
+        temperature: float,
+    ) -> None:
+        """Apply tags + metadata to the active trace."""
+        run_id = self._current_run_id() or ""
+        self._observability.apply_tags(
+            run_id,
+            TracingTagBuilder.build_tags(
+                model_name=self._model_name,
+                agent_type=AGENT_TYPE_TAG,
+                top_k=top_k,
+                temperature=temperature,
+                decision=decision,
+            ),
+        )
+        self._observability.apply_metadata(
+            run_id,
+            TracingTagBuilder.build_metadata(decision),
+        )
+
+    def _record_decision(self, decision: DecisionLogEntry) -> None:
+        """Hand the decision entry to the tracker (best-effort, never raises)."""
+        try:
+            self._decision_tracker.record(decision)
+        except Exception as exc:
+            logger.warning(f"Failed to record decision: {exc}")
+
+    # ── Logging ─────────────────────────────────────────────────────
+
+    def _log_invocation_start(self, query: str) -> None:
+        logger.info(
+            f"ToolCallingAgent.invoke: query={query[:TRUNCATE_QUERY_LOG]}..., "
+            f"tools={[t.name for t in self._tools]}"
+        )
+
+    @staticmethod
+    def _log_invocation_end(
+        query: str,
+        execution_time_ms: float,
+        llm_latency_ms: float,
+        sources_count: int,
+        tools_used: List[str],
+    ) -> None:
+        logger.info(
+            f"ToolCallingAgent complete: query={query[:TRUNCATE_QUERY_LOG]}..., "
+            f"time={execution_time_ms:.0f}ms, llm_time={llm_latency_ms:.0f}ms, "
+            f"sources={sources_count}, tools_used={tools_used}"
+        )
+
+    # ── Small helpers ──────────────────────────────────────────────
+
+    @property
+    def _model_name(self) -> str:
+        """Best-effort LLM model identifier (defaults to ``"unknown"``)."""
+        return getattr(self._llm, "model", "unknown")
+
+    def _current_run_id(self) -> Optional[str]:
+        """The active trace run id, or ``None`` if none is in progress."""
+        return self._observability.get_current_run_id()
