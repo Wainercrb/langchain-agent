@@ -1,4 +1,4 @@
-"""Alert services — AlertProvider ABC + Discord + Slack + Multi-provider.
+"""Alert services — AlertProvider ABC + Discord + Slack.
 
 Normal usage:
     from alerts import DiscordAlertProvider, Severity
@@ -6,24 +6,18 @@ Normal usage:
     await provider.send_alert(Severity.ERROR, "Database timeout", error=exc)
 
 Multi-provider (send to all configured backends):
-    from alerts import MultiAlertProvider, DiscordAlertProvider, SlackAlertProvider
-    multi = MultiAlertProvider([
-        DiscordAlertProvider(webhook_url="discord-url"),
-        SlackAlertProvider(webhook_url="slack-url"),
-    ])
-    await multi.send_alert(Severity.ERROR, "Something broke", error=exc)
+    The multi-provider dispatcher lives in :mod:`core.dispatcher`.
+    Import it as: ``from core.dispatcher import MultiAlertProvider``
 """
 
 from .base import AlertProviderBase, AlertProvider, ENABLED_SEVERITIES
 from .discord import DiscordAlertProvider
 from .slack import SlackAlertProvider
-from .multi import MultiAlertProvider
 
 __all__ = [
     "AlertProvider",
     "AlertProviderBase",
     "DiscordAlertProvider",
     "SlackAlertProvider",
-    "MultiAlertProvider",
     "ENABLED_SEVERITIES",
 ]

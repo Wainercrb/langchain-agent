@@ -15,7 +15,7 @@ from shared.exceptions import (
     TransientLLMError,
 )
 
-from .base import LLMProvider, LLMResponse
+from llm.base import LLMProvider, LLMResponse
 
 logger = logging.getLogger(__name__)
 

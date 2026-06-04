@@ -25,7 +25,7 @@ from agent.observability.base import ObservabilityProvider
 from retrieval.formatting import build_source_documents
 from models import ChatResponse, SourceDocument
 from models.observability.decisions import DecisionLogEntry, DecisionQuality, ToolCallRecord
-from agents.base import Agent
+from .base import Agent
 from loggers import logger
 
 

@@ -5,12 +5,11 @@ the ObservabilityProvider contract. If LangSmith is unreachable, errors are
 caught and logged for graceful degradation.
 """
 
-import uuid
 from typing import Any, Callable, Dict, List, Literal, Optional
 
 from langsmith import traceable
 from langsmith import Client as LangSmithClient
-from langsmith.run_trees import RunTree, _context as run_tree_context
+from langsmith.run_trees import _context as run_tree_context
 
 from config import settings
 from models.feedback import FeedbackResponse

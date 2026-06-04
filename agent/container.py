@@ -9,7 +9,7 @@ from supabase import create_client
 from config import settings
 
 # ── LLM ──────────────────────────────────────────────────────────────
-from llm import MultiProviderLLM
+from core.router import MultiProviderLLM
 
 
 def _configured(provider_classes: list) -> list:
@@ -77,9 +77,9 @@ def _create_alert_providers():
     """Create and return the configured alert service."""
     from alerts import (
         DiscordAlertProvider,
-        MultiAlertProvider,
         SlackAlertProvider,
     )
+    from core.dispatcher import MultiAlertProvider
 
     providers = _configured([
         DiscordAlertProvider,
@@ -109,7 +109,7 @@ retriever = Retriever(
 
 def _create_agent(llm_provider, decision_tracker, retriever, observability):
     """Create the ToolCallingAgent with search and document tools."""
-    from agents import ToolCallingAgent
+    from core.tool_calling import ToolCallingAgent
 
     search_artifact_store = []
 
