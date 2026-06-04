@@ -128,7 +128,6 @@ def _create_agent(llm_provider, decision_tracker, retriever, observability):
         llm=llm_provider.chat_model,
         tools=agent_tools,
         artifact_store=search_artifact_store,
-        default_top_k=5,
         decision_tracker=decision_tracker,
         observability=observability,
     )

@@ -76,16 +76,12 @@ class ToolCallingAgent(Agent):
         llm: Any,
         tools: List[BaseTool],
         artifact_store: Optional[list] = None,
-        default_top_k: int = 5,
-        default_latest_only: bool = True,
         decision_tracker: Optional[Any] = None,
         observability: Optional[ObservabilityProvider] = None,
     ) -> None:
         self._llm = llm
         self._tools = tools
         self._artifact_store = artifact_store
-        self._default_top_k = default_top_k
-        self._default_latest_only = default_latest_only
         self._decision_tracker = decision_tracker
         self._observability = observability
         logger.info(f"ToolCallingAgent initialized with {len(tools)} tools")
