@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from langchain_core.runnables import Runnable
 
-from observability.provider import get_observability_provider
+from agent.observability.base import get_observability_provider
 from shared.exceptions import (
     AllProvidersExhaustedError,
     PermanentLLMError,

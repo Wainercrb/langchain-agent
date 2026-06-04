@@ -21,7 +21,7 @@ from config.constants import (
 )
 from config.prompts import SYSTEM_PROMPT_TOOL_CALLING as SYSTEM_PROMPT
 from observability.decorator import trace
-from observability.provider import ObservabilityProvider
+from agent.observability.base import ObservabilityProvider
 from retrieval.formatting import build_source_documents
 from models import ChatResponse, SourceDocument
 from models.observability.decisions import DecisionLogEntry, DecisionQuality, ToolCallRecord

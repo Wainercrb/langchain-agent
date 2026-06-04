@@ -7,7 +7,6 @@ Unifies tracing (run lifecycle, tags, metadata) and feedback (like/dislike)
 into a single injection point.
 """
 
-import uuid
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Literal, Optional
 
@@ -117,8 +116,4 @@ def set_observability_provider(provider: ObservabilityProvider) -> None:
 
 def get_observability_provider() -> ObservabilityProvider:
     """Return the configured provider, falling back to NoOp if unset."""
-    if _provider is None:
-        from .noop import NoOpObservabilityProvider
-
-        return NoOpObservabilityProvider()
     return _provider

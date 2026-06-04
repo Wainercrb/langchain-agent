@@ -11,7 +11,7 @@ Subpackages:
 
 from .decisions import DecisionTracker
 from .health import CheckResult, HealthVerifier, MonitoringScheduler
-from .provider import (
+from .base import (
     ObservabilityProvider,
     get_observability_provider,
     set_observability_provider,

@@ -16,7 +16,7 @@ Usage::
 import functools
 from typing import Any, Callable, TypeVar
 
-from .provider import get_observability_provider
+from .base import get_observability_provider
 
 T = TypeVar("T")
 

@@ -12,7 +12,7 @@ from config import settings
 from embeddings import GoogleEmbeddingsWrapper
 from loggers import logger
 from observability.decisions import DecisionTracker
-from observability.provider import ObservabilityProvider
+from agent.observability.base import ObservabilityProvider
 from vector_store import VectorStore
 
 

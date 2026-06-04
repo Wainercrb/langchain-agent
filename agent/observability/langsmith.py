@@ -16,7 +16,7 @@ from config import settings
 from models.feedback import FeedbackResponse
 from loggers import logger
 
-from .provider import ObservabilityProvider
+from .base import ObservabilityProvider
 
 
 class LangSmithObservabilityProvider(ObservabilityProvider):

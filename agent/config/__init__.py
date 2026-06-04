@@ -37,7 +37,7 @@ def is_langsmith_enabled() -> bool:
 
 def get_observability_dashboard_url() -> str | None:
     """Return the observability dashboard URL or None if not configured."""
-    from observability.provider import get_observability_provider
+    from agent.observability.base import get_observability_provider
 
     return get_observability_provider().dashboard_url()
 

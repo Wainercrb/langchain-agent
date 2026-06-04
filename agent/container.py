@@ -62,14 +62,10 @@ def _create_observability_provider():
     """Create the observability provider based on configuration."""
     from observability import set_observability_provider
     from observability.langsmith import LangSmithObservabilityProvider
-    from observability.noop import NoOpObservabilityProvider
 
-    if settings.enable_langsmith_tracing and settings.langsmith_api_key:
-        provider = LangSmithObservabilityProvider()
-    else:
-        provider = NoOpObservabilityProvider()
-
+    provider = LangSmithObservabilityProvider()
     set_observability_provider(provider)
+    
     return provider
 
 

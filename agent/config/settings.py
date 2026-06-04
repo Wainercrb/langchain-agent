@@ -1,22 +1,10 @@
 """Configuration management using Pydantic Settings — centralizes all environment variables."""
 
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Optional
 
-from pydantic import BeforeValidator, Field
+from pydantic import Field
 from pydantic_settings import BaseSettings
-
-
-def _parse_list(v: object) -> list[str]:
-    """Parse comma-separated string to list."""
-    if isinstance(v, str):
-        return [p.strip() for p in v.split(",") if p.strip()]
-    if isinstance(v, list):
-        return [str(p).strip() for p in v if str(p).strip()]
-    return v  # type: ignore[return-value]
-
-
-ListFromEnv = Annotated[list[str], BeforeValidator(_parse_list)]
 
 
 class Settings(BaseSettings):
@@ -75,7 +63,7 @@ class Settings(BaseSettings):
     cloudwatch_stream_name: str = Field(default="default", alias="CLOUDWATCH_STREAM_NAME")
 
     # ── CORS ──────────────────────────────────────────────────────────
-    cors_origins: ListFromEnv = Field(
+    cors_origins: list[str] = Field(
         default=[
             "http://localhost:4321",
             "http://localhost:3000",
