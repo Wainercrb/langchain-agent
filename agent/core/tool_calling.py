@@ -6,7 +6,8 @@ Tracing and feedback go through the pluggable ObservabilityProvider.
 """
 
 import time
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Final
 
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -21,12 +22,22 @@ from config.constants import (
 )
 from config.prompts import SYSTEM_PROMPT_TOOL_CALLING as SYSTEM_PROMPT
 from observability.decorator import trace
+from observability.decisions import DecisionTracker
 from agent.observability.base import ObservabilityProvider
 from retrieval.formatting import build_source_documents
 from models import ChatResponse, SourceDocument
 from models.observability.decisions import DecisionLogEntry, DecisionQuality, ToolCallRecord
 from .base import Agent
 from loggers import logger
+
+# Agent type has two intentionally distinct forms (per user Option 3):
+# AGENT_TYPE_DATA = data-of-record (API JSON, DB column, decision log).
+# AGENT_TYPE_TAG  = human-readable LangSmith tracing tag.
+# Unifying these would be a public API change and is explicitly out of scope.
+MAX_AGENT_ITERATIONS: Final[int] = 10
+EARLY_STOPPING_METHOD: Final[str] = "force"
+AGENT_TYPE_DATA: Final[str] = "tool_calling"
+AGENT_TYPE_TAG: Final[str] = "tool-calling"
 
 
 class _TokenCallback(BaseCallbackHandler):
@@ -113,8 +124,8 @@ class ToolCallingAgent(Agent):
             tools=self._tools,
             handle_parsing_errors=True,
             verbose=False,
-            max_iterations=10,
-            early_stopping_method="force",
+            max_iterations=MAX_AGENT_ITERATIONS,
+            early_stopping_method=EARLY_STOPPING_METHOD,
             return_intermediate_steps=True,
         )
 
@@ -165,7 +176,7 @@ class ToolCallingAgent(Agent):
 
             tags = self._build_tags(
                 model_name=getattr(self._llm, "model", "unknown"),
-                agent_type="tool-calling",
+                agent_type=AGENT_TYPE_TAG,
                 top_k=top_k,
                 temperature=temperature,
                 decision_metadata=decision_metadata,
@@ -195,7 +206,7 @@ class ToolCallingAgent(Agent):
                 usage_metadata=token_cb.as_dict(),
                 llm_latency_ms=llm_latency_ms,
                 tracing_tags=tags,
-                agent_type=decision_metadata.agent_type if decision_metadata else "tool_calling",
+                agent_type=decision_metadata.agent_type if decision_metadata else AGENT_TYPE_DATA,
                 tools_used=decision_metadata.tools_used if decision_metadata else [],
                 chain_length=decision_metadata.chain_length if decision_metadata else 0,
                 decision_quality=decision_metadata.decision_quality.value if decision_metadata else DecisionQuality.SUBOPTIMAL.value,
@@ -299,10 +310,6 @@ class ToolCallingAgent(Agent):
         Returns:
             DecisionLogEntry with tool selection and quality metadata.
         """
-        from datetime import datetime, timezone
-
-        from observability.decisions import DecisionTracker
-
         intermediate_steps = executor_result.get("intermediate_steps", [])
 
         chain_tools: List[ToolCallRecord] = []
@@ -362,7 +369,7 @@ class ToolCallingAgent(Agent):
 
         return DecisionLogEntry(
             run_id=run_id,
-            agent_type="tool_calling",
+            agent_type=AGENT_TYPE_DATA,
             query_preview=query[:TRUNCATE_QUERY_PREVIEW],
             query_hash=DecisionTracker.compute_query_hash(query),
             tools_used=tools_used,
