@@ -53,15 +53,29 @@ supabase_client = create_client(db_url, db_key)
 vector_store = VectorStore(supabase_client)
 
 # ── Logger ────────────────────────────────────────────────────────────
-from logging import logger
+from loggers import logger
 
 # ── Parser Registry ──────────────────────────────────────────────────
 from ingestion.parsers.parser import ParserFactory
 
-# ── Feedback ─────────────────────────────────────────────────────────
-from feedback import LangSmithFeedbackProvider
+# ── Observability ─────────────────────────────────────────────────────
 
-feedback_service = LangSmithFeedbackProvider()
+def _create_observability_provider():
+    """Create the observability provider based on configuration."""
+    from observability import set_observability_provider
+    from observability.langsmith import LangSmithObservabilityProvider
+    from observability.noop import NoOpObservabilityProvider
+
+    if settings.enable_langsmith_tracing and settings.langsmith_api_key:
+        provider = LangSmithObservabilityProvider()
+    else:
+        provider = NoOpObservabilityProvider()
+
+    set_observability_provider(provider)
+    return provider
+
+
+observability = _create_observability_provider()
 
 # ── Alerts ────────────────────────────────────────────────────────────
 
@@ -99,7 +113,7 @@ retriever = Retriever(
 
 # ── Agent ─────────────────────────────────────────────────────────────
 
-def _create_agent(llm_provider, decision_tracker, vector_store, embeddings, retriever):
+def _create_agent(llm_provider, decision_tracker, vector_store, embeddings, retriever, observability):
     """Create the ToolCallingAgent with search and document tools."""
     from agents import ToolCallingAgent
 
@@ -122,6 +136,7 @@ def _create_agent(llm_provider, decision_tracker, vector_store, embeddings, retr
         artifact_store=search_artifact_store,
         default_top_k=5,
         decision_tracker=decision_tracker,
+        observability=observability,
     )
 
 
@@ -131,6 +146,7 @@ agent = _create_agent(
     vector_store=vector_store,
     embeddings=embeddings,
     retriever=retriever,
+    observability=observability,
 )
 
 # ── RAG Chain ──────────────────────────────────────────────────────────
@@ -141,6 +157,7 @@ rag_chain = RAGChain(
     llm=llm,
     decision_tracker=decision_tracker,
     logger=logger,
+    observability=observability,
 )
 
 # ── Ingestion Pipeline ─────────────────────────────────────────────────
@@ -171,11 +188,12 @@ _health_verifier = HealthVerifier(
     embeddings=embeddings,
     metrics_store=_metrics_snapshot,
     decision_tracker=decision_tracker,
+    observability=observability,
 )
 
 _monitoring_checks = [
     ("db", _health_verifier.check_db),
-    ("langsmith", _health_verifier.check_langsmith),
+    ("observability", _health_verifier.check_observability),
     ("embeddings", _health_verifier.check_embeddings),
     ("tracing_completeness", _health_verifier.check_tracing_completeness),
     ("memory_usage", _health_verifier.check_memory_usage),

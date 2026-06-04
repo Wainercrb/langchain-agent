@@ -1,4 +1,4 @@
-"""Feedback endpoint — record user feedback correlated to LangSmith run_id."""
+"""Feedback endpoint — record user feedback correlated to a trace run_id."""
 
 from datetime import datetime, timezone
 
@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 
 from api.api_errors import internal_error_response
-from container import decision_tracker, feedback_service
-from logging import logger
+from container import decision_tracker, observability
+from loggers import logger
 from models import ErrorResponse, FeedbackRequest
 from models.observability.decisions import DecisionLogEntry
 
@@ -18,18 +18,18 @@ router = APIRouter(prefix="/v1", tags=["feedback"])
     "/feedback",
     status_code=200,
     responses={
-        202: {"description": "Feedback accepted but LangSmith unreachable"},
+        202: {"description": "Feedback accepted but observability backend unreachable"},
         422: {"model": ErrorResponse, "description": "Validation error"},
     },
 )
 async def feedback(
     request: FeedbackRequest,
-    service=Depends(lambda: feedback_service),
+    service=Depends(lambda: observability),
 ) -> dict:
-    """Record user feedback (like/dislike) correlated to a LangSmith run_id.
+    """Record user feedback (like/dislike) correlated to a trace run_id.
 
-    Accepts feedback via the LangSmith Native Feedback API. If LangSmith is
-    unreachable, the feedback is logged server-side and a 202 Accepted is
+    Accepts feedback via the configured observability backend. If the backend
+    is unreachable, the feedback is logged server-side and a 202 Accepted is
     returned instead of failing the request.
 
     Feedback is also correlated with the in-memory DecisionTracker so that
@@ -37,7 +37,7 @@ async def feedback(
 
     Args:
         request: FeedbackRequest containing:
-            - run_id: LangSmith run ID for feedback correlation
+            - run_id: Trace run ID for feedback correlation
             - feedback_type: "like" (score=1.0) or "dislike" (score=0.0)
             - comment: Optional user comment (max 1000 chars)
 

@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from container import _monitoring_scheduler
-from logging import logger
+from loggers import logger
 
 
 @asynccontextmanager

@@ -10,7 +10,7 @@ from typing import Any, List, Protocol
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from logging.base import Logger
+from loggers.base import Logger
 from ingestion.parsers.parser import ParserFactory as ParserRegistry
 
 

@@ -6,7 +6,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 from config import settings
 from .base import LLMProvider, LLMResponse
-from logging import logger
+from loggers import logger
 
 
 class GoogleProvider(LLMProvider):

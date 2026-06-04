@@ -21,6 +21,13 @@ if settings.enable_langsmith_tracing:
         "LANGCHAIN_PROJECT",
         settings.langsmith_project or "langchain-agent",
     )
+    if settings.langsmith_api_key:
+        os.environ.setdefault("LANGSMITH_API_KEY", settings.langsmith_api_key)
+
+
+def is_observability_enabled() -> bool:
+    """Return True if an observability backend is configured."""
+    return settings.observability_backend != "none"
 
 
 def is_langsmith_enabled() -> bool:
@@ -28,12 +35,22 @@ def is_langsmith_enabled() -> bool:
     return settings.enable_langsmith_tracing and bool(settings.langsmith_api_key)
 
 
-def get_langsmith_dashboard_url() -> str | None:
-    """Return the LangSmith dashboard URL or None if tracing is not configured."""
-    if not is_langsmith_enabled():
-        return None
-    project = settings.langsmith_project or "langchain-agent"
-    return f"https://smith.langchain.com/o/default/projects/p/{project}"
+def get_observability_dashboard_url() -> str | None:
+    """Return the observability dashboard URL or None if not configured."""
+    from observability.provider import get_observability_provider
+
+    return get_observability_provider().dashboard_url()
 
 
-__all__ = ["Settings", "settings", "is_langsmith_enabled", "get_langsmith_dashboard_url"]
+# Backward compatibility alias
+get_langsmith_dashboard_url = get_observability_dashboard_url
+
+
+__all__ = [
+    "Settings",
+    "settings",
+    "is_observability_enabled",
+    "is_langsmith_enabled",
+    "get_observability_dashboard_url",
+    "get_langsmith_dashboard_url",
+]

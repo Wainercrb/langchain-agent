@@ -23,7 +23,7 @@ from config import settings
 from ingestion import DocumentIngestionPipeline
 from ingestion.pipeline import IngestionStatus
 from container import alert_service, embeddings, vector_store
-from logging import logger
+from loggers import logger
 from shared.exceptions import Severity
 
 # ── Ingestion Alert Deduplication ─────────────────────────────────────

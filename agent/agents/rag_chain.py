@@ -1,19 +1,19 @@
 """RAGChain — legacy retrieve-then-generate agent.
 
 Retrieves documents, formats them as context, and passes them to an LLM.
-Fully traced via LangSmith @traceable decorator.
+Tracing and feedback go through the pluggable ObservabilityProvider.
 """
 
 import hashlib
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from langsmith import traceable
+from observability.decorator import trace
+from observability.provider import ObservabilityProvider
 
 from config.constants import TRUNCATE_CONTENT_PREVIEW, TRUNCATE_QUERY_LOG, TRUNCATE_QUERY_PREVIEW
-from logging.base import Logger
-from observability.tracing import capture_tracing_tags, extract_run_id
+from loggers.base import Logger
 from models import ChatResponse
 from models.observability.decisions import DecisionLogEntry, DecisionQuality
 from retrieval.formatting import build_source_documents, format_documents_as_context
@@ -41,15 +41,17 @@ class RAGChain:
         llm: Any,
         decision_tracker: Optional[Any] = None,
         logger: Logger = None,
+        observability: Optional[ObservabilityProvider] = None,
     ) -> None:
         self._retriever = retriever
         self._llm = llm
         self._decision_tracker = decision_tracker
+        self._observability = observability
         self.logger = logger
         if self.logger:
             self.logger.info("RAGChain initialized")
 
-    @traceable(name="RAGChain.invoke", run_type="chain")
+    @trace(name="RAGChain.invoke", run_type="chain")
     def invoke(
         self,
         query: str,
@@ -100,20 +102,21 @@ class RAGChain:
 
             execution_time_ms = (time.time() - start_time) * 1000
 
-            run_id = extract_run_id()
+            run_id = self._observability.get_current_run_id()
 
             decision_metadata = self._extract_decision_metadata(
                 run_id, query, execution_time_ms, top_k, temperature, len(retrieved)
             )
 
-            run_id, langsmith_tags = capture_tracing_tags(
+            tags = self._build_tags(
                 model_name=self._llm.model,
                 agent_type="rag-chain",
                 top_k=top_k,
                 temperature=temperature,
                 decision_metadata=decision_metadata,
-                pre_run_id=run_id,
             )
+            self._observability.apply_tags(run_id, tags)
+            self._apply_decision_metadata(run_id, decision_metadata)
 
             sources_list = build_source_documents(
                 retrieved, include_sources, TRUNCATE_CONTENT_PREVIEW
@@ -142,7 +145,7 @@ class RAGChain:
                 run_id=run_id,
                 usage_metadata=usage_metadata,
                 llm_latency_ms=llm_latency_ms,
-                langsmith_tags=langsmith_tags,
+                tracing_tags=tags,
                 agent_type=decision_metadata.agent_type if decision_metadata else "rag_chain",
                 tools_used=decision_metadata.tools_used if decision_metadata else [],
                 chain_length=decision_metadata.chain_length if decision_metadata else 0,
@@ -199,7 +202,6 @@ class RAGChain:
         if self.logger:
             self.logger.debug(f"LLM response received: {len(response_text)} chars")
 
-        # Capture token usage
         usage_metadata = None
         if getattr(llm_response, "usage", None):
             usage_metadata = dict(llm_response.usage)
@@ -211,6 +213,51 @@ class RAGChain:
             )
 
         return response_text, usage_metadata, llm_latency_ms
+
+    def _build_tags(
+        self,
+        model_name: str,
+        agent_type: str,
+        top_k: int,
+        temperature: float,
+        decision_metadata: Optional[DecisionLogEntry],
+    ) -> List[str]:
+        """Build the list of tracing tag strings."""
+        tags = [
+            f"model:{model_name}",
+            f"agent:{agent_type}",
+            f"top_k:{top_k}",
+            f"temperature:{temperature}",
+        ]
+
+        if decision_metadata:
+            tags.append(f"decision_quality:{decision_metadata.decision_quality.value}")
+            tags.append(f"chain_length:{decision_metadata.chain_length}")
+            if decision_metadata.tools_used:
+                tags.append(f"tools_used:{','.join(decision_metadata.tools_used)}")
+
+        return tags
+
+    def _apply_decision_metadata(
+        self, run_id: str, decision_metadata: Optional[DecisionLogEntry]
+    ) -> None:
+        """Attach decision metadata to the active trace."""
+        if not decision_metadata or not self._observability:
+            return
+
+        metadata = {
+            "agent_type": decision_metadata.agent_type,
+            "decision_quality": decision_metadata.decision_quality.value,
+            "chain_length": decision_metadata.chain_length,
+            "tools_used": decision_metadata.tools_used,
+            "reasoning_summary": decision_metadata.reasoning_summary,
+            "tool_selection_rationale": decision_metadata.tool_selection_rationale,
+            "query_preview": decision_metadata.query_preview,
+            "latency_ms": decision_metadata.latency_ms,
+            "documents_retrieved": decision_metadata.top_k,
+        }
+
+        self._observability.apply_metadata(run_id, metadata)
 
     def _extract_decision_metadata(
         self,
@@ -226,7 +273,7 @@ class RAGChain:
         RAGChain always retrieves documents, so tool selection is implicit.
 
         Args:
-            run_id: LangSmith run ID for this invocation.
+            run_id: Run ID for this invocation.
             query: Original user query.
             execution_time_ms: Total execution time.
             top_k: Number of documents retrieved.

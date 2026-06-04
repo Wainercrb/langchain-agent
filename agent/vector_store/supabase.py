@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from vector_store.base import VectorStore as VectorStoreBase
 
 from shared.exceptions import DocumentStoreError
-from logging import logger
+from loggers import logger
 
 
 class VectorStore(VectorStoreBase):

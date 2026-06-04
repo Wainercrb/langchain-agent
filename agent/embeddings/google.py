@@ -5,7 +5,7 @@ from typing import List
 from embeddings.base import Embeddings
 from rate_limiter import RateLimiter
 from shared.exceptions import EmbeddingError
-from logging import logger
+from loggers import logger
 
 
 class GoogleEmbeddingsWrapper(Embeddings):

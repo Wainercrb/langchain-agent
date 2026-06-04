@@ -29,7 +29,7 @@ def build_chat_response(
         run_id=_safe_get("run_id"),
         usage_metadata=_safe_get("usage_metadata"),
         llm_latency_ms=_safe_get("llm_latency_ms"),
-        langsmith_tags=_safe_get("langsmith_tags"),
+        tracing_tags=_safe_get("tracing_tags"),
         agent_type=_safe_get("agent_type", "tool_calling"),
         tools_used=_safe_get("tools_used", []),
         chain_length=_safe_get("chain_length", 0),
@@ -40,7 +40,7 @@ def build_chat_response(
 
 def build_metrics_response(
     data: dict[str, Any],
-    langsmith_dashboard_url: Optional[str] = None,
+    observability_dashboard_url: Optional[str] = None,
 ) -> MetricsResponse:
     """Build a MetricsResponse from a metrics snapshot."""
     return MetricsResponse(
@@ -50,6 +50,6 @@ def build_metrics_response(
         total_input_tokens=data["total_input_tokens"],
         total_output_tokens=data["total_output_tokens"],
         avg_tokens_per_request=data["avg_tokens_per_request"],
-        langsmith_dashboard_url=langsmith_dashboard_url,
+        observability_dashboard_url=observability_dashboard_url,
         ai_decisions=data.get("ai_decisions"),
     )

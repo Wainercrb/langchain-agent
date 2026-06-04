@@ -1,20 +1,28 @@
-"""Observability — active health monitoring, AI decision tracking, and LangSmith tracing.
+"""Observability — active health monitoring, AI decision tracking, and pluggable tracing.
 
 Subpackages:
     - `health`: Health verification checks and background scheduling.
     - `decisions`: Thread-safe bounded log of AI decision metadata.
-    - `tracing`: LangSmith run ID extraction and tag application.
+    - `provider`: Abstract ObservabilityProvider (Strategy Pattern).
+    - `langsmith`: LangSmith backend implementation.
+    - `noop`: No-op fallback for local dev.
+    - `decorator`: Provider-agnostic @trace decorator.
 """
 
 from .decisions import DecisionTracker
 from .health import CheckResult, HealthVerifier, MonitoringScheduler
-from .tracing import capture_tracing_tags, extract_run_id
+from .provider import (
+    ObservabilityProvider,
+    get_observability_provider,
+    set_observability_provider,
+)
 
 __all__ = [
     "CheckResult",
     "DecisionTracker",
     "HealthVerifier",
     "MonitoringScheduler",
-    "capture_tracing_tags",
-    "extract_run_id",
+    "ObservabilityProvider",
+    "get_observability_provider",
+    "set_observability_provider",
 ]

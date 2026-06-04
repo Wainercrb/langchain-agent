@@ -58,8 +58,8 @@ class DecisionLogEntry(BaseModel):
     )
     query_hash: str = Field(
         ...,
-        max_length=50,
-        description="Hash of the full query (first 50 chars)",
+        max_length=64,
+        description="SHA-256 hash of the full query (64 hex chars)",
     )
     tools_used: List[str] = Field(
         default_factory=list,

@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from config import settings
-from logging import logger
+from loggers import logger
 from models.observability.decisions import DecisionLogEntry, DecisionMetricsResponse
 from vector_store import VectorStore
 

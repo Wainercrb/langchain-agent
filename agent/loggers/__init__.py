@@ -1,7 +1,7 @@
 """Logging services — Logger ABC + Console/CloudWatch backends + singleton logger.
 
 Uso normal:
-    from logging import logger
+    from loggers import logger
     logger.info("mensaje")
 
 El backend se configura vía LOGGER_BACKEND en .env:

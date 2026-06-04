@@ -114,7 +114,11 @@ class Settings(BaseSettings):
     traffic_shedding_enabled: bool = Field(default=False, alias="TRAFFIC_SHEDDING_ENABLED")
     traffic_shedding_retry_after: int = Field(default=60, alias="TRAFFIC_SHEDDING_RETRY_AFTER")
 
-    # ── LangSmith / Tracing ────────────────────────────────────────────
+    # ── Observability ──────────────────────────────────────────────────
+    # Backend choice: "langsmith" or "none" (no-op fallback)
+    observability_backend: str = Field(default="langsmith", alias="OBSERVABILITY_BACKEND")
+
+    # ── LangSmith (used when observability_backend="langsmith") ────────
     langsmith_api_key: str = Field(default="", alias="LANGSMITH_API_KEY")
     langsmith_project: Optional[str] = Field(default=None, alias="LANGSMITH_PROJECT")
     enable_langsmith_tracing: bool = Field(

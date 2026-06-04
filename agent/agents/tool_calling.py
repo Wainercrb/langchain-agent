@@ -2,6 +2,7 @@
 
 The LLM decides which tools to call (or none) based on the query.
 Tools are INJECTED via constructor — the container decides which tools are active.
+Tracing and feedback go through the pluggable ObservabilityProvider.
 """
 
 import time
@@ -11,7 +12,6 @@ from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import BaseTool
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
-from langsmith import traceable
 
 from config.constants import (
     TRUNCATE_CONTENT_PREVIEW,
@@ -20,12 +20,13 @@ from config.constants import (
     TRUNCATE_QUERY_PREVIEW,
 )
 from config.prompts import SYSTEM_PROMPT_TOOL_CALLING as SYSTEM_PROMPT
-from observability.tracing import capture_tracing_tags, extract_run_id
+from observability.decorator import trace
+from observability.provider import ObservabilityProvider
 from retrieval.formatting import build_source_documents
 from models import ChatResponse, SourceDocument
 from models.observability.decisions import DecisionLogEntry, DecisionQuality, ToolCallRecord
 from agents.base import Agent
-from logging import logger
+from loggers import logger
 
 
 class _TokenCallback(BaseCallbackHandler):
@@ -37,10 +38,8 @@ class _TokenCallback(BaseCallbackHandler):
 
     def on_llm_end(self, response: Any, **kwargs: Any) -> None:
         """Extract token counts from the LLM response."""
-        # LangChain passes an LLMResult object; usage may be in .usage or .llm_output
         usage = getattr(response, "usage_metadata", None) or getattr(response, "usage", None)
         if not usage:
-            # Try llm_output for older LangChain versions
             llm_output = getattr(response, "llm_output", None) or {}
             usage = llm_output.get("token_usage", {}) if isinstance(llm_output, dict) else None
 
@@ -80,6 +79,7 @@ class ToolCallingAgent(Agent):
         default_top_k: int = 5,
         default_latest_only: bool = True,
         decision_tracker: Optional[Any] = None,
+        observability: Optional[ObservabilityProvider] = None,
     ) -> None:
         self._llm = llm
         self._tools = tools
@@ -87,6 +87,7 @@ class ToolCallingAgent(Agent):
         self._default_top_k = default_top_k
         self._default_latest_only = default_latest_only
         self._decision_tracker = decision_tracker
+        self._observability = observability
         logger.info(f"ToolCallingAgent initialized with {len(tools)} tools")
 
     def _build_prompt(self) -> ChatPromptTemplate:
@@ -121,7 +122,7 @@ class ToolCallingAgent(Agent):
             return_intermediate_steps=True,
         )
 
-    @traceable(name="ToolCallingAgent.invoke", run_type="chain")
+    @trace(name="ToolCallingAgent.invoke", run_type="chain")
     def invoke(
         self,
         query: str,
@@ -160,20 +161,21 @@ class ToolCallingAgent(Agent):
 
             sources_list = self._extract_sources(include_sources)
 
-            run_id = extract_run_id()
+            run_id = self._observability.get_current_run_id()
 
             decision_metadata = self._extract_decision_metadata(
                 run_id, query, executor_result, execution_time_ms, top_k, temperature
             )
 
-            run_id, langsmith_tags = capture_tracing_tags(
+            tags = self._build_tags(
                 model_name=getattr(self._llm, "model", "unknown"),
                 agent_type="tool-calling",
                 top_k=top_k,
                 temperature=temperature,
                 decision_metadata=decision_metadata,
-                pre_run_id=run_id,
             )
+            self._observability.apply_tags(run_id, tags)
+            self._apply_decision_metadata(run_id, decision_metadata)
 
             if self._decision_tracker and decision_metadata:
                 try:
@@ -196,7 +198,7 @@ class ToolCallingAgent(Agent):
                 run_id=run_id,
                 usage_metadata=token_cb.as_dict(),
                 llm_latency_ms=llm_latency_ms,
-                langsmith_tags=langsmith_tags,
+                tracing_tags=tags,
                 agent_type=decision_metadata.agent_type if decision_metadata else "tool_calling",
                 tools_used=decision_metadata.tools_used if decision_metadata else [],
                 chain_length=decision_metadata.chain_length if decision_metadata else 0,
@@ -224,6 +226,61 @@ class ToolCallingAgent(Agent):
         llm_latency_ms = (time.time() - llm_start) * 1000
         return llm_latency_ms, result.get("output", ""), result
 
+    def _build_tags(
+        self,
+        model_name: str,
+        agent_type: str,
+        top_k: int,
+        temperature: float,
+        decision_metadata: Optional[DecisionLogEntry],
+    ) -> List[str]:
+        """Build the list of tracing tag strings."""
+        tags = [
+            f"model:{model_name}",
+            f"agent:{agent_type}",
+            f"top_k:{top_k}",
+            f"temperature:{temperature}",
+        ]
+
+        if decision_metadata:
+            tags.append(f"decision_quality:{decision_metadata.decision_quality.value}")
+            tags.append(f"chain_length:{decision_metadata.chain_length}")
+            if decision_metadata.tools_used:
+                tags.append(f"tools_used:{','.join(decision_metadata.tools_used)}")
+
+        return tags
+
+    def _apply_decision_metadata(
+        self, run_id: str, decision_metadata: Optional[DecisionLogEntry]
+    ) -> None:
+        """Attach decision metadata to the active trace."""
+        if not decision_metadata or not self._observability:
+            return
+
+        metadata = {
+            "agent_type": decision_metadata.agent_type,
+            "decision_quality": decision_metadata.decision_quality.value,
+            "chain_length": decision_metadata.chain_length,
+            "tools_used": decision_metadata.tools_used,
+            "reasoning_summary": decision_metadata.reasoning_summary,
+            "tool_selection_rationale": decision_metadata.tool_selection_rationale,
+            "query_preview": decision_metadata.query_preview,
+            "latency_ms": decision_metadata.latency_ms,
+            "documents_retrieved": decision_metadata.top_k,
+        }
+
+        if decision_metadata.chain_tools:
+            metadata["chain_tools"] = [
+                {
+                    "tool": t.tool_name,
+                    "order": t.order,
+                    "output_summary": t.output_summary,
+                }
+                for t in decision_metadata.chain_tools
+            ]
+
+        self._observability.apply_metadata(run_id, metadata)
+
     def _extract_decision_metadata(
         self,
         run_id: str,
@@ -236,7 +293,7 @@ class ToolCallingAgent(Agent):
         """Extract decision metadata from AgentExecutor result.
 
         Args:
-            run_id: LangSmith run ID for this invocation.
+            run_id: Run ID for this invocation.
             query: Original user query.
             executor_result: Full result dict from AgentExecutor.invoke().
             execution_time_ms: Total execution time.
@@ -262,14 +319,12 @@ class ToolCallingAgent(Agent):
             output_summary = None
             rationale = None
 
-            # Format 1: tuple/list of (AgentAction, output)
             if isinstance(step, (list, tuple)) and len(step) >= 2:
                 action = step[0]
                 tool_name = getattr(action, "tool", None) or str(action)
                 tool_input = getattr(action, "tool_input", {})
                 output_summary = str(step[1])[:TRUNCATE_OUTPUT_SUMMARY]
                 rationale = getattr(action, "log", None)
-            # Format 2: object with .tool attribute
             elif hasattr(step, "tool"):
                 tool_name = step.tool
                 tool_input = getattr(step, "tool_input", {})

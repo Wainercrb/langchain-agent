@@ -6,8 +6,8 @@ import time
 from typing import Any, Dict, List, Optional
 
 from langchain_core.runnables import Runnable, RunnableConfig
-from langsmith.run_trees import _context as run_tree_context
 
+from observability.provider import get_observability_provider
 from shared.exceptions import TransientLLMError, PermanentLLMError, AllProvidersExhaustedError
 
 from .base import LLMProvider, LLMResponse
@@ -82,14 +82,13 @@ class ResilientChatModel(Runnable):
         return response
 
     def _tag_trace(self, provider_name: str) -> None:
-        """Tag LangSmith trace with actual provider."""
+        """Tag active trace with actual provider."""
         try:
-            current_run = run_tree_context.get_current_run_tree()
-            if current_run:
-                current_run.add_tags([f"provider:{provider_name}"])
-                current_run.add_metadata({
-                    "actual_provider": provider_name,
-                })
+            obs = get_observability_provider()
+            run_id = obs.get_current_run_id()
+            if run_id:
+                obs.apply_tags(run_id, [f"provider:{provider_name}"])
+                obs.apply_metadata(run_id, {"actual_provider": provider_name})
         except Exception:
             pass
 
@@ -263,10 +262,11 @@ class ResilientLLMProvider(LLMProvider):
             response.metadata["failed_providers"] = attempted
 
         try:
-            current_run = run_tree_context.get_current_run_tree()
-            if current_run:
-                current_run.add_tags([f"provider:{provider_name}"])
-                current_run.add_metadata({
+            obs = get_observability_provider()
+            run_id = obs.get_current_run_id()
+            if run_id:
+                obs.apply_tags(run_id, [f"provider:{provider_name}"])
+                obs.apply_metadata(run_id, {
                     "actual_provider": provider_name,
                     "failed_providers": attempted if attempted else [],
                 })

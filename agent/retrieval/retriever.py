@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from models import RetrievedDocument
 
-from logging.base import Logger
+from loggers.base import Logger
 from shared.filters import filter_by_threshold
 
 

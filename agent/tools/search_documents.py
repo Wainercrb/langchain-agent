@@ -11,7 +11,7 @@ from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
 from retrieval.formatting import format_documents_as_context
-from logging import logger
+from loggers import logger
 
 # Phrases to strip from user queries before semantic search.
 # These are conversational "filler" that hurt embedding quality.

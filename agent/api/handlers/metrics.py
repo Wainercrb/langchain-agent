@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends
 
 from api.api_responses import build_metrics_response
-from config import get_langsmith_dashboard_url
+from config import get_observability_dashboard_url
 from container import decision_tracker
 from api.metrics_store import build_metrics_snapshot
 from models import MetricsResponse
@@ -22,7 +22,7 @@ async def metrics_endpoint(
     """
     Return lightweight operational counters since process startup.
 
-    LangSmith handles the comprehensive observability dashboards;
+    The configured observability backend handles comprehensive dashboards;
     this endpoint provides simple request/error/latency counters
     that are health-check friendly.
 
@@ -33,7 +33,7 @@ async def metrics_endpoint(
 
     Returns:
         MetricsResponse with request_count, error_count, avg_latency_ms,
-        and langsmith_dashboard_url (if tracing is configured).
+        and observability_dashboard_url (if tracing is configured).
     """
     data = build_metrics_snapshot()
     data["ai_decisions"] = {
@@ -41,6 +41,6 @@ async def metrics_endpoint(
         "decisions_evicted": tracker.eviction_count,
     }
 
-    langsmith_url = get_langsmith_dashboard_url()
+    dashboard_url = get_observability_dashboard_url()
 
-    return build_metrics_response(data=data, langsmith_dashboard_url=langsmith_url)
+    return build_metrics_response(data=data, observability_dashboard_url=dashboard_url)

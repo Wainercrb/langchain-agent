@@ -6,7 +6,7 @@ to return the top 3 results as a formatted string.
 
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
-from logging import logger
+from loggers import logger
 
 
 class WebSearchInput(BaseModel):

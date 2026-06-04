@@ -6,7 +6,7 @@ from langchain_openai import ChatOpenAI
 
 from config import settings
 from .base import LLMProvider, LLMResponse
-from logging import logger
+from loggers import logger
 
 
 class OpenRouterProvider(LLMProvider):

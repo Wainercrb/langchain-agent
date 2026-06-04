@@ -16,7 +16,7 @@ from config.constants import (
     TRUNCATE_METADATA,
     TRUNCATE_TITLE,
 )
-from logging import logger
+from loggers import logger
 from shared.exceptions import Severity
 
 from .base import AlertProviderBase

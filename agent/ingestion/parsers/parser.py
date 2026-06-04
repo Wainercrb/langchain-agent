@@ -10,7 +10,7 @@ from html.parser import HTMLParser as StdlibHTMLParser
 from pathlib import Path
 from typing import Dict, List
 
-from logging import logger
+from loggers import logger
 from shared.exceptions import IngestionError
 
 

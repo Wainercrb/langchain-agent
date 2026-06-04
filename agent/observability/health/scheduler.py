@@ -12,7 +12,7 @@ from typing import Awaitable, Callable, Dict, List, Optional, Tuple
 from alerts.base import AlertProviderBase
 from config import Settings
 from config import settings as default_settings
-from logging import logger
+from loggers import logger
 from models.observability.health import HealthCheckResult
 from observability.health.checks import CheckResult
 from shared.exceptions import Severity

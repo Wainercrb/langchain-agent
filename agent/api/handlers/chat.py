@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from api.api_errors import internal_error_response, validation_error_response
 from api.api_responses import build_chat_response
 from container import agent
-from logging import logger
+from loggers import logger
 from api.metrics_store import get_llm_usage_metrics, get_request_metrics
 from models import ChatRequest, ChatResponse, ErrorResponse
 from shared.exceptions import Severity, AllProvidersExhaustedError
@@ -142,7 +142,7 @@ async def chat(
             run_id=str(uuid.uuid4()),
             usage_metadata=None,
             llm_latency_ms=0,
-            langsmith_tags=["degraded:true", "reason:all_providers_exhausted"],
+            tracing_tags=["degraded:true", "reason:all_providers_exhausted"],
         )
 
     except Exception as e:

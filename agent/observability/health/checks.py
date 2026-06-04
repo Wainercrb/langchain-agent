@@ -1,6 +1,6 @@
 """Health verifier — individual check methods for automated monitoring.
 
-All checks execute WITHOUT LLM invocation. Each returns a ``CheckResult``
+All checks executes WITHOUT LLM invocation. Each returns a ``CheckResult``
 with status and human-readable detail.
 """
 
@@ -10,8 +10,9 @@ from typing import Callable, Optional
 
 from config import settings
 from embeddings import GoogleEmbeddingsWrapper
-from logging import logger
+from loggers import logger
 from observability.decisions import DecisionTracker
+from observability.provider import ObservabilityProvider
 from vector_store import VectorStore
 
 
@@ -49,6 +50,7 @@ class HealthVerifier:
         embeddings: Embeddings provider instance for embedding checks.
         metrics_store: Callable returning request metrics snapshot.
         decision_tracker: DecisionTracker for drift analysis.
+        observability: ObservabilityProvider for backend checks.
     """
 
     def __init__(
@@ -57,11 +59,13 @@ class HealthVerifier:
         embeddings: GoogleEmbeddingsWrapper,
         metrics_store: Optional[Callable[[], dict]] = None,
         decision_tracker: Optional[DecisionTracker] = None,
+        observability: Optional[ObservabilityProvider] = None,
     ) -> None:
         self._vector_store = vector_store
         self._embeddings = embeddings
         self._metrics_store = metrics_store
         self._decision_tracker = decision_tracker
+        self._observability = observability
 
     async def check_db(self) -> CheckResult:
         """Verify database connectivity via vector store health check."""
@@ -73,18 +77,11 @@ class HealthVerifier:
         except Exception as e:
             return CheckResult.failure(f"Database connection failed: {str(e)}")
 
-    async def check_langsmith(self) -> CheckResult:
-        """Verify LangSmith API is reachable using list_projects()."""
-        if not settings.enable_langsmith_tracing or not settings.langsmith_api_key:
-            return CheckResult.success("LangSmith tracing not configured, skipping")
-        try:
-            from langsmith import Client as LangSmithClient
-
-            client = LangSmithClient()
-            list(client.list_projects(limit=1))
-            return CheckResult.success("LangSmith API reachable")
-        except Exception as e:
-            return CheckResult.failure(f"LangSmith API unreachable: {str(e)}")
+    async def check_observability(self) -> CheckResult:
+        """Verify the configured observability backend is reachable."""
+        if self._observability is None:
+            return CheckResult.success("Observability not configured, skipping")
+        return await self._observability.health_check()
 
     async def check_embeddings(self) -> CheckResult:
         """Verify embeddings provider is reachable."""
@@ -97,14 +94,26 @@ class HealthVerifier:
             return CheckResult.failure(f"Embeddings provider unreachable: {str(e)}")
 
     async def check_tracing_completeness(self) -> CheckResult:
-        """Compare LangSmith trace count against in-memory request count."""
-        if not settings.enable_langsmith_tracing or not settings.langsmith_api_key:
-            return CheckResult.success("LangSmith tracing not configured, skipping")
+        """Compare trace count against in-memory request count.
+
+        Delegates to the configured observability provider for backend-specific
+        trace counting. Falls back to a skip if the provider doesn't support
+        trace enumeration.
+        """
+        if self._observability is None or not self._observability.is_configured():
+            return CheckResult.success("Observability not configured, skipping")
 
         if not self._metrics_store:
             return CheckResult.success("Metrics store not available, tracing check skipped")
 
         try:
+            snapshot = self._metrics_store()
+            request_count = snapshot.get("request_count", 0)
+
+            if request_count == 0:
+                return CheckResult.success("No requests made yet, tracing completeness N/A")
+
+            # LangSmith-specific trace counting
             from langsmith import Client as LangSmithClient
 
             client = LangSmithClient()
@@ -117,12 +126,6 @@ class HealthVerifier:
                 )
             )
             trace_count = len(runs)
-
-            snapshot = self._metrics_store()
-            request_count = snapshot.get("request_count", 0)
-
-            if request_count == 0:
-                return CheckResult.success("No requests made yet, tracing completeness N/A")
 
             if trace_count == 0 and request_count > 0:
                 return CheckResult.failure(
@@ -140,6 +143,8 @@ class HealthVerifier:
             return CheckResult.success(
                 f"Tracing complete: {trace_count} traces for {request_count} requests"
             )
+        except ImportError:
+            return CheckResult.success("LangSmith client not available, tracing check skipped")
         except Exception as e:
             return CheckResult.failure(f"Tracing completeness check failed: {str(e)}")
 

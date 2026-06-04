@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter
 
-from container import _health_verifier
+from container import _health_verifier, observability
 from config import settings
 from models import HealthResponse
 
@@ -24,14 +24,14 @@ router = APIRouter(prefix="/v1", tags=["health"])
 async def health() -> HealthResponse:
     """Check service readiness using HealthVerifier (single source of truth).
 
-    Runs real connectivity checks for DB, LangSmith, and embeddings.
+    Runs real connectivity checks for DB, observability backend, and embeddings.
     LLM check is configuration-only (no token costs).
     """
     db_result = await _health_verifier.check_db()
-    langsmith_result = await _health_verifier.check_langsmith()
+    observability_result = await observability.health_check()
     embedding_result = await _health_verifier.check_embeddings()
 
-    all_ok = db_result.ok and langsmith_result.ok and embedding_result.ok
+    all_ok = db_result.ok and observability_result.ok and embedding_result.ok
 
     return HealthResponse(
         status="ok" if all_ok else "degraded",
@@ -42,6 +42,6 @@ async def health() -> HealthResponse:
             or settings.openrouter_api_key
             or settings.openai_api_key
         ),
-        langsmith_connected=langsmith_result.ok,
+        observability_connected=observability_result.ok,
         embedding_connected=embedding_result.ok,
     )

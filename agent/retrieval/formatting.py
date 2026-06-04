@@ -8,7 +8,7 @@ Provides two complementary formatters:
 from typing import List, Optional
 
 from models import RetrievedDocument, SourceDocument
-from logging import logger
+from loggers import logger
 
 
 def format_documents_as_context(

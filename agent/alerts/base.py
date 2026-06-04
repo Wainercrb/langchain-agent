@@ -17,7 +17,7 @@ from config.constants import (
     RATE_LIMIT_WINDOW_SECONDS,
     TRUNCATE_FINGERPRINT,
 )
-from logging import logger
+from loggers import logger
 
 
 # Severities that trigger alerts — hardcoded, not env-configurable.

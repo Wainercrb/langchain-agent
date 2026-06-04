@@ -18,7 +18,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from config import settings
 from config.constants import RATE_LIMITER_WINDOW_SECONDS
-from logging import logger
+from loggers import logger
 from shared.correlation import set_correlation_id, get_correlation_id
 
 

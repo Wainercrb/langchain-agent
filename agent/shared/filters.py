@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, Generator, List
 
-from logging import logger
+from loggers import logger
 
 
 def filter_by_threshold(

@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from api.api_errors import internal_error_response
 from config.constants import TRUNCATE_ALERT_MESSAGE
 from container import alert_service
-from logging import logger
+from loggers import logger
 from shared.exceptions import Severity, RAGException
 
 
