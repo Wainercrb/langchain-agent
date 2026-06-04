@@ -2,7 +2,6 @@
 
 Swappable implementations:
 - ToolCallingAgent: LLM decides which tools to use
-- RAGChainAgent: Legacy hardcoded retrieval + generation
 - Future: PlanAndExecuteAgent, ReActAgent, etc.
 
 The container (services/container.py) wires the chosen implementation.

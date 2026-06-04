@@ -176,7 +176,7 @@ agent/
 │   ├── vector_store/          # Supabase pgvector operations
 │   ├── parsers/               # File parsers (txt, md, html, pdf, docx, csv)
 │   ├── tools/                 # LangChain tools (search_documents, web_search)
-│   ├── agent/                 # Agent strategies (ToolCallingAgent, RAGChainAgent)
+│   ├── agent/                 # Agent strategies (ToolCallingAgent)
 │   ├── alerts/                # Discord webhook alerts (rate-limited, deduped)
 │   ├── feedback/              # LangSmith feedback provider
 │   └── logging/               # Structured JSON logging (console, file)
@@ -323,12 +323,6 @@ All settings are loaded from environment variables via `config/settings.py`.
 | `LOGGER_BACKEND` | `console` | Logger type: `console` (dev) or `cloudwatch` (prod) |
 | `DISCORD_WEBHOOK_URL` | — | Discord webhook for error alerts |
 | `ALERT_RATE_LIMIT_PER_MINUTE` | `5` | Max alerts per minute |
-
-### Agent Strategy
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `USE_TOOL_AGENT` | `true` | Use tool-calling agent (true) or RAG chain (false) |
 
 ### CORS
 
