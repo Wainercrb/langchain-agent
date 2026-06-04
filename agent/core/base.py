@@ -27,7 +27,6 @@ class Agent(ABC):
         top_k: int = 5,
         temperature: float = 0.7,
         include_sources: bool = True,
-        latest_only: bool = True,
     ) -> ChatResponse:
         """Process a user query and return a response.
 
@@ -36,7 +35,6 @@ class Agent(ABC):
             top_k: Number of documents to retrieve when relevant.
             temperature: LLM creativity level.
             include_sources: Whether to include source documents.
-            latest_only: Only use latest document versions.
 
         Returns:
             ChatResponse with answer, sources, timing, and model info.

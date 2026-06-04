@@ -83,7 +83,6 @@ async def chat(
             top_k=request.top_k,
             temperature=request.temperature,
             include_sources=request.include_sources,
-            latest_only=request.latest_only,
         )
 
         execution_time_ms = (time.time() - start_time) * 1000

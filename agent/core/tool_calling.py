@@ -136,7 +136,6 @@ class ToolCallingAgent(Agent):
         top_k: int = 5,
         temperature: float = 0.7,
         include_sources: bool = True,
-        latest_only: bool = True,
     ) -> ChatResponse:
         """Process query using tool-calling agent.
 
@@ -145,7 +144,6 @@ class ToolCallingAgent(Agent):
             top_k: Number of documents to retrieve (passed to search tool).
             temperature: LLM creativity (0.0-1.0).
             include_sources: Whether to include source documents in response.
-            latest_only: Whether to search only latest document versions.
 
         Returns:
             ChatResponse with answer, sources, and metadata.
