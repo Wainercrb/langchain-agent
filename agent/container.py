@@ -145,17 +145,6 @@ agent = _create_agent(
     observability=observability,
 )
 
-# ── RAG Chain ──────────────────────────────────────────────────────────
-from agents.rag_chain import RAGChain
-
-rag_chain = RAGChain(
-    retriever=retriever,
-    llm=llm,
-    decision_tracker=decision_tracker,
-    logger=logger,
-    observability=observability,
-)
-
 # ── Ingestion Pipeline ─────────────────────────────────────────────────
 from pathlib import Path
 from ingestion.pipeline import DocumentIngestionPipeline
