@@ -48,7 +48,6 @@ class MultiAlertProvider:
     ) -> None:
         """Send alert to all configured providers in parallel."""
         if not self._providers:
-            logger.warning("MultiAlertProvider: no providers configured")
             return
 
         tasks = []
