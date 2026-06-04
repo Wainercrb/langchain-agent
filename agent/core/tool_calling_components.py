@@ -43,7 +43,7 @@ from models.observability.decisions import (
     DecisionQuality,
     ToolCallRecord,
 )
-from agent.observability.decisions import DecisionTracker
+from observability.decisions import DecisionTracker, compute_query_hash
 
 
 __all__ = [
@@ -272,7 +272,7 @@ class DecisionMetadataExtractor:
             run_id=run_id,
             agent_type=agent_type,
             query_preview=query[:TRUNCATE_QUERY_PREVIEW],
-            query_hash=DecisionTracker.compute_query_hash(query),
+            query_hash=compute_query_hash(query),
             tools_used=tools_used,
             chain_length=len(tools_used),
             chain_tools=[step.to_record() for step in chain_tools],

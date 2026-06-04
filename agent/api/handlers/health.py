@@ -1,17 +1,18 @@
 """Health endpoint — verify service readiness using the single source of truth.
 
-Delegates all checks to HealthVerifier (the same instance used by the
-background monitoring scheduler) so the endpoint and monitoring always
-share identical logic.
+Delegates all checks to functions from ``observability.health.checks``
+(the same functions used by the background monitoring scheduler) so the
+endpoint and monitoring always share identical logic.
 """
 
 from datetime import datetime, timezone
 
 from fastapi import APIRouter
 
-from container import _health_verifier, observability
+from container import embeddings, observability, vector_store
 from config import settings
 from models import HealthResponse
+from observability.health.checks import check_database, check_embeddings_service
 
 router = APIRouter(prefix="/v1", tags=["health"])
 
@@ -22,14 +23,14 @@ router = APIRouter(prefix="/v1", tags=["health"])
     status_code=200,
 )
 async def health() -> HealthResponse:
-    """Check service readiness using HealthVerifier (single source of truth).
+    """Check service readiness.
 
     Runs real connectivity checks for DB, observability backend, and embeddings.
     LLM check is configuration-only (no token costs).
     """
-    db_result = await _health_verifier.check_db()
+    db_result = await check_database(vector_store)
     observability_result = await observability.health_check()
-    embedding_result = await _health_verifier.check_embeddings()
+    embedding_result = await check_embeddings_service(embeddings)
 
     all_ok = db_result.ok and observability_result.ok and embedding_result.ok
 

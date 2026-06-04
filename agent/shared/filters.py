@@ -1,8 +1,9 @@
 """Filtering utilities for search results."""
 
+import logging
 from typing import Any, Dict, Generator, List
 
-from loggers import logger
+logger = logging.getLogger(__name__)
 
 
 def filter_by_threshold(

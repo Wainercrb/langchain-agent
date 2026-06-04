@@ -13,11 +13,12 @@ from config.settings import settings
 
 from .base import Logger
 from .console import Console
-from .cloudwatch import CloudWatchLogger
 
 
 def _build_logger() -> Logger:
     if settings.logger_backend == "cloudwatch":
+        from .cloudwatch import CloudWatchLogger
+
         return CloudWatchLogger()
     return Console()
 

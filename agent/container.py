@@ -152,7 +152,16 @@ pipeline = DocumentIngestionPipeline(
 )
 
 # ── Monitoring ───────────────────────────────────────────────────────
-from observability.health import HealthVerifier, MonitoringScheduler
+from observability.health import MonitoringScheduler
+from observability.health.checks import (
+    check_database,
+    check_decision_drift,
+    check_embeddings_service,
+    check_observability_backend,
+    check_process_memory,
+    check_tracing_completeness,
+)
+
 
 def _metrics_snapshot():
     """Return current request metrics snapshot for health checks."""
@@ -160,25 +169,17 @@ def _metrics_snapshot():
     return get_request_metrics().snapshot()
 
 
-_health_verifier = HealthVerifier(
-    vector_store=vector_store,
-    embeddings=embeddings,
-    metrics_store=_metrics_snapshot,
-    decision_tracker=decision_tracker,
-    observability=observability,
-)
-
 _monitoring_checks = [
-    ("db", _health_verifier.check_db),
-    ("observability", _health_verifier.check_observability),
-    ("embeddings", _health_verifier.check_embeddings),
-    ("tracing_completeness", _health_verifier.check_tracing_completeness),
-    ("memory_usage", _health_verifier.check_memory_usage),
-    ("decision_drift", _health_verifier.check_decision_drift),
+    ("db", lambda: check_database(vector_store)),
+    ("observability", lambda: check_observability_backend(observability)),
+    ("embeddings", lambda: check_embeddings_service(embeddings)),
+    ("tracing_completeness", lambda: check_tracing_completeness(observability, _metrics_snapshot)),
+    ("memory_usage", check_process_memory),
+    ("decision_drift", lambda: check_decision_drift(decision_tracker)),
 ]
 
 _monitoring_scheduler = MonitoringScheduler(
     checks=_monitoring_checks,
     alert_service=alert_service,
-    settings=settings,
+    interval_seconds=settings.monitoring_interval_seconds,
 )

@@ -15,19 +15,18 @@ from config import settings
 from models.feedback import FeedbackResponse
 from loggers import logger
 
-from .base import ObservabilityProvider
+from .base import CheckResult, ObservabilityProvider
 
 
 class LangSmithObservabilityProvider(ObservabilityProvider):
     """LangSmith backend for tracing and feedback.
 
-    Integrates with LangChain's @traceable decorator for automatic run
-    lifecycle management, and uses langsmith.Client for feedback and
+    Integrates with LangChain's ``@traceable`` decorator for automatic run
+    lifecycle management, and uses ``langsmith.Client`` for feedback and
     health checks.
     """
 
     def __init__(self) -> None:
-        """Initialize the LangSmith client."""
         self._client = LangSmithClient()
 
     def is_configured(self) -> bool:
@@ -64,7 +63,7 @@ class LangSmithObservabilityProvider(ObservabilityProvider):
         try:
             current_run.add_metadata(metadata)
         except Exception as e:
-            logger.debug(f"LangSmith metadata attachment failed: {e}")
+            logger.debug("LangSmith metadata attachment failed: %s", e)
 
     def record_feedback(
         self,
@@ -75,16 +74,16 @@ class LangSmithObservabilityProvider(ObservabilityProvider):
         """Record user feedback in LangSmith.
 
         Maps feedback_type to a numeric score:
-            - "like"    → score=1.0
-            - "dislike" → score=0.0
+            - "like"    → score = 1.0
+            - "dislike" → score = 0.0
 
         Args:
             run_id: LangSmith run ID for feedback correlation.
-            feedback_type: "like" (score=1.0) or "dislike" (score=0.0).
+            feedback_type: ``"like"`` (score=1.0) or ``"dislike"`` (score=0.0).
             comment: Optional user comment (max 1000 chars).
 
         Returns:
-            FeedbackResponse with status "recorded" on success or "accepted" on fallback.
+            FeedbackResponse with status ``"recorded"`` on success or ``"accepted"`` on fallback.
         """
         score = 1.0 if feedback_type == "like" else 0.0
 
@@ -96,14 +95,18 @@ class LangSmithObservabilityProvider(ObservabilityProvider):
                 comment=comment,
             )
             logger.info(
-                f"Feedback recorded: run_id={run_id}, "
-                f"feedback_type={feedback_type}, score={score}"
+                "Feedback recorded: run_id=%s, feedback_type=%s, score=%s",
+                run_id,
+                feedback_type,
+                score,
             )
             return FeedbackResponse(status="recorded")
         except Exception as e:
             logger.warning(
-                f"Failed to record feedback in LangSmith: run_id={run_id}, "
-                f"feedback_type={feedback_type}, error={str(e)}"
+                "Failed to record feedback in LangSmith: run_id=%s, feedback_type=%s, error=%s",
+                run_id,
+                feedback_type,
+                e,
             )
             return FeedbackResponse(status="accepted")
 
@@ -114,17 +117,15 @@ class LangSmithObservabilityProvider(ObservabilityProvider):
         project = settings.langsmith_project or "langchain-agent"
         return f"https://smith.langchain.com/o/default/projects/p/{project}"
 
-    async def health_check(self) -> "CheckResult":
-        """Verify LangSmith API is reachable using list_projects()."""
-        from agent.observability.base import CheckResult
-
+    async def health_check(self) -> CheckResult:
+        """Verify LangSmith API is reachable using ``list_projects()``."""
         if not self.is_configured():
             return CheckResult.success("LangSmith tracing not configured, skipping")
         try:
             list(self._client.list_projects(limit=1))
             return CheckResult.success("LangSmith API reachable")
         except Exception as e:
-            return CheckResult.failure(f"LangSmith API unreachable: {str(e)}")
+            return CheckResult.failure(f"LangSmith API unreachable: {e}")
 
     def trace_call(
         self,
@@ -134,10 +135,10 @@ class LangSmithObservabilityProvider(ObservabilityProvider):
         args: tuple,
         kwargs: dict,
     ) -> Any:
-        """Wrap the function call with LangSmith's @traceable decorator.
+        """Wrap the function call with LangSmith's ``@traceable`` decorator.
 
-        This sets up the RunTree context so that get_current_run_id(),
-        apply_tags(), and apply_metadata() work inside the function body.
+        This sets up the RunTree context so that ``get_current_run_id()``,
+        ``apply_tags()``, and ``apply_metadata()`` work inside the function body.
         """
         wrapped = traceable(name=name, run_type=run_type)(fn)
         return wrapped(*args, **kwargs)

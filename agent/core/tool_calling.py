@@ -27,7 +27,7 @@ from models import ChatResponse, SourceDocument
 from models.observability.decisions import DecisionLogEntry
 from models.retrieval import RetrievedDocument
 from observability.decorator import trace
-from agent.observability.base import ObservabilityProvider
+from observability.base import ObservabilityProvider
 from retrieval.formatting import build_source_documents
 
 from .base import Agent
