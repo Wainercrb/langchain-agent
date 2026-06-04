@@ -9,7 +9,7 @@ from supabase import create_client
 from config import settings
 
 # ── LLM ──────────────────────────────────────────────────────────────
-from llm import ResilientLLMProvider
+from llm import MultiProviderLLM
 
 
 def _configured(provider_classes: list) -> list:
@@ -30,15 +30,13 @@ def _create_llm_providers():
 
 _llm_providers = _create_llm_providers()
 
-llm = ResilientLLMProvider(
+llm = MultiProviderLLM(
     providers=_llm_providers,
     failure_threshold=settings.llm_circuit_failure_threshold,
     recovery_timeout=settings.llm_circuit_recovery_timeout,
     backoff_base=settings.llm_backoff_base,
     backoff_max=settings.llm_backoff_max,
 )
-llm.resolve_chat_model()
-
 # ── Embeddings ───────────────────────────────────────────────────────
 from embeddings import GoogleEmbeddingsWrapper
 
@@ -113,7 +111,7 @@ retriever = Retriever(
 
 # ── Agent ─────────────────────────────────────────────────────────────
 
-def _create_agent(llm_provider, decision_tracker, vector_store, embeddings, retriever, observability):
+def _create_agent(llm_provider, decision_tracker, retriever, observability):
     """Create the ToolCallingAgent with search and document tools."""
     from agents import ToolCallingAgent
 
@@ -143,8 +141,6 @@ def _create_agent(llm_provider, decision_tracker, vector_store, embeddings, retr
 agent = _create_agent(
     llm_provider=llm,
     decision_tracker=decision_tracker,
-    vector_store=vector_store,
-    embeddings=embeddings,
     retriever=retriever,
     observability=observability,
 )

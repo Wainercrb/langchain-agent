@@ -11,8 +11,7 @@ Each provider implements LLMProvider (ABC). Instantiate directly:
 """
 
 from .base import LLMProvider, LLMResponse
-from .circuit_breaker import CircuitBreaker, CircuitState
-from .resilient import ResilientLLMProvider, ResilientChatModel
+from .multi import CircuitBreaker, CircuitState, MultiProviderLLM, MultiProviderChatModel
 from shared.exceptions import LLMProviderError, TransientLLMError, PermanentLLMError, AllProvidersExhaustedError
 from .google import GoogleProvider
 from .openai import OpenAIProvider
@@ -20,11 +19,11 @@ from .openrouter import OpenRouterProvider
 
 __all__ = [
     "LLMProvider",
-    "ResilientLLMProvider",
-    "ResilientChatModel",
     "LLMResponse",
     "CircuitBreaker",
     "CircuitState",
+    "MultiProviderLLM",
+    "MultiProviderChatModel",
     "LLMProviderError",
     "TransientLLMError",
     "PermanentLLMError",
