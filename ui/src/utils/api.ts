@@ -89,7 +89,7 @@ export interface ChatSettings {
 // API Client
 // ============================================
 
-const API_BASE_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.PUBLIC_API_URL || '';
 const REQUEST_TIMEOUT = 30000;
 
 function getErrorMessage(error: unknown): string {
@@ -120,25 +120,6 @@ async function fetchWithTimeout(
     throw error;
   }
 }
-
-export async function checkHealth(): Promise<boolean> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-    const response = await fetch(`${API_BASE_URL}/v1/health`, {
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-    return response.ok;
-  } catch (error) {
-    console.error('Health check failed:', error);
-    return false;
-  }
-}
-
-export const checkBackendHealth = checkHealth;
 
 async function sendChat(request: ChatRequest): Promise<ChatResponse> {
   const response = await fetchWithTimeout(`${API_BASE_URL}/v1/chat`, {

@@ -40,7 +40,7 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/v1/health || exit 1
+    CMD curl -f http://localhost:8000/v1/system/status || exit 1
 
 # Run the application — launch both the FastAPI server and the APScheduler cronjob
 # in the same container. `wait -n` makes the container exit if EITHER process dies,

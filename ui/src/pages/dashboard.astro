@@ -91,7 +91,7 @@ import Layout from '../layouts/Layout.astro';
 </Layout>
 
 <script>
-  const API_BASE = import.meta.env.PUBLIC_API_URL || 'http://localhost:8000';
+  const API_BASE = import.meta.env.PUBLIC_API_URL || '';
 
   function showError() {
     document.getElementById('connection-error')?.classList.remove('hidden');
