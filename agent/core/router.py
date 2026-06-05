@@ -1,6 +1,5 @@
 """Consolidated LLM resilience: circuit breaker, backoff, and provider failover."""
 
-import logging
 import random
 import time
 from dataclasses import dataclass, replace
@@ -15,8 +14,7 @@ from shared.exceptions import (
     TransientLLMError,
 )
 from llm.base import LLMProvider, LLMResponse
-
-logger = logging.getLogger(__name__)
+from loggers import logger
 
 _PERMANENT_KEYWORDS = (
     "authentication",

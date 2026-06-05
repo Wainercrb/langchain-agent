@@ -1,9 +1,6 @@
 """Filtering utilities for search results."""
 
-import logging
 from typing import Any, Dict, Generator, List
-
-logger = logging.getLogger(__name__)
 
 
 def filter_by_threshold(
@@ -27,6 +24,7 @@ def filter_by_threshold(
         if score >= threshold:
             yield result
         else:
+            from loggers import logger
             logger.debug(
                 f"Filtered out document {result.get('document_id')} "
                 f"(similarity {score} < {threshold})"

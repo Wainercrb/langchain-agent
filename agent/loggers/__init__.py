@@ -13,6 +13,7 @@ from config.settings import settings
 
 from .base import Logger
 from .console import Console
+from .cloudwatch import CloudWatchLogger
 
 
 def _build_logger() -> Logger:
@@ -25,4 +26,4 @@ def _build_logger() -> Logger:
 
 logger = _build_logger()
 
-__all__ = ["Logger", "Console", "CloudWatchLogger", "logger"]
+__all__ = ["Logger", "Console", "CloudWatchLogger", "logger", "_build_logger"]

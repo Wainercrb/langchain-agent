@@ -51,7 +51,14 @@ supabase_client = create_client(db_url, db_key)
 vector_store = VectorStore(supabase_client)
 
 # ── Logger ────────────────────────────────────────────────────────────
-from loggers import logger
+from loggers import CloudWatchLogger, Console, Logger 
+
+def _build_logger() -> Logger:
+    if settings.logger_backend == "cloudwatch":
+        return CloudWatchLogger()
+    return Console()
+
+logger = _build_logger()
 
 # ── Parser Registry ──────────────────────────────────────────────────
 from ingestion.parsers.parser import ParserFactory
@@ -124,7 +131,7 @@ def _create_agent(llm_provider, decision_tracker, retriever, observability):
     return ToolCallingAgent(
         llm=llm_provider.chat_model,
         tools=agent_tools,
-        artifact_store=search_artifact_store,
+        artifact_store=search_artifact_store, # TODO: Is this required?
         decision_tracker=decision_tracker,
         observability=observability,
     )

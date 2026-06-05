@@ -1,12 +1,9 @@
 """Abstract LLM provider interface for pluggable AI backends."""
 
-import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
 from shared.exceptions import TransientLLMError, PermanentLLMError
-
-logger = logging.getLogger(__name__)
 
 _PERMANENT_ERROR_KEYWORDS = (
     "authentication",
