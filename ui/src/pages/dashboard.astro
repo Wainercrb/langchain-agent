@@ -2,120 +2,159 @@
 import Layout from '../layouts/Layout.astro';
 ---
 
-<Layout title="System Dashboard">
-  <main class="mx-auto w-full max-w-1/2 px-4 py-8">
-    <header class="mb-6 flex items-baseline justify-between">
-      <h1 class="text-2xl font-bold text-[var(--color-text)]">System Health</h1>
-      <time id="last-updated" class="text-xs text-[var(--color-text-muted)]">--</time>
-    </header>
+<Layout title="System Status">
+  <header class="mb-6 flex items-baseline justify-between">
+    <h1 class="text-2xl font-bold text-[var(--color-text)]">Health</h1>
+    <time id="last-updated" class="text-xs text-[var(--color-text-muted)]">--</time>
+  </header>
 
-    <section id="status-grid" class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3" aria-label="Service status">
-      <article class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm transition-shadow hover:shadow-md">
-        <div class="mb-1 flex items-center gap-2">
-          <span id="db-indicator" class="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-yellow-500" aria-hidden="true"></span>
-          <span class="text-sm font-semibold text-[var(--color-text)]">Database</span>
-        </div>
-        <span id="db-detail" class="block pl-[calc(0.625rem+0.5rem)] text-xs text-[var(--color-text-muted)]">Checking...</span>
-      </article>
-      <article class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm transition-shadow hover:shadow-md">
-        <div class="mb-1 flex items-center gap-2">
-          <span id="llm-indicator" class="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-yellow-500" aria-hidden="true"></span>
-          <span class="text-sm font-semibold text-[var(--color-text)]">LLM</span>
-        </div>
-        <span id="llm-detail" class="block pl-[calc(0.625rem+0.5rem)] text-xs text-[var(--color-text-muted)]">Checking...</span>
-      </article>
-      <article class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm transition-shadow hover:shadow-md">
-        <div class="mb-1 flex items-center gap-2">
-          <span id="embedding-indicator" class="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-yellow-500" aria-hidden="true"></span>
-          <span class="text-sm font-semibold text-[var(--color-text)]">Embedding</span>
-        </div>
-        <span id="embedding-detail" class="block pl-[calc(0.625rem+0.5rem)] text-xs text-[var(--color-text-muted)]">Checking...</span>
-      </article>
-    </section>
-
-    <section id="metrics-grid" class="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4" aria-label="Operational metrics">
-      <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-center shadow-sm transition-shadow hover:shadow-md">
-        <span id="request-count" class="block text-2xl font-bold text-[var(--color-text)]">-</span>
-        <span class="mt-1 block text-[0.65rem] uppercase tracking-wider text-[var(--color-text-muted)]">Total Requests</span>
+  <section class="mb-6">
+    <h2 class="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-3">Services</h2>
+    <div id="status-grid" class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <article class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm transition-shadow hover:shadow-md">
+      <div class="mb-1 flex items-center gap-2">
+        <span id="db-indicator" class="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-yellow-500" aria-hidden="true"></span>
+        <span class="text-sm font-semibold text-[var(--color-text)]">Database</span>
       </div>
-      <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-center shadow-sm transition-shadow hover:shadow-md">
-        <span id="error-rate" class="block text-2xl font-bold text-[var(--color-text)]">-</span>
-        <span class="mt-1 block text-[0.65rem] uppercase tracking-wider text-[var(--color-text-muted)]">Error Rate</span>
+      <span id="db-detail" class="block pl-[calc(0.625rem+0.5rem)] text-xs text-[var(--color-text-muted)]">Checking...</span>
+    </article>
+    <article class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm transition-shadow hover:shadow-md">
+      <div class="mb-1 flex items-center gap-2">
+        <span id="llm-indicator" class="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-yellow-500" aria-hidden="true"></span>
+        <span class="text-sm font-semibold text-[var(--color-text)]">LLM</span>
       </div>
-      <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-center shadow-sm transition-shadow hover:shadow-md">
-        <span id="avg-latency" class="block text-2xl font-bold text-[var(--color-text)]">-</span>
-        <span class="mt-1 block text-[0.65rem] uppercase tracking-wider text-[var(--color-text-muted)]">Avg Latency</span>
+      <span id="llm-detail" class="block pl-[calc(0.625rem+0.5rem)] text-xs text-[var(--color-text-muted)]">Checking...</span>
+    </article>
+    <article class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm transition-shadow hover:shadow-md">
+      <div class="mb-1 flex items-center gap-2">
+        <span id="embedding-indicator" class="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-yellow-500" aria-hidden="true"></span>
+        <span class="text-sm font-semibold text-[var(--color-text)]">Embedding</span>
       </div>
-      <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-center shadow-sm transition-shadow hover:shadow-md">
-        <span id="token-usage" class="block text-2xl font-bold text-[var(--color-text)]">-</span>
-        <span class="mt-1 block text-[0.65rem] uppercase tracking-wider text-[var(--color-text-muted)]">Token Usage</span>
-      </div>
-    </section>
-
-    <div id="connection-error" class="hidden rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/5 p-6 text-center text-[var(--color-error)]">
-      <p>Unable to connect to backend</p>
-      <button id="retry-btn" type="button" class="mt-3 rounded-md bg-[var(--color-error)] px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--color-error)]/90">Retry</button>
+      <span id="embedding-detail" class="block pl-[calc(0.625rem+0.5rem)] text-xs text-[var(--color-text-muted)]">Checking...</span>
+    </article>
     </div>
-  </main>
+  </section>
+
+  <section class="mb-6">
+    <h2 class="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-3">Circuit Breakers</h2>
+    <div id="circuits-grid" class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <article class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
+        <div class="mb-1 flex items-center gap-2">
+          <span class="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-yellow-500" aria-hidden="true"></span>
+          <span class="text-sm font-semibold text-[var(--color-text)]">google</span>
+        </div>
+        <span class="block pl-[calc(0.625rem+0.5rem)] text-xs text-[var(--color-text-muted)]">Checking...</span>
+      </article>
+      <article class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
+        <div class="mb-1 flex items-center gap-2">
+          <span class="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-yellow-500" aria-hidden="true"></span>
+          <span class="text-sm font-semibold text-[var(--color-text)]">openai</span>
+        </div>
+        <span class="block pl-[calc(0.625rem+0.5rem)] text-xs text-[var(--color-text-muted)]">Checking...</span>
+      </article>
+      <article class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
+        <div class="mb-1 flex items-center gap-2">
+          <span class="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-yellow-500" aria-hidden="true"></span>
+          <span class="text-sm font-semibold text-[var(--color-text)]">openrouter</span>
+        </div>
+        <span class="block pl-[calc(0.625rem+0.5rem)] text-xs text-[var(--color-text-muted)]">Checking...</span>
+      </article>
+    </div>
+  </section>
+
+  <section class="mb-6">
+    <h2 class="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-3">Metrics <span class="font-normal lowercase text-[var(--color-text-muted)] opacity-60">since startup</span></h2>
+    <div id="metrics-grid" class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+    <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-center shadow-sm transition-shadow hover:shadow-md">
+      <span id="request-count" class="block text-2xl font-bold text-[var(--color-text)]">-</span>
+      <span class="mt-1 block text-[0.65rem] uppercase tracking-wider text-[var(--color-text-muted)]">Total Requests</span>
+    </div>
+    <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-center shadow-sm transition-shadow hover:shadow-md">
+      <span id="error-rate" class="block text-2xl font-bold text-[var(--color-text)]">-</span>
+      <span class="mt-1 block text-[0.65rem] uppercase tracking-wider text-[var(--color-text-muted)]">Error Rate</span>
+    </div>
+    <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-center shadow-sm transition-shadow hover:shadow-md">
+      <span id="avg-latency" class="block text-2xl font-bold text-[var(--color-text)]">-</span>
+      <span class="mt-1 block text-[0.65rem] uppercase tracking-wider text-[var(--color-text-muted)]">Avg Latency</span>
+    </div>
+    <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-center shadow-sm transition-shadow hover:shadow-md">
+      <span id="token-usage" class="block text-2xl font-bold text-[var(--color-text)]">-</span>
+      <span class="mt-1 block text-[0.65rem] uppercase tracking-wider text-[var(--color-text-muted)]">Token Usage</span>
+    </div>
+    </div>
+  </section>
+
+  <div id="connection-error" class="hidden rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/5 p-6 text-center text-[var(--color-error)]">
+    <p>Unable to connect to backend</p>
+    <button id="retry-btn" type="button" class="mt-3 rounded-md bg-[var(--color-error)] px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--color-error)]/90">Retry</button>
+  </div>
 </Layout>
 
 <script>
   const API_BASE = import.meta.env.PUBLIC_API_URL || 'http://localhost:8000';
-  const POLL_INTERVAL_MS = 30_000;
-  const MAX_ERRORS_BEFORE_SHOW = 3;
 
-  let consecutiveErrors = 0;
-
-  function toggleErrorState(show: boolean) {
-    const errorEl = document.getElementById('connection-error');
-    const statusEl = document.getElementById('status-grid');
-    const metricsEl = document.getElementById('metrics-grid');
-
-    if (show) {
-      errorEl?.classList.remove('hidden');
-      statusEl?.classList.add('hidden');
-      metricsEl?.classList.add('hidden');
-    } else {
-      errorEl?.classList.add('hidden');
-      statusEl?.classList.remove('hidden');
-      metricsEl?.classList.remove('hidden');
-    }
+  function showError() {
+    document.getElementById('connection-error')?.classList.remove('hidden');
+    document.getElementById('status-grid')?.classList.add('hidden');
+    document.getElementById('circuits-grid')?.classList.add('hidden');
+    document.getElementById('metrics-grid')?.classList.add('hidden');
   }
 
-  function handleFetchError() {
-    consecutiveErrors++;
-    if (consecutiveErrors >= MAX_ERRORS_BEFORE_SHOW) {
-      toggleErrorState(true);
-    }
+  function hideError() {
+    document.getElementById('connection-error')?.classList.add('hidden');
+    document.getElementById('status-grid')?.classList.remove('hidden');
+    document.getElementById('circuits-grid')?.classList.remove('hidden');
+    document.getElementById('metrics-grid')?.classList.remove('hidden');
   }
 
-  function resetErrorState() {
-    consecutiveErrors = 0;
-    toggleErrorState(false);
+  function updateIndicator(dotId: string, detailId: string, isConnected: boolean) {
+    const dot = document.getElementById(dotId);
+    const detail = document.getElementById(detailId);
+    if (!dot || !detail) return;
+
+    dot.className = `h-2.5 w-2.5 flex-shrink-0 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`;
+    detail.textContent = isConnected ? 'Connected' : 'Disconnected';
   }
 
-  async function fetchHealth() {
+  function renderCircuits(circuits: Record<string, string>) {
+    const grid = document.getElementById('circuits-grid');
+    if (!grid) return;
+
+    grid.innerHTML = Object.entries(circuits).map(([provider, state]) => {
+      const stateClass = state === 'closed' ? 'bg-green-500'
+        : state === 'half_open' ? 'bg-yellow-500'
+        : 'bg-red-500';
+      const stateLabel = state === 'closed' ? 'Closed'
+        : state === 'half_open' ? 'Half-Open'
+        : 'Open';
+      return `
+        <article class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm transition-shadow hover:shadow-md">
+          <div class="mb-1 flex items-center gap-2">
+            <span class="h-2.5 w-2.5 flex-shrink-0 rounded-full ${stateClass}" aria-hidden="true"></span>
+            <span class="text-sm font-semibold text-[var(--color-text)] capitalize">${provider}</span>
+          </div>
+          <span class="block pl-[calc(0.625rem+0.5rem)] text-xs text-[var(--color-text-muted)]">${stateLabel}</span>
+        </article>
+      `;
+    }).join('');
+  }
+
+  async function fetchSystemStatus() {
     try {
-      const res = await fetch(`${API_BASE}/v1/health`);
+      const res = await fetch(`${API_BASE}/v1/system/status`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      resetErrorState();
+      hideError();
 
+      // Health indicators
       updateIndicator('db-indicator', 'db-detail', data.db_connected);
       updateIndicator('llm-indicator', 'llm-detail', data.llm_connected);
       updateIndicator('embedding-indicator', 'embedding-detail', data.embedding_connected);
-    } catch {
-      handleFetchError();
-    }
-  }
 
-  async function fetchMetrics() {
-    try {
-      const res = await fetch(`${API_BASE}/v1/metrics`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      resetErrorState();
+      // Circuit breakers
+      renderCircuits(data.circuits || {});
 
+      // Metrics
       document.getElementById('request-count')!.textContent = data.request_count.toLocaleString();
 
       const errorRate = data.request_count > 0
@@ -129,30 +168,14 @@ import Layout from '../layouts/Layout.astro';
       document.getElementById('token-usage')!.textContent = hasTokens
         ? `In: ${data.total_input_tokens.toLocaleString()} / Out: ${data.total_output_tokens.toLocaleString()}`
         : 'N/A';
+
+      document.getElementById('last-updated')!.textContent = new Date().toLocaleString();
     } catch {
-      handleFetchError();
+      showError();
     }
-
-    document.getElementById('last-updated')!.textContent = new Date().toLocaleTimeString();
   }
 
-  function updateIndicator(dotId: string, detailId: string, isConnected: boolean) {
-    const dot = document.getElementById(dotId);
-    const detail = document.getElementById(detailId);
-    if (!dot || !detail) return;
+  document.getElementById('retry-btn')!.addEventListener('click', fetchSystemStatus);
 
-    dot.className = `h-2.5 w-2.5 flex-shrink-0 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`;
-    detail.textContent = isConnected ? 'Connected' : 'Disconnected';
-  }
-
-  document.getElementById('retry-btn')!.addEventListener('click', () => {
-    fetchHealth();
-    fetchMetrics();
-  });
-
-  fetchHealth();
-  fetchMetrics();
-
-  setInterval(fetchHealth, POLL_INTERVAL_MS);
-  setInterval(fetchMetrics, POLL_INTERVAL_MS);
+  fetchSystemStatus();
 </script>

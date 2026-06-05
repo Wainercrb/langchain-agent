@@ -1,108 +1,102 @@
-"""search_documents tool — wraps the existing Retriever as a LangChain StructuredTool.
+"""search_documents tool — wraps the existing Retriever as a LangChain tool.
 
-Factory pattern: the container calls create_search_documents_tool() with the
-retriever and an artifact_store list, then injects the resulting tool into the agent.
+Uses the ``@tool(response_format="content_and_artifact")`` pattern:
+  - Return value is ``(serialized_text, documents)``
+  - LangChain puts *serialized_text* in ``ToolMessage.content`` (what the LLM sees)
+  - LangChain puts *documents* in ``ToolMessage.artifact`` (what the app uses for
+    source attribution)
+
+The agent extracts artifacts from ``ToolMessage.artifact`` after invocation,
+so the tool no longer mutates a shared ``artifact_store`` list.
+
+Factory pattern: the container calls ``create_search_documents_tool(retriever)``
+to produce a tool ready for agent injection.
 """
 
-import re
-from typing import Optional
-
-from langchain_core.tools import StructuredTool
+from langchain.tools import tool
 from pydantic import BaseModel, Field
 
+from models.retrieval import RetrievedDocument
 from retrieval.formatting import format_documents_as_context
 from loggers import logger
-
-# Phrases to strip from user queries before semantic search.
-# These are conversational "filler" that hurt embedding quality.
-_QUERY_NOISE_PATTERNS = [
-    r"^find\s+(in\s+the\s+)?",
-    r"^search\s+(for\s+)?",
-    r"^look\s+up\s+",
-    r"^tell\s+me\s+(about\s+)?",
-    r"\b(api|requirement|uiqcg)\s+(documentation|documents?|docs?)\b",
-    r"^can\s+you\s+",
-    r"^please\s+",
-    r"^what\s+does\s+the\s+document\s+say\s+about\s+",
-    r"^where\s+in\s+the\s+docs?\s+is\s+",
-    r"^i\s+need\s+to\s+know\s+",
-    r"\?$",  # trailing question mark
-]
+from .summaries import register as register_summary
 
 
 def _clean_query(raw_query: str) -> str:
-    """Strip conversational filler so the retriever gets pure semantic intent.
+    """Minimal cleanup — just strip whitespace and trailing punctuation.
 
-    Only applies cleaning when the query looks like a raw user question
-    (starts with filler words). LLM-constructed tool inputs are already
-    focused and should NOT be cleaned.
-
-    Example:
-        "Find in the api documentation who is the maintainer?"
-        → "who is the maintainer"
-        "maintainer in api documentation"
-        → "maintainer in api documentation"  (LLM-constructed, skip cleaning)
+    The LLM constructs the query via SearchDocumentsInput instructions,
+    so aggressive noise stripping is unnecessary and can hurt search quality.
     """
-    cleaned = raw_query.strip()
-
-    # Skip cleaning for LLM-constructed queries: if it doesn't start with
-    # conversational filler, the LLM already made it focused
-    _FILLER_STARTERS = (
-        "find ", "search ", "look up ", "tell me ", "can you ",
-        "please ", "what does ", "where in ", "i need ",
-    )
-    if not cleaned.lower().startswith(_FILLER_STARTERS):
-        return cleaned
-
-    # Apply cleaning patterns one at a time, but never reduce to empty
-    for pattern in _QUERY_NOISE_PATTERNS:
-        result = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
-        result = re.sub(r"\s+", " ", result).strip()
-        # Only apply if result is non-empty and meaningfully shorter
-        if result and len(result) < len(cleaned):
-            cleaned = result
-
-    return cleaned or raw_query.strip()
+    return raw_query.strip().rstrip("?¿!¡.,;:")
 
 
 class SearchDocumentsInput(BaseModel):
     """Input schema for the search_documents tool."""
 
     query: str = Field(
-        description="The user's FULL original question. Do NOT shorten, rephrase, or extract keywords. Pass it exactly as the user wrote it."
+        description="The CORE search query — extract what the user wants to FIND, removing conversational filler. "
+        "Do NOT pass greetings, pleasantries, or meta-questions ('tell me about', 'what does X say', "
+        "'can you', 'i need to know', etc.). Pass a concise, keyword-focused search that captures "
+        "the semantic intent. Examples: 'authentication flow in API' (not 'what does the document say "
+        "about authentication in the API'), 'security policy requirements' (not 'find in the requirement "
+        "documents the security policy')."
     )
     top_k: int = Field(default=5, description="Number of documents to retrieve (1-20)")
 
 
+# ── Artifact summary formatter (registered for OCP) ────────────────
+
+
+def _summarize_search(artifact: object) -> str | None:
+    """Build a one-line summary from a list of ``RetrievedDocument``."""
+    if not isinstance(artifact, list):
+        return None
+    docs = [d for d in artifact if isinstance(d, RetrievedDocument)]
+    if not docs:
+        return None
+    scores = ", ".join(f"{d.similarity_score:.0%}" for d in docs)
+    return f"Found {len(docs)} document{'s' if len(docs) != 1 else ''} (score: {scores})"
+
+
+register_summary("search_documents", _summarize_search)
+
 
 def create_search_documents_tool(
     retriever,
-    artifact_store: Optional[list] = None,
     default_latest_only: bool = True,
-) -> StructuredTool:
+):
     """Factory: create a search_documents tool bound to the given retriever.
+
+    Uses ``@tool(response_format="content_and_artifact")`` so the retrieved
+    documents are returned as an artifact separate from the text sent to the
+    LLM. The agent reads ``ToolMessage.artifact`` to build response sources.
 
     Args:
         retriever: A Retriever instance (from retrieval.retriever).
-        artifact_store: Optional list that receives RetrievedDocument objects
-            when the tool is called. The agent uses this to build ChatResponse.sources.
         default_latest_only: Whether to only retrieve latest document versions.
 
     Returns:
-        A StructuredTool ready for agent injection.
+        A LangChain tool (``StructuredTool``) ready for agent injection.
     """
 
-    def _search_docs(query: str, top_k: int = 5) -> str:
-        """Search the ingested document knowledge base for relevant information.
+    @tool(
+        response_format="content_and_artifact",
+        args_schema=SearchDocumentsInput,
+    )
+    def search_documents(query: str, top_k: int = 5) -> str:
+        """Search the internal document knowledge base (ingested API docs, requirements,
+        UIQCG guides, project documentation, and any uploaded files).
 
-        IMPORTANT: Pass the user's FULL original query. Do NOT shorten or
-        rephrase it. The semantic search works best with complete questions.
+        USE THIS whenever the user asks about project-specific content, technical
+        documentation, policies, specifications, or anything that might live in
+        the project's ingested documents — regardless of phrasing. The user may ask
+        in any language or style; do NOT assume you can answer from your training data
+        alone. Always check the documents first if the question is about the project.
 
-        Use when the user asks to find, search, or look up information
-        in uploaded documents using phrases like: 'find the ...', 'search for ...',
-        'look up ...', 'find in the ...', 'find in the api documentation',
-        'find in the requirement documents', 'find in the UIQCG documents'.
-        Do NOT use for general knowledge, math, time, or web.
+        DO NOT use for: math, time/date, weather, news, general/factual knowledge,
+        sports scores, stock prices, or anything requiring current/real-time data.
+        Returns matching document chunks with source filenames.
         """
         # Strip conversational noise so embedding matches actual content
         search_query = _clean_query(query)
@@ -118,36 +112,17 @@ def create_search_documents_tool(
             )
             logger.debug(f"search_documents retrieved {len(docs)} documents")
 
-            if artifact_store is not None:
-                artifact_store.clear()
-                artifact_store.extend(docs)
-
-            return format_documents_as_context(
-                docs, empty_message="No relevant documents found."
+            serialized = format_documents_as_context(
+                docs, empty_message="No relevant documents found.",
             )
+            # content_and_artifact: (str_for_LLM, list_of_docs_for_app)
+            return serialized, docs
+
         except Exception as e:
             logger.error(
                 f"search_documents tool error: query={query[:50]}..., error={str(e)}",
                 exc_info=True,
             )
-            return f"Error retrieving documents: {str(e)}"
+            return f"Error retrieving documents: {str(e)}", []
 
-    tool = StructuredTool.from_function(
-        func=_search_docs,
-        name="search_documents",
-        description=(
-            "Search the ingested document knowledge base. "
-            "USE THIS when the user asks to find, search, or look up information "
-            "in uploaded documents using phrases like: 'find the ...', 'search for ...', "
-            "'look up ...', 'find in the ...', 'find in the api documentation', "
-            "'find in the requirement documents', 'find in the UIQCG documents', "
-            "'what does the document say about ...', 'where in the docs is ...'. "
-            "DO NOT use for: math, time/date, weather, news, general knowledge, "
-            "sports scores, stock prices, or anything requiring current/real-time data. "
-            "Returns matching document chunks with source filenames."
-        ),
-        args_schema=SearchDocumentsInput,
-        return_direct=False,
-    )
-
-    return tool
+    return search_documents

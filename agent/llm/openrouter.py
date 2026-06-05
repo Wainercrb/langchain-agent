@@ -20,7 +20,8 @@ class OpenRouterProvider(LLMProvider):
 
     def __init__(
         self,
-        model: str = "openai/gpt-4o",
+        # model: str = "openai/gpt-4o",
+        model: str = "google/gemma-4-31b-it:free",  
         temperature: float = 0.7,
         max_tokens: int = 4000,
         api_key: str = None,

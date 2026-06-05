@@ -252,6 +252,12 @@ def upgrade() -> None:
         LANGUAGE plpgsql STABLE
         AS $$
         BEGIN
+            -- Increase IVFFlat probes for better recall on small datasets.
+            -- With lists=100 and default probes=1, zero rows may be returned
+            -- when the table has few entries. 10 probes is a safe default
+            -- that works well from 2 to 100K+ rows.
+            PERFORM set_config('ivfflat.probes', '10', TRUE);
+
             IF latest_only THEN
                 RETURN QUERY
                 WITH latest_docs AS (

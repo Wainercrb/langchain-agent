@@ -221,6 +221,66 @@ class HealthResponse(BaseModel):
     )
 
 
+class SystemStatusResponse(BaseModel):
+    """
+    Consolidated response model for GET /v1/system/status.
+
+    Combines health checks and operational metrics into a single response
+    so the dashboard only needs one call instead of two.
+    """
+
+    status: str = Field(
+        ...,
+        pattern="^(ok|error|degraded)$",
+        description="Service status: 'ok', 'degraded', or 'error'",
+    )
+    timestamp: datetime = Field(
+        ...,
+        description="Status check timestamp",
+    )
+    db_connected: bool = Field(
+        ...,
+        description="Database connectivity status",
+    )
+    llm_connected: bool = Field(
+        default=False,
+        description="LLM provider readiness (configuration check)",
+    )
+    embedding_connected: bool = Field(
+        default=False,
+        description="Embedding service availability",
+    )
+    request_count: int = Field(
+        default=0,
+        ge=0,
+        description="Total number of requests handled since startup",
+    )
+    error_count: int = Field(
+        default=0,
+        ge=0,
+        description="Total number of errors since startup",
+    )
+    avg_latency_ms: float = Field(
+        default=0.0,
+        ge=0,
+        description="Average request latency in milliseconds",
+    )
+    total_input_tokens: int = Field(
+        default=0,
+        ge=0,
+        description="Total input (prompt) tokens since startup",
+    )
+    total_output_tokens: int = Field(
+        default=0,
+        ge=0,
+        description="Total output (completion) tokens since startup",
+    )
+    circuits: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Circuit breaker state per LLM provider (closed / open / half_open)",
+    )
+
+
 class ErrorResponse(BaseModel):
     """
     Standard error response for all error statuses.

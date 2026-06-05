@@ -1,10 +1,12 @@
 """Web search tool — uses DuckDuckGo for real-time information retrieval.
 
-No API key required. Wraps langchain_community.utilities.DuckDuckGoSearchAPIWrapper
-to return the top 3 results as a formatted string.
+No API key required. Uses ``ddgs`` to return the top 3 results as
+formatted text. No ``content_and_artifact`` needed here because web
+results are plain text — there are no structured document objects
+to separate as artifacts.
 """
 
-from langchain_core.tools import StructuredTool
+from langchain.tools import tool
 from pydantic import BaseModel, Field
 from loggers import logger
 
@@ -33,16 +35,17 @@ def _format_search_results(results: list) -> str:
     return "\n".join(formatted)
 
 
-def _web_search_func(query: str) -> str:
-    """Search the web for current information not in your document knowledge base.
+@tool(args_schema=WebSearchInput)
+def web_search(query: str) -> str:
+    """Search the web for current information.
 
-    Use this tool when the user asks:
-    - Current events, news, or recent developments
-    - Real-time information (weather, stock prices, sports scores)
-    - Information not covered in the ingested documents
-    - General knowledge questions where web accuracy matters
-
-    Returns the top 3 results with title, snippet, and link.
+    USE THIS when the user asks about: news, current events, weather,
+    sports scores, stock prices, celebrity information, recent developments,
+    or ANY topic that requires up-to-date information NOT found in documents.
+    Examples: 'Who won the World Cup?', 'What is the weather today?',
+    'Latest news about AI', 'What movies are playing?'.
+    DO NOT use for: math, time, or questions about uploaded documents.
+    Returns top 3 search result snippets.
     """
     logger.info(f"web_search tool called: query={query[:50]}...")
     try:
@@ -65,21 +68,3 @@ def _web_search_func(query: str) -> str:
             exc_info=True,
         )
         return f"Error searching the web: {str(e)}"
-
-
-web_search_tool = StructuredTool.from_function(
-    func=_web_search_func,
-    name="web_search",
-    description=(
-        "Search the web for current information. "
-        "USE THIS when the user asks about: news, current events, weather, "
-        "sports scores, stock prices, celebrity information, recent developments, "
-        "or ANY topic that requires up-to-date information NOT found in documents. "
-        "Examples: 'Who won the World Cup?', 'What is the weather today?', "
-        "'Latest news about AI', 'What movies are playing?'. "
-        "DO NOT use for: math, time, or questions about uploaded documents. "
-        "Returns top 3 search result snippets."
-    ),
-    args_schema=WebSearchInput,
-    return_direct=False,
-)

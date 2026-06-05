@@ -89,7 +89,11 @@ class VectorStore(VectorStoreBase):
                     "document_id": document_id,
                     "chunk_index": idx,
                     "text": chunk["text"],
-                    "embedding": chunk["embedding"],
+                    # Supabase REST API (PostgREST) needs the vector as a
+                    # string representation "[0.1, 0.2, ...]" so it can cast
+                    # it to the vector(1536) column type. A raw Python list
+                    # gets serialised as a JSON array and is NOT auto-cast.
+                    "embedding": str(chunk["embedding"]),
                     "metadata": chunk.get("metadata", {}),
                     "created_at": datetime.now(timezone.utc).isoformat(),
                 }
@@ -117,7 +121,8 @@ class VectorStore(VectorStoreBase):
     ) -> List[Dict[str, Any]]:
         try:
             rpc_params = {
-                "query_embedding": query_embedding,
+                # String representation so PostgREST casts to vector(1536).
+                "query_embedding": str(query_embedding),
                 "top_k": top_k,
                 "latest_only": latest_only,
             }

@@ -9,6 +9,7 @@ Changing agent strategy = changing ONE line in container.py.
 """
 
 from abc import ABC, abstractmethod
+from typing import Iterator
 
 from models import ChatResponse
 
@@ -38,6 +39,37 @@ class Agent(ABC):
 
         Returns:
             ChatResponse with answer, sources, timing, and model info.
+        """
+        pass
+
+    @abstractmethod
+    def stream(
+        self,
+        query: str,
+        top_k: int = 5,
+        temperature: float = 0.7,
+        include_sources: bool = True,
+    ) -> Iterator[dict]:
+        """Process a user query and yield streaming events.
+
+        Yields dicts with event data. The last event has ``type: "done"``
+        and includes the full ``ChatResponse``-compatible payload.
+
+        Intermediate event types:
+            - ``{"type": "token", "content": str}`` — text delta.
+            - ``{"type": "tool_call", "tool": str, "args": dict}`` — tool
+              invocation request from the LLM.
+            - ``{"type": "tool_result", "tool": str, "summary": str}`` —
+              tool execution result.
+
+        Args:
+            query: Natural language question.
+            top_k: Number of documents to retrieve when relevant.
+            temperature: LLM creativity level.
+            include_sources: Whether to include source documents.
+
+        Yields:
+            Streaming event dicts.
         """
         pass
 

@@ -133,7 +133,7 @@ class SlackAlertProvider(AlertProviderBase):
             "elements": [
                 {
                     "type": "plain_text",
-                    "text": f"Timestamp: {datetime.now(timezone.utc).isoformat()}",
+                    "text": f"Timestamp: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
                 }
             ],
         })

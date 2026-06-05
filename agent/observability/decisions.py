@@ -10,7 +10,7 @@ import hashlib
 import threading
 import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Dict, List, Optional
 
 from loggers import logger
@@ -305,8 +305,8 @@ class DecisionTracker:
         (used for feedback correlation). If the store is at capacity
         and this is a new entry, the oldest record is evicted first.
 
-        Persistence is batched: the actual save fires after accumulating
-        ``batch_size`` new records or ``batch_interval`` seconds.
+        Persistence is immediate: every new record is saved to Supabase
+        right away (best-effort, never raises).
 
         Args:
             entry: DecisionLogEntry to record or update.
@@ -319,13 +319,9 @@ class DecisionTracker:
                 return
 
             self._store.add(entry)
-            should_save = self._persistence.mark_and_check()
+            snapshot = self._store.get_all()
 
-            if should_save:
-                snapshot = self._store.get_all()
-
-        if should_save:
-            self._persistence.save(snapshot)
+        self._persistence.save(snapshot)
 
     def query(
         self,
@@ -371,7 +367,7 @@ class DecisionTracker:
             page=page,
             per_page=per_page,
             decisions=page_items,
-            aggregates=compute_aggregates(filtered),
+            aggregates=asdict(compute_aggregates(filtered)),
         )
 
     def get_by_run_id(self, run_id: str) -> Optional[DecisionLogEntry]:

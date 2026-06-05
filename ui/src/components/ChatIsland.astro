@@ -3,7 +3,7 @@
 ---
 
 <div class="flex flex-col h-full" role="log" aria-live="polite" aria-label="Chat messages">
-    <div class="flex flex-col gap-5 flex-1" id="messages-container">
+    <div class="flex flex-col gap-3 flex-1" id="messages-container">
       <!-- Empty state -->
       <div class="flex items-center justify-center flex-1 text-center" id="empty-state">
         <div class="text-[var(--color-text-secondary)]">
@@ -15,8 +15,8 @@
 </div>
 
 <script>
-  import { chatWithAgent, submitFeedback, validateSettings, checkHealth } from '../utils/api';
-  import type { ChatResponse } from '../utils/api';
+  import { streamChat, submitFeedback, validateSettings } from '../utils/api';
+  import type { ChatResponse, StreamEvent, StreamDoneEvent } from '../utils/api';
 
   // ============================================
   // Types
@@ -50,29 +50,6 @@
   };
 
   let resizeTimeout: number | undefined;
-  let healthCheckInterval: number | undefined;
-
-  // ============================================
-  // Health Check
-  // ============================================
-
-  async function updateHealthStatus() {
-    const dot = document.getElementById('status-dot');
-    const text = document.getElementById('status-text');
-    try {
-      const isHealthy = await checkHealth();
-      if (isHealthy) {
-        if (dot) dot.style.backgroundColor = 'var(--color-success)';
-        if (text) text.textContent = 'System Online';
-      } else {
-        if (dot) dot.style.backgroundColor = 'var(--color-error)';
-        if (text) text.textContent = 'System Offline';
-      }
-    } catch {
-      if (dot) dot.style.backgroundColor = 'var(--color-error)';
-      if (text) text.textContent = 'System Offline';
-    }
-  }
 
   // ============================================
   // Settings
@@ -133,7 +110,7 @@
 
       // AI bubble
       const bubble = document.createElement('div');
-      bubble.className = 'max-w-[85%] p-4 break-words bg-[var(--color-ai-bubble)] rounded-[0.75rem_0.75rem_0.75rem_0.25rem] border border-[rgba(199,196,215,0.3)] shadow-[var(--shadow-sm)]';
+      bubble.className = 'max-w-[85%] max-w-[42rem] p-4 break-words bg-[var(--color-ai-bubble)] rounded-[0.75rem_0.75rem_0.75rem_0.25rem] border border-[rgba(199,196,215,0.3)] shadow-[var(--shadow-sm)]';
 
       const content = document.createElement('p');
       content.className = 'm-0 text-base leading-[1.625]';
@@ -225,7 +202,7 @@
     } else {
       // User message
       const bubble = document.createElement('div');
-      bubble.className = 'max-w-[85%] p-4 break-words bg-[var(--color-primary)] text-white rounded-[0.75rem_0.75rem_0.25rem_0.75rem] border border-[rgba(70,72,212,0.2)] shadow-[var(--shadow-md)]';
+      bubble.className = 'max-w-[85%] max-w-[42rem] p-4 break-words bg-[var(--color-primary)] text-white rounded-[0.75rem_0.75rem_0.25rem_0.75rem] border border-[rgba(70,72,212,0.2)] shadow-[var(--shadow-md)]';
 
       const content = document.createElement('p');
       content.className = 'm-0 text-base leading-[1.625] text-white';
@@ -249,29 +226,7 @@
     }
   }
 
-  function showLoading(): HTMLElement {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'flex flex-col w-full gap-2 items-start animate-[message-fade-in_0.4s_ease-out_forwards]';
-    wrapper.innerHTML = `
-      <div class="flex items-center gap-2 mb-2 ml-1">
-        <span class="w-6 h-6 rounded-full bg-[var(--color-ai-bubble)] flex items-center justify-center text-[#626567]" aria-hidden="true">${icons.bolt}</span>
-        <span class="text-[11px] font-semibold tracking-widest text-[var(--color-text-secondary)]">FW Agent</span>
-      </div>
-      <div class="max-w-[85%] p-4 break-words bg-[var(--color-ai-bubble)] rounded-[0.75rem_0.75rem_0.75rem_0.25rem] border border-[rgba(199,196,215,0.3)] shadow-[var(--shadow-sm)]">
-        <p class="m-0 text-base leading-[1.625]">Thinking...</p>
-      </div>
-    `;
-    const container = document.getElementById('messages-container');
-    if (container) {
-      container.appendChild(wrapper);
-      container.scrollTop = container.scrollHeight;
-    }
-    return wrapper;
-  }
-
-  function removeLoading(el: HTMLElement) {
-    el.remove();
-  }
+  // showLoading / removeLoading removed — replaced by createStreamingBubble
 
   // ============================================
   // Event Handlers
@@ -306,6 +261,149 @@
     }, 2000);
   }
 
+  // ============================================
+  // Streaming helpers
+  // ============================================
+
+  // Inject the thinking-dots keyframes once
+  if (!document.getElementById('__thinking-style')) {
+    const style = document.createElement('style');
+    style.id = '__thinking-style';
+    style.textContent = `
+      @keyframes thinking-dot {
+        0%, 80%, 100% { opacity: 0.2; transform: translateY(0); }
+        40% { opacity: 1; transform: translateY(-3px); }
+      }
+      .thinking-dot {
+        display: inline-block;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--color-text-muted);
+        animation: thinking-dot 1.4s infinite ease-in-out both;
+      }
+      .thinking-dot:nth-child(1) { animation-delay: -0.32s; }
+      .thinking-dot:nth-child(2) { animation-delay: -0.16s; }
+      .thinking-dot:nth-child(3) { animation-delay: 0s; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  /**
+   * Create a skeleton assistant bubble in the DOM and return handles
+   * to update it as events arrive from the SSE stream.
+   */
+  function createStreamingBubble() {
+    const messageId = crypto.randomUUID();
+    const bubbleId = `stream-bubble-${messageId}`;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'flex flex-col w-full gap-2 items-start animate-[message-fade-in_0.4s_ease-out_forwards]';
+
+    // Label
+    const label = document.createElement('div');
+    label.className = 'flex items-center gap-2 mb-2 ml-1';
+    label.innerHTML = `<span class="w-6 h-6 rounded-full bg-[var(--color-ai-bubble)] flex items-center justify-center text-[#626567]" aria-hidden="true">${icons.bolt}</span><span class="text-[11px] font-semibold tracking-widest text-[var(--color-text-secondary)]">FW Agent</span>`;
+    wrapper.appendChild(label);
+
+    // Bubble
+    const bubble = document.createElement('div');
+    bubble.className = 'max-w-[85%] max-w-[42rem] p-4 break-words bg-[var(--color-ai-bubble)] rounded-[0.75rem_0.75rem_0.75rem_0.25rem] border border-[rgba(199,196,215,0.3)] shadow-[var(--shadow-sm)]';
+    bubble.id = bubbleId;
+
+    // Thinking indicator (three animated dots) — shown until first token arrives
+    const thinkEl = document.createElement('div');
+    thinkEl.id = `think-${messageId}`;
+    thinkEl.style.display = 'flex';
+    thinkEl.style.alignItems = 'center';
+    thinkEl.style.gap = '8px';
+    thinkEl.style.padding = '4px 0';
+    thinkEl.innerHTML = `
+      <span style="font-size:12px;color:var(--color-text-muted);font-weight:500;">Thinking</span>
+      <span class="thinking-dot"></span>
+      <span class="thinking-dot"></span>
+      <span class="thinking-dot"></span>
+    `;
+    bubble.appendChild(thinkEl);
+
+    // Content paragraph (updated as tokens arrive) — hidden until first token
+    const contentEl = document.createElement('p');
+    contentEl.className = 'm-0 text-base leading-[1.625]';
+    contentEl.style.display = 'none';
+    contentEl.textContent = '';
+    bubble.appendChild(contentEl);
+
+    // Activity bar — thin, subtle line for tool calls / results
+    const activityEl = document.createElement('div');
+    activityEl.style.display = 'none';
+    activityEl.style.marginTop = '10px';
+    activityEl.style.padding = '6px 8px';
+    activityEl.style.background = 'var(--color-surface-container-low, rgba(0,0,0,0.03))';
+    activityEl.style.borderRadius = '6px';
+    activityEl.style.fontSize = '11px';
+    activityEl.style.color = 'var(--color-text-muted)';
+    activityEl.style.lineHeight = '1.5';
+    activityEl.style.fontWeight = '500';
+    activityEl.id = `activity-${messageId}`;
+    bubble.appendChild(activityEl);
+
+    // Container for sources & action buttons (added on "done")
+    const footerEl = document.createElement('div');
+    footerEl.id = `footer-${messageId}`;
+    bubble.appendChild(footerEl);
+
+    wrapper.appendChild(bubble);
+
+    // Append to DOM
+    const container = document.getElementById('messages-container');
+    const emptyState = document.getElementById('empty-state');
+    if (emptyState) emptyState.remove();
+    if (container) {
+      container.appendChild(wrapper);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    return {
+      messageId,
+      thinkEl,
+      contentEl,
+      activityEl,
+      footerEl,
+      bubbleId,
+      scrollToBottom: () => {
+        if (container) container.scrollTop = container.scrollHeight;
+      },
+      showContent() {
+        // First token arrived: hide thinking dots, show content
+        thinkEl.style.display = 'none';
+        contentEl.style.display = 'block';
+      },
+      // Track a tool activity line by tool name.
+      // On tool_call: creates/replaces the line with a "searching..." state.
+      // On tool_result: updates the same line with the result.
+      _toolLines: {} as Record<string, HTMLDivElement>,
+      upsertActivity(tool: string, line: string) {
+        activityEl.style.display = 'block';
+        const existing = this._toolLines[tool];
+        if (existing) {
+          existing.innerHTML = line;
+        } else {
+          const div = document.createElement('div');
+          div.style.display = 'flex';
+          div.style.alignItems = 'center';
+          div.style.gap = '6px';
+          div.innerHTML = line;
+          activityEl.appendChild(div);
+          this._toolLines[tool] = div;
+        }
+        this.scrollToBottom();
+      },
+      setFooter(html: string) {
+        footerEl.innerHTML = html;
+      },
+    };
+  }
+
   async function handleSend() {
     const input = document.getElementById('chat-input') as HTMLTextAreaElement;
     const sendBtn = document.getElementById('send-btn') as HTMLButtonElement;
@@ -317,6 +415,7 @@
     input.disabled = true;
     sendBtn.disabled = true;
 
+    // Add user message
     addMessageToDOM({
       id: crypto.randomUUID(),
       role: 'user',
@@ -327,40 +426,77 @@
     input.value = '';
     input.style.height = 'auto';
 
-    const loadingEl = showLoading();
+    // Create streaming assistant bubble
+    const bubble = createStreamingBubble();
+    let fullContent = '';
+    let finalRunId: string | null = null;
 
-    try {
-      const response: ChatResponse = await chatWithAgent(query, state.settings);
-      removeLoading(loadingEl);
+    await streamChat(
+      query,
+      state.settings,
+      // onEvent — called for every SSE event
+      (event: StreamEvent) => {
+        if (event.type === 'token') {
+          if (!fullContent) bubble.showContent();
+          fullContent += event.content;
+          bubble.contentEl.textContent = fullContent;
+          bubble.scrollToBottom();
+        } else if (event.type === 'tool_call') {
+          const label = event.tool.replace(/_/g, ' ');
+          bubble.upsertActivity(event.tool, `
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.6"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            <span>${label}…</span>
+          `);
+        } else if (event.type === 'tool_result') {
+          const label = event.tool.replace(/_/g, ' ');
+          bubble.upsertActivity(event.tool, `
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.6"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>${label} — ${event.summary}</span>
+          `);
+        } else if (event.type === 'done') {
+          finalRunId = event.run_id;
+          // Store the full message into state
+          const msg: ChatMessage = {
+            id: bubble.messageId,
+            role: 'assistant',
+            content: fullContent || event.response,
+            timestamp: new Date(),
+            sources: event.sources?.map(s => ({
+              filename: s.filename || 'Document',
+              similarity_score: s.similarity_score,
+              content: (s as any).content_preview || '',
+            })),
+            executionTime: event.execution_time_ms,
+            model: event.model,
+            runId: event.run_id,
+          };
+          state.messages.push(msg);
 
-      addMessageToDOM({
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: response.response,
-        timestamp: new Date(),
-        sources: response.sources?.map(s => ({
-          filename: s.filename || 'Document',
-          similarity_score: s.similarity_score,
-          content: (s as any).content_preview || '',
-        })),
-        executionTime: response.execution_time_ms,
-        model: response.model,
-        runId: response.run_id,
-      });
-    } catch (error) {
-      removeLoading(loadingEl);
-      addMessageToDOM({
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        timestamp: new Date(),
-      });
-    } finally {
-      state.isLoading = false;
-      input.disabled = false;
-      sendBtn.disabled = false;
-      input.focus();
-    }
+          // Replace streaming bubble with full rendered message
+          // (swap the wrapper)
+          const wrapper = bubble.footerEl.closest('.flex') as HTMLElement;
+          if (wrapper && wrapper.parentNode) {
+            const rendered = renderMessage(msg);
+            wrapper.parentNode.replaceChild(rendered, wrapper);
+          }
+        }
+      },
+      // onDone — called after the done event is processed
+      (_done: StreamDoneEvent) => {
+        // already handled in onEvent
+      },
+      // onError
+      (error: Error) => {
+        if (!fullContent) bubble.showContent();
+        bubble.contentEl.textContent = `Error: ${error.message}`;
+        bubble.contentEl.style.color = 'var(--color-error, #ba1a1a)';
+      },
+    );
+
+    state.isLoading = false;
+    input.disabled = false;
+    sendBtn.disabled = false;
+    input.focus();
   }
 
   // ============================================
@@ -418,14 +554,10 @@
       }, 100);
     });
 
-    // Health check every 60 seconds
-    updateHealthStatus(); // Run immediately on load
-    healthCheckInterval = window.setInterval(updateHealthStatus, 60000);
   }
 
   window.addEventListener('beforeunload', () => {
     if (resizeTimeout) clearTimeout(resizeTimeout);
-    if (healthCheckInterval) clearInterval(healthCheckInterval);
   });
 
   init();

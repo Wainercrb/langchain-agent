@@ -1,10 +1,14 @@
 """Chat endpoint — process user queries via the configured agent strategy."""
 
+import json
 import time
 import uuid
+from datetime import datetime
 from typing import Any, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from api.api_errors import internal_error_response, validation_error_response
 from api.api_responses import build_chat_response
@@ -13,6 +17,17 @@ from loggers import logger
 from api.metrics_store import get_llm_usage_metrics, get_request_metrics
 from models import ChatRequest, ChatResponse, ErrorResponse
 from shared.exceptions import Severity, AllProvidersExhaustedError
+
+
+class _Encoder(json.JSONEncoder):
+    """JSON encoder that handles Pydantic models and datetime objects."""
+
+    def default(self, obj: object) -> object:
+        if isinstance(obj, BaseModel):
+            return obj.model_dump(mode="json")
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
 
 router = APIRouter(prefix="/v1", tags=["chat"])
 
@@ -158,3 +173,73 @@ async def chat(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=internal_error_response("Failed to process query"),
         )
+
+
+# ── Streaming endpoint ────────────────────────────────────────────────
+
+
+@router.post("/chat/stream")
+async def chat_stream(
+    request: ChatRequest,
+    processor=Depends(lambda: agent),
+) -> StreamingResponse:
+    """Process a user query and stream results via Server-Sent Events.
+
+    Same input schema as ``POST /v1/chat`` but returns an SSE stream
+    instead of a single JSON response.
+
+    SSE event types:
+        ``token``      — ``{"type":"token","content":str}`` text delta.
+        ``tool_call``  — ``{"type":"tool_call","tool":str,"args":dict}``.
+        ``tool_result``— ``{"type":"tool_result","tool":str,"summary":str}``.
+        ``done``       — Final event with full response payload.
+        ``error``      — ``{"type":"error","message":str}``.
+
+    Usage (JavaScript):
+        .. code:: js
+
+            const response = await fetch("/v1/chat/stream", { method: "POST", body: {...} });
+            const reader = response.body.getReader();
+            // Parse SSE frames from the byte stream.
+    """
+    def _generate():
+        _stream_start = time.time()
+        try:
+            for event in processor.stream(
+                query=request.query,
+                top_k=request.top_k,
+                temperature=request.temperature,
+                include_sources=request.include_sources,
+            ):
+                event_type = event.get("type", "message")
+                # The agent's stream dict includes "type"; SSE also carries
+                # the type as the event name. Keeping it in both places is
+                # harmless and makes client-side parsing simpler.
+                yield f"event: {event_type}\ndata: {json.dumps(event, cls=_Encoder)}\n\n"
+
+            get_request_metrics().record_request((time.time() - _stream_start) * 1000)
+
+        except AllProvidersExhaustedError as e:
+            logger.error(f"Chat stream exhausted: {e}")
+            yield (
+                "event: error\n"
+                f"data: {json.dumps({'type': 'error', 'message': str(e)}, cls=_Encoder)}\n\n"
+            )
+
+        except Exception as e:
+            logger.error(f"Chat stream error: {str(e)}", exc_info=True)
+            get_request_metrics().record_error()
+            yield (
+                "event: error\n"
+                f"data: {json.dumps({'type': 'error', 'message': str(e)}, cls=_Encoder)}\n\n"
+            )
+
+    return StreamingResponse(
+        _generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

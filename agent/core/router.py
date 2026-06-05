@@ -319,6 +319,16 @@ class MultiProviderChatModel(Runnable):
         self._backoff_base = backoff_base
         self._backoff_max = backoff_max
         self._tools: list = []
+        self._last_model: str | None = None
+
+    @property
+    def model(self) -> str:
+        """Model identifier — the **actual** model used in the last invocation
+        if available, otherwise all configured models joined."""
+        if self._last_model:
+            return self._last_model
+        names = [getattr(p, "model", p.name) for p in self._providers]
+        return "|".join(names)
 
     def bind_tools(self, tools: list, **kwargs):
         """Bind tools to ALL providers and return self for chained invocation."""
@@ -326,14 +336,21 @@ class MultiProviderChatModel(Runnable):
         return self
 
     def invoke(self, input: Any, config: dict | None = None, **kwargs) -> Any:
-        """Try providers in order, failover on transient error (sync)."""
+        """Try providers in order, failover on transient error (sync).
+
+        Records which provider actually responded so ``.model`` returns
+        the real model identifier.
+        """
+        used: list[object] = []
+
         def _call(provider: object) -> Any:
             raw_model = provider.chat_model  # type: ignore[attr-defined]
             bound = raw_model.bind_tools(self._tools, **kwargs) if self._tools else raw_model
             response = bound.invoke(input, config=config, **kwargs)
+            used.append(provider)
             return _normalize_content(response)
 
-        return _try_providers(
+        result = _try_providers(
             providers=self._providers,
             circuit_breakers=self._circuit_breakers,
             call_provider=_call,
@@ -341,6 +358,12 @@ class MultiProviderChatModel(Runnable):
             backoff_base=self._backoff_base,
             backoff_max=self._backoff_max,
         )
+
+        if used:
+            p = used[0]
+            self._last_model = getattr(p, "model", getattr(p, "name", "unknown"))
+
+        return result
 
 
 # ── MultiProviderLLM (LLMProvider interface) ────────────────────────────

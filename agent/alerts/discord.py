@@ -95,7 +95,7 @@ class DiscordAlertProvider(AlertProviderBase):
             "title": f"[{severity.value}] {message[:TRUNCATE_TITLE]}",
             "description": message[:TRUNCATE_DESCRIPTION],
             "color": color_map.get(severity, 0x000000),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
 
         fields: list = []

@@ -244,33 +244,171 @@ export function validateSettings(settings: unknown): ChatSettings {
 // ============================================
 
 export interface DecisionRecord {
-  id: string;
+  run_id: string;
   timestamp: string;
-  decision: string;
-  rationale: string;
-  status: string;
+  query_preview: string;
+  decision_quality: 'optimal' | 'suboptimal' | 'poor';
+  model_used: string;
+  chain_length: number;
+  tools_used: string[];
+  latency_ms: number;
+  reasoning_summary: string | null;
 }
 
-export interface HealthStatus {
-  status: 'healthy' | 'degraded' | 'unhealthy';
-  details: Record<string, unknown>;
-  timestamp: string;
+export interface DecisionsResponse {
+  total: number;
+  page: number;
+  per_page: number;
+  decisions: DecisionRecord[];
+  aggregates: Record<string, unknown> | null;
 }
 
 // ============================================
-// Decision & Health API
+// Decision API
 // ============================================
 
-export async function fetchDecisions(): Promise<DecisionRecord[]> {
+export async function fetchDecisions(): Promise<DecisionsResponse> {
   const response = await fetchWithTimeout(`${API_BASE_URL}/v1/decisions`);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 }
 
-export async function fetchHealthStatus(): Promise<HealthStatus> {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/v1/monitoring/status`);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json();
+// ============================================
+// Streaming Types & Client
+// ============================================
+
+export interface StreamTokenEvent {
+  type: 'token';
+  content: string;
+}
+
+export interface StreamToolCallEvent {
+  type: 'tool_call';
+  tool: string;
+  args: Record<string, unknown>;
+}
+
+export interface StreamToolResultEvent {
+  type: 'tool_result';
+  tool: string;
+  summary: string;
+}
+
+export interface StreamDoneEvent {
+  type: 'done';
+  response: string;
+  query: string;
+  sources: Source[] | null;
+  execution_time_ms: number;
+  llm_latency_ms: number;
+  model: string;
+  run_id: string | null;
+  usage_metadata: Record<string, number> | null;
+  agent_type: string;
+  tools_used: string[];
+  chain_length: number;
+  decision_quality: string;
+  reasoning_summary: string;
+}
+
+export interface StreamErrorEvent {
+  type: 'error';
+  message: string;
+}
+
+export type StreamEvent =
+  | StreamTokenEvent
+  | StreamToolCallEvent
+  | StreamToolResultEvent
+  | StreamDoneEvent
+  | StreamErrorEvent;
+
+export type StreamEventCallback = (event: StreamEvent) => void;
+export type StreamDoneCallback = (event: StreamDoneEvent) => void;
+export type StreamErrorCallback = (error: Error) => void;
+
+/**
+ * Send a chat query via POST SSE streaming.
+ *
+ * Reads the ``Response`` body as a byte stream, parses SSE frames, and
+ * invokes the provided callbacks for each event type.
+ *
+ * @param query          - User's question.
+ * @param settings       - Chat settings (topK, temperature, etc.).
+ * @param onEvent        - Called for every SSE event with the parsed payload.
+ * @param onDone         - Called when the stream completes (after ``done`` event).
+ * @param onError        - Called on connection / parse errors.
+ * @returns              - A promise that resolves when the stream ends.
+ */
+export async function streamChat(
+  query: string,
+  settings: ChatSettings,
+  onEvent: StreamEventCallback,
+  onDone: StreamDoneCallback,
+  onError: StreamErrorCallback,
+): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/v1/chat/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query,
+        top_k: settings.topK,
+        temperature: settings.temperature,
+        include_sources: settings.includeSources,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `API error: ${response.statusText}`);
+    }
+
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let currentEvent = '';
+    let currentData = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Parse SSE frames from the buffer.
+      // SSE frame format:
+      //   event: <type>\n
+      //   data: <json>\n
+      //   \n
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // keep incomplete tail in buffer
+
+      for (const line of lines) {
+        if (line.startsWith('event: ')) {
+          currentEvent = line.slice(7).trim();
+        } else if (line.startsWith('data: ')) {
+          currentData = line.slice(6).trim();
+        } else if (line === '' && currentData) {
+          // Empty line = end of SSE frame
+          try {
+            const parsed = JSON.parse(currentData) as StreamEvent;
+            onEvent(parsed);
+
+            if (parsed.type === 'done') {
+              onDone(parsed);
+            }
+          } catch (parseError) {
+            console.warn('SSE parse error:', parseError, 'raw:', currentData);
+          }
+          currentEvent = '';
+          currentData = '';
+        }
+      }
+    }
+  } catch (error) {
+    onError(error instanceof Error ? error : new Error(String(error)));
+  }
 }
 
 export { getErrorMessage };

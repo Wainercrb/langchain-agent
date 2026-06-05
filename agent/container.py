@@ -111,15 +111,14 @@ def _create_agent(llm_provider, decision_tracker, retriever, observability):
 
     search_artifact_store = []
 
-    from tools import create_search_documents_tool, web_search_tool
+    from tools import create_search_documents_tool, web_search
 
     agent_tools = [
         create_search_documents_tool(
             retriever=retriever,
-            artifact_store=search_artifact_store,
             default_latest_only=True,
         ),
-        web_search_tool,
+        web_search,
     ]
 
     return ToolCallingAgent(

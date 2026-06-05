@@ -2,7 +2,7 @@
 
 from typing import Any, Optional
 
-from models import ChatResponse, MetricsResponse
+from models import ChatResponse
 
 
 def build_chat_response(
@@ -38,18 +38,3 @@ def build_chat_response(
     )
 
 
-def build_metrics_response(
-    data: dict[str, Any],
-    observability_dashboard_url: Optional[str] = None,
-) -> MetricsResponse:
-    """Build a MetricsResponse from a metrics snapshot."""
-    return MetricsResponse(
-        request_count=data["request_count"],
-        error_count=data["error_count"],
-        avg_latency_ms=data["avg_latency_ms"],
-        total_input_tokens=data["total_input_tokens"],
-        total_output_tokens=data["total_output_tokens"],
-        avg_tokens_per_request=data["avg_tokens_per_request"],
-        observability_dashboard_url=observability_dashboard_url,
-        ai_decisions=data.get("ai_decisions"),
-    )

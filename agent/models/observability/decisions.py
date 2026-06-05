@@ -115,11 +115,10 @@ class DecisionLogEntry(BaseModel):
     def to_db_row(self) -> Dict[str, Any]:
         """Convert this entry to a Supabase-compatible row dict."""
         ts = self.timestamp
-        if isinstance(ts, str):
-            try:
-                ts = datetime.fromisoformat(ts)
-            except (ValueError, TypeError):
-                ts = datetime.now(timezone.utc)
+        if isinstance(ts, datetime):
+            ts = ts.isoformat()
+        elif not isinstance(ts, str):
+            ts = datetime.now(timezone.utc).isoformat()
 
         quality = self.decision_quality.value if hasattr(self.decision_quality, "value") else self.decision_quality
 
@@ -130,7 +129,9 @@ class DecisionLogEntry(BaseModel):
             "query_hash": self.query_hash,
             "tools_used": self.tools_used,
             "chain_length": self.chain_length,
-            "chain_tools": self.chain_tools,
+            "chain_tools": [
+                ct.model_dump() for ct in self.chain_tools
+            ],
             "decision_quality": quality,
             "timestamp": ts,
             "model_used": self.model_used,

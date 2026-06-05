@@ -15,6 +15,9 @@ import sys
 import time
 from pathlib import Path
 
+# Ensure agent/ is on the path so imports work regardless of where we run from
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -22,6 +25,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from config import settings
 from ingestion import DocumentIngestionPipeline
 from ingestion.pipeline import IngestionStatus
+from ingestion.parsers.parser import ParserFactory
 from container import alert_service, embeddings, vector_store
 from loggers import logger
 from shared.exceptions import Severity
@@ -274,6 +278,7 @@ def main() -> None:
         vector_store=vector_store,
         processed_dir=settings.processed_dir,
         failed_dir=settings.failed_dir,
+        parser_registry=ParserFactory,
         chunk_size=settings.chunk_size,
         chunk_overlap=settings.chunk_overlap,
     )
