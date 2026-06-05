@@ -7,9 +7,8 @@ const { currentPath } = Astro.props;
 
 const navItems = [
   { href: '/', label: 'Chat', icon: 'chat' },
-  { href: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
+  { href: '/dashboard', label: 'Health', icon: 'dashboard' },
   { href: '/decisions', label: 'Decisions', icon: 'decisions' },
-  { href: '/monitoring', label: 'Health Checks', icon: 'health' },
 ];
 ---
 
@@ -27,7 +26,9 @@ const navItems = [
   <!-- Navigation Links -->
   <nav class="flex-1 space-y-1 px-3 py-4">
     {navItems.map((item) => {
-      const isActive = currentPath === item.href;
+      // Normalize paths: handle trailing slashes and root paths
+      const normalizeRoute = (path: string) => path === '/' ? '/' : path.replace(/\/$/, '');
+      const isActive = normalizeRoute(currentPath) === normalizeRoute(item.href);
       return (
         <a
           href={item.href}

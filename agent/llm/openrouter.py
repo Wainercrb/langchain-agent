@@ -1,0 +1,55 @@
+"""OpenRouter LLM provider implementation (OpenAI-compatible API)."""
+
+from typing import Dict, List
+
+from langchain_openai import ChatOpenAI
+
+from config import settings
+from .base import LLMProvider, LLMResponse
+from loggers import logger
+
+
+class OpenRouterProvider(LLMProvider):
+    """OpenRouter LLM provider (OpenAI-compatible gateway)."""
+
+    name = "openrouter"
+
+    @classmethod
+    def is_configured(cls) -> bool:
+        return bool(settings.openrouter_api_key)
+
+    def __init__(
+        self,
+        # model: str = "openai/gpt-4o",
+        model: str = "google/gemma-4-31b-it:free",  
+        temperature: float = 0.7,
+        max_tokens: int = 4000,
+        api_key: str = None,
+        timeout: int = 60,
+        **kwargs,
+    ):
+        api_key = api_key or settings.openrouter_api_key
+        if not api_key:
+            raise ValueError("openrouter_api_key is required")
+        super().__init__(model=model, temperature=temperature, **kwargs)
+        self._llm = ChatOpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            api_key=api_key,
+            timeout=timeout,
+            **kwargs,
+        )
+        logger.info(f"OpenRouter provider initialized: model={self.model}")
+
+    @property
+    def chat_model(self):
+        """Expose the underlying LangChain chat model for tool calling."""
+        return self._llm
+
+    def invoke(self, messages: List[Dict[str, str]], **kwargs) -> LLMResponse:
+        try:
+            return self._invoke_provider(messages, **kwargs)
+        except Exception as e:
+            raise self.classify_error(e, provider=self.name)

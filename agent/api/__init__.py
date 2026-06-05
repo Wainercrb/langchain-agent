@@ -1,5 +1,5 @@
 """FastAPI routes, models, and metrics for the RAG API."""
 
-from .routes import router
+from .router import router
 
 __all__ = ["router"]

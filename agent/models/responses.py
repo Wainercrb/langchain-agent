@@ -12,14 +12,14 @@ class MetricsResponse(BaseModel):
     """
     Response model for GET /v1/metrics endpoint.
 
-    Provides lightweight operational counters. LangSmith handles the
-    comprehensive observability dashboards.
+    Provides lightweight operational counters. The configured observability
+    backend (LangSmith, OpenTelemetry, etc.) handles comprehensive dashboards.
 
     Attributes:
         request_count: Total number of requests handled since startup
         error_count: Total number of errors since startup
         avg_latency_ms: Average request latency in milliseconds
-        langsmith_dashboard_url: Link to LangSmith project dashboard (if configured)
+        observability_dashboard_url: Link to observability dashboard (if configured)
     """
 
     request_count: int = Field(
@@ -52,13 +52,9 @@ class MetricsResponse(BaseModel):
         ge=0.0,
         description="Average total tokens per request (input + output)",
     )
-    langsmith_dashboard_url: Optional[str] = Field(
+    observability_dashboard_url: Optional[str] = Field(
         default=None,
-        description="Link to LangSmith project dashboard (null if tracing disabled)",
-    )
-    langsmith_audit_url: Optional[str] = Field(
-        default=None,
-        description="Link to LangSmith audit/project URL (null if tracing disabled)",
+        description="Link to observability dashboard (null if tracing disabled)",
     )
     ai_decisions: Optional[Dict[str, Any]] = Field(
         default=None,
@@ -103,7 +99,7 @@ class ChatResponse(BaseModel):
     )
     run_id: Optional[str] = Field(
         default=None,
-        description="LangSmith run ID for feedback correlation (null when tracing disabled)",
+        description="Trace run ID for feedback correlation (null when tracing disabled)",
     )
     usage_metadata: Optional[Dict[str, Any]] = Field(
         default=None,
@@ -114,9 +110,9 @@ class ChatResponse(BaseModel):
         ge=0,
         description="Time spent in the LLM call only (excludes retrieval, serialization). Approximates TTFT for non-streaming calls.",
     )
-    langsmith_tags: Optional[List[str]] = Field(
+    tracing_tags: Optional[List[str]] = Field(
         default=None,
-        description="Tags applied to the LangSmith run for filtering (null when tracing disabled)",
+        description="Tags applied to the trace run for filtering (null when tracing disabled)",
     )
     agent_type: str = Field(
         default="tool_calling",
@@ -158,7 +154,7 @@ class ChatResponse(BaseModel):
                 "model": "gemini-2.5-flash",
                 "run_id": "550e8400-e29b-41d4-a716-446655440000",
                 "llm_latency_ms": 1850.3,
-                "langsmith_tags": ["model:openai/gpt-4o", "agent:tool-calling", "top_k:5"],
+                "tracing_tags": ["model:openai/gpt-4o", "agent:tool-calling", "top_k:5"],
             }
         }
     )
@@ -175,13 +171,13 @@ class HealthResponse(BaseModel):
         timestamp: Health check timestamp
         version: API version (default: "1.0.0")
         db_connected: Whether database is reachable
-        langsmith_connected: Whether LangSmith tracing API is reachable
+        observability_connected: Whether the configured observability backend is reachable
     """
 
     status: str = Field(
         ...,
-        pattern="^(ok|error)$",
-        description="Service status: 'ok' or 'error'",
+        pattern="^(ok|error|degraded)$",
+        description="Service status: 'ok', 'degraded', or 'error'",
     )
     timestamp: datetime = Field(
         ...,
@@ -203,9 +199,9 @@ class HealthResponse(BaseModel):
             "an API key configured. No real LLM invocation is performed."
         ),
     )
-    langsmith_connected: bool = Field(
+    observability_connected: bool = Field(
         default=False,
-        description="LangSmith tracing API availability",
+        description="Observability backend availability (LangSmith, OpenTelemetry, etc.)",
     )
     embedding_connected: bool = Field(
         default=False,
@@ -219,9 +215,69 @@ class HealthResponse(BaseModel):
                 "timestamp": "2025-01-15T12:00:00",
                 "version": "1.0.0",
                 "db_connected": True,
-                "langsmith_connected": True,
+                "observability_connected": True,
             }
         }
+    )
+
+
+class SystemStatusResponse(BaseModel):
+    """
+    Consolidated response model for GET /v1/system/status.
+
+    Combines health checks and operational metrics into a single response
+    so the dashboard only needs one call instead of two.
+    """
+
+    status: str = Field(
+        ...,
+        pattern="^(ok|error|degraded)$",
+        description="Service status: 'ok', 'degraded', or 'error'",
+    )
+    timestamp: datetime = Field(
+        ...,
+        description="Status check timestamp",
+    )
+    db_connected: bool = Field(
+        ...,
+        description="Database connectivity status",
+    )
+    llm_connected: bool = Field(
+        default=False,
+        description="LLM provider readiness (configuration check)",
+    )
+    embedding_connected: bool = Field(
+        default=False,
+        description="Embedding service availability",
+    )
+    request_count: int = Field(
+        default=0,
+        ge=0,
+        description="Total number of requests handled since startup",
+    )
+    error_count: int = Field(
+        default=0,
+        ge=0,
+        description="Total number of errors since startup",
+    )
+    avg_latency_ms: float = Field(
+        default=0.0,
+        ge=0,
+        description="Average request latency in milliseconds",
+    )
+    total_input_tokens: int = Field(
+        default=0,
+        ge=0,
+        description="Total input (prompt) tokens since startup",
+    )
+    total_output_tokens: int = Field(
+        default=0,
+        ge=0,
+        description="Total output (completion) tokens since startup",
+    )
+    circuits: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Circuit breaker state per LLM provider (closed / open / half_open)",
     )
 
 

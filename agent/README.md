@@ -176,7 +176,7 @@ agent/
 │   ├── vector_store/          # Supabase pgvector operations
 │   ├── parsers/               # File parsers (txt, md, html, pdf, docx, csv)
 │   ├── tools/                 # LangChain tools (search_documents, web_search)
-│   ├── agent/                 # Agent strategies (ToolCallingAgent, RAGChainAgent)
+│   ├── agent/                 # Agent strategies (ToolCallingAgent)
 │   ├── alerts/                # Discord webhook alerts (rate-limited, deduped)
 │   ├── feedback/              # LangSmith feedback provider
 │   └── logging/               # Structured JSON logging (console, file)
@@ -320,16 +320,9 @@ All settings are loaded from environment variables via `config/settings.py`.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LOG_LEVEL` | `INFO` | Logging verbosity |
-| `LOGGER_BACKEND` | `console` | Logger type: `console` or `file` |
-| `LOG_FILE` | — | Log file path (if `LOGGER_BACKEND=file`) |
+| `LOGGER_BACKEND` | `console` | Logger type: `console` (dev) or `cloudwatch` (prod) |
 | `DISCORD_WEBHOOK_URL` | — | Discord webhook for error alerts |
 | `ALERT_RATE_LIMIT_PER_MINUTE` | `5` | Max alerts per minute |
-
-### Agent Strategy
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `USE_TOOL_AGENT` | `true` | Use tool-calling agent (true) or RAG chain (false) |
 
 ### CORS
 
@@ -455,7 +448,7 @@ ls knowledge/raw_docs/
 
 # Check logs
 # If LOGGER_BACKEND=console: check stdout
-# If LOGGER_BACKEND=file: tail -f <LOG_FILE>
+# If LOGGER_BACKEND=cloudwatch: AWS Console → CloudWatch → Log groups → langchain-agent
 
 # Verify ingestion pipeline is running
 ps aux | grep cronjob

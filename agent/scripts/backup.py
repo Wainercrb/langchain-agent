@@ -27,8 +27,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config import settings
-from infrastructure.logging import logger
-from utils.exceptions import Severity
+from loggers import logger
+from shared.exceptions import Severity
 
 
 def _send_alert(message: str, error: Exception | None = None) -> None:
@@ -38,7 +38,7 @@ def _send_alert(message: str, error: Exception | None = None) -> None:
         return
 
     import asyncio
-    from infrastructure.container import alert_service
+    from container import alert_service
 
     try:
         loop = asyncio.get_running_loop()

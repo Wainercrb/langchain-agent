@@ -11,7 +11,8 @@ Run this checklist during the scheduled weekly maintenance window.
 > |---|---|---|
 > | Weekly database backup | Sundays 02:00 | `cronjob.py:_run_backup_cycle` → `scripts/backup.py` |
 > | Weekly VACUUM ANALYZE | Sundays 04:00 | `cronjob.py:_run_vacuum_analyze` → `psql` |
-> | Daily log rotation check | 03:00 daily | `cronjob.py:_run_log_rotation_check` |
+>
+> Log retention is managed by CloudWatch log group retention policies.
 >
 > Each automated job dispatches an ERROR alert on failure. Tune via
 > `MAINTENANCE_*` env vars (see `agent/.env.example`).
@@ -20,14 +21,10 @@ Run this checklist during the scheduled weekly maintenance window.
 
 ## Log Review
 
-- [ ] Review application logs for recurring errors:
-  ```bash
-  grep "ERROR" logs/*.log | sort | uniq -c | sort -rn | head -20
-  ```
-- [ ] Check for warnings that may indicate emerging issues:
-  ```bash
-  grep "WARNING" logs/*.log | sort | uniq -c | sort -rn | head -10
-  ```
+- [ ] Review application logs in CloudWatch:
+  - AWS Console → CloudWatch → Log groups → `langchain-agent`
+  - Filter by `level = "ERROR"` for recurring errors
+  - Filter by `level = "WARNING"` for emerging issues
 - [ ] Review Discord alert history for patterns (same alert firing repeatedly)
 
 ---
@@ -70,6 +67,7 @@ Run this checklist during the scheduled weekly maintenance window.
   VACUUM ANALYZE ingestion_logs;
   VACUUM ANALYZE documents;
   VACUUM ANALYZE document_chunks;
+  VACUUM ANALYZE ai_decisions;
   ```
 
 ---

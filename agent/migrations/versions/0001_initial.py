@@ -138,6 +138,62 @@ def upgrade() -> None:
         [sa.text("processed_at DESC")],
     )
 
+    # ── ai_decisions ──────────────────────────────────────────────────
+    op.create_table(
+        "ai_decisions",
+        sa.Column(
+            "run_id", sa.Text(), nullable=False,
+            comment="LangSmith run ID — primary key",
+        ),
+        sa.Column("agent_type", sa.Text(), nullable=False),
+        sa.Column("query_preview", sa.Text(), nullable=False),
+        sa.Column("query_hash", sa.String(50), nullable=False),
+        sa.Column("tools_used", sa.JSON(), nullable=False, server_default=sa.text("'[]'::jsonb")),
+        sa.Column("chain_length", sa.Integer(), nullable=False, server_default=sa.text("0")),
+        sa.Column("chain_tools", sa.JSON(), nullable=False, server_default=sa.text("'[]'::jsonb")),
+        sa.Column("decision_quality", sa.Text(), nullable=False, server_default=sa.text("'suboptimal'")),
+        sa.Column(
+            "timestamp", sa.DateTime(), nullable=False,
+            server_default=sa.text("NOW()"),
+        ),
+        sa.Column("model_used", sa.Text(), nullable=False),
+        sa.Column("top_k", sa.Integer(), nullable=False, server_default=sa.text("5")),
+        sa.Column("temperature", sa.Float(), nullable=False, server_default=sa.text("0.7")),
+        sa.Column("latency_ms", sa.Float(), nullable=False),
+        sa.Column("reasoning_summary", sa.Text(), nullable=True),
+        sa.Column("tool_selection_rationale", sa.Text(), nullable=True),
+        sa.Column("user_feedback", sa.JSON(), nullable=True),
+        sa.CheckConstraint(
+            "decision_quality IN ('optimal', 'suboptimal', 'poor')",
+            name="valid_decision_quality",
+        ),
+        sa.CheckConstraint("chain_length >= 0", name="valid_chain_length"),
+        sa.CheckConstraint("top_k >= 0", name="valid_top_k"),
+        sa.CheckConstraint("latency_ms >= 0", name="valid_latency"),
+        sa.PrimaryKeyConstraint("run_id"),
+    )
+
+    op.create_index(
+        "idx_ai_decisions_timestamp",
+        "ai_decisions",
+        [sa.text("timestamp DESC")],
+    )
+    op.create_index(
+        "idx_ai_decisions_quality",
+        "ai_decisions",
+        ["decision_quality"],
+    )
+    op.create_index(
+        "idx_ai_decisions_agent_type",
+        "ai_decisions",
+        ["agent_type"],
+    )
+    op.create_index(
+        "idx_ai_decisions_query_hash",
+        "ai_decisions",
+        ["query_hash"],
+    )
+
     # ── Triggers ─────────────────────────────────────────────────────
     op.execute("""
         CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -163,14 +219,17 @@ def upgrade() -> None:
         "GRANT SELECT, INSERT, UPDATE, DELETE ON document_chunks TO authenticated"
     )
     op.execute("GRANT SELECT, INSERT, UPDATE ON ingestion_logs TO authenticated")
+    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON ai_decisions TO authenticated")
     # Grant to anon (anonymous users via Supabase client)
     op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON documents TO anon")
     op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON document_chunks TO anon")
     op.execute("GRANT SELECT, INSERT, UPDATE ON ingestion_logs TO anon")
+    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON ai_decisions TO anon")
     # Grant to public (all roles, fallback)
     op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON documents TO public")
     op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON document_chunks TO public")
     op.execute("GRANT SELECT, INSERT, UPDATE ON ingestion_logs TO public")
+    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON ai_decisions TO public")
 
     # ── search_similar_chunks function ───────────────────────────────
     op.execute("""
@@ -193,6 +252,12 @@ def upgrade() -> None:
         LANGUAGE plpgsql STABLE
         AS $$
         BEGIN
+            -- Increase IVFFlat probes for better recall on small datasets.
+            -- With lists=100 and default probes=1, zero rows may be returned
+            -- when the table has few entries. 10 probes is a safe default
+            -- that works well from 2 to 100K+ rows.
+            PERFORM set_config('ivfflat.probes', '10', TRUE);
+
             IF latest_only THEN
                 RETURN QUERY
                 WITH latest_docs AS (
@@ -244,5 +309,6 @@ def downgrade() -> None:
     op.execute("DROP TRIGGER IF EXISTS update_documents_updated_at ON documents")
     op.execute("DROP FUNCTION IF EXISTS update_updated_at_column()")
     op.drop_table("ingestion_logs")
+    op.drop_table("ai_decisions")
     op.drop_table("document_chunks")
     op.drop_table("documents")

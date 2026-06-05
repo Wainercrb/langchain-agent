@@ -15,7 +15,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 from config import settings
-from infrastructure.logging import logger
+from loggers import logger
 
 db_direct_url = settings.supabase_direct_url
 
